@@ -1,0 +1,29 @@
+# --- Secrets: never commit any of these (CLAUDE.md §8) ---
+local.properties
+keystore.properties
+*.jks
+*.keystore
+secrets.properties
+# The Notion integration token is stored encrypted on-device and must never reach the repo.
+
+# --- Gradle / build output ---
+.gradle/
+build/
+captures/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+release/
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.kotlin/
+
+# --- OS ---
+.DS_Store
+Thumbs.db

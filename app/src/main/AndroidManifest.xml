@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      No permissions are declared yet. INTERNET arrives in M4.2, for Notion sync and
+      nothing else (CLAUDE.md §8). v1 declares no POST_NOTIFICATIONS — reminders are
+      deferred post-v1 (ADR-009).
+    -->
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MyHabitApp">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

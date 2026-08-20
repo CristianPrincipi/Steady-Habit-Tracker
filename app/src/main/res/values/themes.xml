@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A deliberately minimal launch theme. The app's real theme is Compose-side and is
+      built in M2 from docs/tokens.md; this exists only so the window has a background
+      before the first frame. It uses a platform parent so that no new dependency is
+      pulled in for XML theming. v1 is dark-only (ADR-009), hence the dark parent.
+    -->
+    <style name="Theme.MyHabitApp" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

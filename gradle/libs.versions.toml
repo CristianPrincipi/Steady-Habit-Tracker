@@ -1,0 +1,32 @@
+# Every version here was resolved from a live repository on 2026-08-20, never from memory.
+# See CLAUDE.md §4 ("Version numbers") and docs/decisions.md ADR-011.
+#
+#   Gradle 9.7.1   services.gradle.org/versions/current
+#   AGP    9.3.1   dl.google.com/dl/android/maven2/.../gradle/maven-metadata.xml
+#   Kotlin 2.2.10  the KGP version AGP 9.3.1 itself depends on — built-in Kotlin (ADR-011)
+#
+# M1.2 completes this catalog with the rest of the stack from CLAUDE.md §4.
+
+[versions]
+agp = "9.3.1"
+kotlin = "2.2.10"
+androidxCore = "1.19.0"
+androidxLifecycle = "2.11.0"
+androidxActivity = "1.13.0"
+composeBom = "2026.08.00"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidxCore" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidxLifecycle" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidxActivity" }
+
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
