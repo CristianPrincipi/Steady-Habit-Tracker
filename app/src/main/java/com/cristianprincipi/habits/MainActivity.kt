@@ -3,6 +3,7 @@ package com.cristianprincipi.habits
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -14,15 +15,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Bootstrap entry point.
  *
- * Everything here is scaffolding for M1.1 and is replaced later: Hilt's `@AndroidEntryPoint`
- * and `enableEdgeToEdge()` arrive in M1.9, `HabitsTheme` in M2.4, and the navigation host in M5.
+ * The placeholder body is still scaffolding: `HabitsTheme` replaces `BootstrapTheme` in M2.4,
+ * and the navigation host replaces the placeholder in M5.
  */
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super.onCreate, so the decor fitting is settled before any view exists.
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
             BootstrapTheme {
