@@ -104,6 +104,8 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
+    // Room's processor must run for the androidTest source set too — see RoomToolchainProbe.
+    kspAndroidTest(libs.androidx.room.compiler)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 
