@@ -104,6 +104,11 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
+    // Declared explicitly to OVERRIDE the espresso 3.5.0 / runner 1.5.0 that Compose UI test pulls
+    // in transitively. Espresso 3.5.0 reflects on InputManager.getInstance(), which no longer
+    // exists on API 37 — every Compose UI test dies at onIdle without this. See ADR-018.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.espresso.core)
     // Room's processor must run for the androidTest source set too — see RoomToolchainProbe.
     kspAndroidTest(libs.androidx.room.compiler)
     androidTestImplementation(platform(libs.androidx.compose.bom))

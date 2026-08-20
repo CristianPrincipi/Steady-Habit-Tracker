@@ -1,7 +1,9 @@
 package com.cristianprincipi.habits
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
@@ -26,8 +28,16 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Before super.onCreate, so the decor fitting is settled before any view exists.
-        enableEdgeToEdge()
+        // Both bars are forced dark rather than left to `enableEdgeToEdge()`'s default, which
+        // follows the SYSTEM light/dark setting. v1 is dark-only regardless of that setting
+        // (ADR-009), so the default produced dark status-bar icons on our dark background —
+        // effectively invisible — while the nav bar picked the light treatment. Revisit only if a
+        // real light theme ever ships.
+        // Called before super.onCreate, so decor fitting is settled before any view exists.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         setContent {
             BootstrapTheme {
