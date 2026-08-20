@@ -1,0 +1,33 @@
+# Shared formatting rules. ktlint reads this file directly — it is the ktlint configuration,
+# not a separate IDE-only convenience. Android Studio honours it too, so the IDE and
+# `./gradlew ktlintCheck` agree by construction.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+max_line_length = 120
+
+# Compose composables are PascalCase by Compose convention. Without this, ktlint's function-naming
+# rule fires on every single one. Kept in step with detekt's matching FunctionNaming override.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# Trailing commas keep diffs to one line when a parameter is added — worth having on by default
+# in a codebase whose composables grow parameter lists constantly.
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+[*.{yml,yaml,json,xml,toml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[gradlew.bat]
+end_of_line = crlf

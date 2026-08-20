@@ -1,0 +1,47 @@
+# detekt configuration for My Habit App.
+#
+# This file lists ONLY the deviations from detekt's own defaults. The build sets
+# `buildUponDefaultConfig = true`, so everything absent here keeps detekt's default. The full
+# generated default is ~800 lines; committing it verbatim would bury the handful of choices that
+# are actually ours behind hundreds of lines nobody has read.
+#
+# `build.maxIssues` stays at its default of 0 — any finding fails the build. That is the point of
+# the gate in CLAUDE.md §7.
+#
+# Almost every override below exists for the same reason: Compose composables break the naming and
+# size conventions detekt was written for. They are PascalCase functions that legitimately take
+# many parameters and run long. None of these relax a rule for ordinary Kotlin.
+
+complexity:
+  LongMethod:
+    # A screen-level composable is one long declarative tree, not a procedure with 60 lines of
+    # branching. Splitting it to satisfy a line count makes it harder to read, not easier.
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    # A stateless composable takes its whole state plus one lambda per event — CLAUDE.md §6
+    # requires exactly that shape ("data down, events up"), so the count is by design.
+    ignoreAnnotated: ['Composable']
+
+naming:
+  FunctionNaming:
+    # Composables are PascalCase by Compose convention and by Google's own API guidelines.
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    # CLAUDE.md §6 bans raw values in composables and sends them to the design system instead —
+    # so core/designsystem/theme is precisely where the literal numbers are SUPPOSED to live.
+    # Everything outside it stays covered.
+    excludes:
+      - '**/test/**'
+      - '**/androidTest/**'
+      - '**/core/designsystem/theme/**'
+      - '**/*.kts'
+  MaxLineLength:
+    # ktlint owns line length (see .editorconfig). Two tools reporting the same violation is noise,
+    # and only one of them can fix it with `ktlintFormat`.
+    active: false
+  UnusedPrivateMember:
+    # @Preview functions are private and never called by anything — that is what makes them previews.
+    # CLAUDE.md §6 requires one on every reusable composable, so this would fire constantly.
+    ignoreAnnotated: ['Preview', 'PreviewLightDark', 'Composable']

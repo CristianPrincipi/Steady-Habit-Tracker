@@ -33,6 +33,10 @@ navigation = "2.9.8"
 coroutines = "1.11.0"
 serializationJson = "1.11.0"
 
+detekt = "1.23.8"
+ktlint = "1.8.0"
+ktlintGradle = "14.2.0"
+
 junit = "4.13.2"
 turbine = "1.2.1"
 mockk = "1.14.11"
@@ -82,3 +86,5 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
