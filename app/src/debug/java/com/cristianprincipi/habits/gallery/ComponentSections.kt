@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.gallery
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -136,14 +137,23 @@ private fun StaticWeek(
 @Composable
 fun DotGridSection() {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-        GalleryLabel("Month — completed, incomplete and future, ragged last row")
-        MonthDotGrid(days = GalleryMonth, habitColor = HabitsTheme.colors.habit.blue)
+        GalleryLabel(
+            "Month — completed, incomplete and future, ragged last row. A cell is width ÷ 7, so " +
+                "all three below are drawn at one Month card's width",
+        )
+        AtMonthCardWidth {
+            MonthDotGrid(days = GalleryMonth, habitColor = HabitsTheme.colors.habit.blue)
+        }
 
         GalleryLabel("Month — a single day, the first day a habit exists")
-        MonthDotGrid(days = listOf(DayStatus.COMPLETED), habitColor = HabitsTheme.colors.habit.green)
+        AtMonthCardWidth {
+            MonthDotGrid(days = listOf(DayStatus.COMPLETED), habitColor = HabitsTheme.colors.habit.green)
+        }
 
         GalleryLabel("Month — empty, which must not divide by zero")
-        MonthDotGrid(days = emptyList(), habitColor = HabitsTheme.colors.habit.orange)
+        AtMonthCardWidth {
+            MonthDotGrid(days = emptyList(), habitColor = HabitsTheme.colors.habit.orange)
+        }
 
         GalleryLabel("Year at 4dp — the Year card. Scrolls, and starts at today")
         YearDotGrid(days = GalleryYear, habitColor = HabitsTheme.colors.habit.orange, dotSize = Sizing.yearDotSmall)
@@ -346,9 +356,23 @@ private val GalleryYear =
 private val MONTHS = listOf("August 2026", "September 2026", "October 2026", "November 2026")
 
 private const val SEVEN = 7
+private const val MONTH_CARD_FRACTION = 0.5f
 private const val TODAY = 4
 private const val FIVE = 5
 private const val THIRTY_ONE = 31
 private const val TWENTY_ONE = 21
 private const val YEAR = 365
 private const val STARTED = 60
+
+/**
+ * Half the gallery's width, which is roughly what the Month view's two-across layout gives a card.
+ *
+ * A `MonthDotGrid` sizes its cells at width ÷ 7, so handed the whole screen it draws 50dp squares —
+ * a magnification of the component rather than a specimen of it. The Month cards further down show
+ * the same grid in its real container; these three exist for the data cases, and have to be the
+ * right size to be worth comparing against the design.
+ */
+@Composable
+private fun AtMonthCardWidth(content: @Composable () -> Unit) {
+    Box(modifier = Modifier.fillMaxWidth(MONTH_CARD_FRACTION)) { content() }
+}
