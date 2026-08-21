@@ -14,6 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.designsystem.icon.Lucide
+import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
+import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -26,8 +29,8 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * the tile does not move.
  *
  * @param icon supplied by the caller so the icon set can change without touching this signature —
- *   M2.6 fills these with Lucide's `Hash`, `Percent`, `Flame` and `Trophy` (ADR-024). The slot is
- *   expected to draw at [Sizing.checkGlyph] in [habitColor].
+ *   the four are Lucide's `Hash`, `Percent`, `Flame` and `Trophy` (ADR-024). The slot is expected
+ *   to draw at [Sizing.iconSmall] in [habitColor]; [StatTileIcon] does exactly that.
  */
 @Composable
 fun StatTile(
@@ -63,6 +66,20 @@ fun StatTile(
     }
 }
 
+/** The icon slot filled the way every stat tile fills it: one glyph, 13dp, in the habit's colour. */
+@Composable
+fun StatTileIcon(
+    glyph: LucideGlyph,
+    habitColor: Color,
+) {
+    LucideIcon(
+        glyph = glyph,
+        contentDescription = null,
+        modifier = Modifier.size(Sizing.iconSmall),
+        tint = habitColor,
+    )
+}
+
 @Preview(backgroundColor = 0xFF111113, showBackground = true, widthDp = 360)
 @Composable
 private fun StatTilePreview() {
@@ -71,12 +88,14 @@ private fun StatTilePreview() {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
                 StatTile(
                     label = "Completed days",
+                    icon = { StatTileIcon(Lucide.Hash, HabitsTheme.colors.habit.purple) },
                     value = "111",
                     habitColor = HabitsTheme.colors.habit.purple,
                     modifier = Modifier.weight(1f),
                 )
                 StatTile(
                     label = "Completion rate",
+                    icon = { StatTileIcon(Lucide.Percent, HabitsTheme.colors.habit.purple) },
                     value = "84%",
                     habitColor = HabitsTheme.colors.habit.purple,
                     modifier = Modifier.weight(1f),
@@ -85,6 +104,7 @@ private fun StatTilePreview() {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
                 StatTile(
                     label = "Current streak",
+                    icon = { StatTileIcon(Lucide.Flame, HabitsTheme.colors.habit.purple) },
                     value = "111",
                     habitColor = HabitsTheme.colors.habit.purple,
                     numeralStyle = NumeralStyle.MONO,
@@ -92,6 +112,7 @@ private fun StatTilePreview() {
                 )
                 StatTile(
                     label = "Best streak",
+                    icon = { StatTileIcon(Lucide.Trophy, HabitsTheme.colors.habit.purple) },
                     value = "84%",
                     habitColor = HabitsTheme.colors.habit.purple,
                     numeralStyle = NumeralStyle.MONO,

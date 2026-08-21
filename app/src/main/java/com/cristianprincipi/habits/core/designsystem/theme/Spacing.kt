@@ -122,16 +122,20 @@ object Sizing {
     /** `box-shadow: 0 0 0 1.5px` — the ring the design puts around today's week pill. */
     val todayRing: Dp = 1.5.dp
 
-    /** `stroke-width: 3` at 13px — the check inside a completed week pill. */
-    val checkStroke: Dp = 3.dp
+    // --- Icon sizes, docs/tokens.md §5 -------------------------------------------------------
+    //
+    // A three-step ladder rather than one name per role: the design draws icons at exactly three
+    // sizes, and naming them by size keeps a glyph from acquiring a second name the day it is
+    // reused. The STROKE widths that go with them are not dp and live in `LucideStroke`.
 
-    /**
-     * The 13dp glyph box shared by the week pill's check and the four stat-tile icons.
-     *
-     * The first of `docs/tokens.md §5`'s icon sizes to be needed. M2.6 adds the rest — 22dp for the
-     * bottom nav, 18dp for `+` and the chevrons — when it builds the Lucide set (ADR-024).
-     */
-    val checkGlyph: Dp = 13.dp
+    /** The four stat-tile icons, and the check inside a completed week pill. */
+    val iconSmall: Dp = 13.dp
+
+    /** The header `+` button, and the Month/Week nav chevrons. */
+    val iconMedium: Dp = 18.dp
+
+    /** Every bottom-nav item. */
+    val iconLarge: Dp = 22.dp
 
     /** Android's minimum interactive size. Not from the prototype — the web mock has no touch. */
     val minimumTouchTarget: Dp = 48.dp

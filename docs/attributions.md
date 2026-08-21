@@ -65,7 +65,17 @@ rejected, and why "Material Symbols are already available" turned out to be fals
 
 | Asset | Licence | Source |
 | --- | --- | --- |
-| `res/drawable/ic_*.xml` (13 icons) | ISC | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) |
+| `core/designsystem/icon/LucideGlyphs.kt` (13 icons) | ISC | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) |
+
+**Kotlin, not `res/drawable`** — ADR-025. The bottom nav draws the same five glyphs at two stroke
+weights, which a vector drawable cannot do without duplicating every file, so the path data is stored
+as constants and the `ImageVector` is built with the stroke as a parameter. The path strings are the
+`d` attributes of the upstream SVGs verbatim; `rect`, `circle` and `line` elements were converted to
+path data mechanically, since neither an `ImageVector` nor a vector drawable understands them.
+
+Two of the names in `docs/tokens.md §5` no longer exist upstream: `align-justify` is now
+`text-align-justify`, and `bar-chart-2` is now `chart-no-axes-column`. Both are pure renames per
+Lucide's own alias metadata, so the geometry is unchanged.
 
 > Copyright (c) 2026 Lucide Icons and Contributors
 >
@@ -76,9 +86,9 @@ and permission notice appear in all copies. It therefore ships inside the APK at
 `assets/licences/Lucide-ISC.txt`, for the same reason the font licences do — see the note under
 **What the OFL requires** about `isShrinkResources`.
 
-**This entry is deliberately ahead of the drawables.** The licence is committed and recorded at M2.5;
-the icons it covers arrive at M2.6. Recording it first is what stops it being discovered at release.
-`Plan.md` M11.8 (the About screen) is where all three licences surface to the user.
+The licence was committed and recorded at M2.5, ahead of the icons it covers, which landed at M2.6 —
+recording it first is what stopped it being discovered at release. `Plan.md` M11.8 (the About screen)
+is where all three licences surface to the user.
 
 ---
 

@@ -1,6 +1,5 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -14,15 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.designsystem.icon.Lucide
+import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 
@@ -100,43 +97,20 @@ private fun ChevronButton(
                 ).pressScale(interactionSource, ARROW_PRESSED_SCALE),
         contentAlignment = Alignment.Center,
     ) {
-        // The drawn box stays 32dp — docs/tokens.md §4.4 keeps the visual size and grows only the
-        // target around it.
-        Canvas(modifier = Modifier.size(Sizing.navArrowButton)) {
-            chevron(pointsLeft = pointsLeft, color = tint, strokeWidth = CHEVRON_STROKE.toPx())
-        }
+        // 18dp of glyph inside a 32dp button inside a 48dp target — docs/tokens.md §4.4 and §5.
+        // Three sizes for one arrow looks fussy written down and is exactly what the design does:
+        // the button is the visual weight, the glyph is smaller than it, and the target is bigger.
+        LucideIcon(
+            glyph = if (pointsLeft) Lucide.ChevronLeft else Lucide.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(Sizing.iconMedium),
+            tint = tint,
+        )
     }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.chevron(
-    pointsLeft: Boolean,
-    color: Color,
-    strokeWidth: Float,
-) {
-    val centreX = size.width / 2f
-    val centreY = size.height / 2f
-    val reach = size.minDimension * CHEVRON_REACH
-    val tipX = if (pointsLeft) centreX - reach / 2f else centreX + reach / 2f
-    val backX = if (pointsLeft) centreX + reach / 2f else centreX - reach / 2f
-
-    val stroke = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    val path =
-        androidx.compose.ui.graphics.Path().apply {
-            moveTo(backX, centreY - reach)
-            lineTo(tipX, centreY)
-            lineTo(backX, centreY + reach)
-        }
-    drawPath(path = path, color = color, style = stroke)
 }
 
 /** `active:scale-90` on both arrows — `docs/tokens.md §6`. */
 private const val ARROW_PRESSED_SCALE = 0.90f
-
-/** Lucide draws its chevrons at stroke 2 on a 24px grid; scaled to an 18px glyph that is 1.5. */
-private val CHEVRON_STROKE = Sizing.todayRing
-
-/** How far the chevron reaches from its centre, as a fraction of the 32dp box. */
-private const val CHEVRON_REACH = 0.16f
 
 @Preview(backgroundColor = 0xFF111113, showBackground = true)
 @Composable
