@@ -174,6 +174,10 @@ data class HabitsTextStyles(
 /**
  * The extended styles that accompany [HabitsTypography].
  *
+ * There is no light counterpart and there never will be: a `TextStyle` here carries size, weight,
+ * tracking and family, and no colour — so unlike the palette, type does not vary by theme. Colour
+ * arrives at the call site from `MaterialTheme.colorScheme` or `HabitsTheme.colors`.
+ *
  * **On the two numeric styles.** `docs/tokens.md §2.3` asks for tabular figures so digits stop
  * jittering as a value changes, and the prototype sets `font-variant-numeric: tabular-nums` to get
  * them. That does nothing here, and it does nothing in the prototype either: DM Sans 4.004 ships
@@ -187,7 +191,7 @@ data class HabitsTextStyles(
  * DM Mono's digits are all 600 units wide — but swapping a stat value to monospace is a visible
  * design change and is the user's call, not ours.
  */
-val HabitsDarkTextStyles: HabitsTextStyles =
+val DefaultHabitsTextStyles: HabitsTextStyles =
     HabitsTextStyles(
         eyebrow = sansStyle(10.sp, 14.sp, FontWeight.SemiBold, TrackingWidest),
         eyebrowSmall = sansStyle(9.sp, 12.sp, FontWeight.SemiBold, TrackingWidest),
@@ -212,4 +216,4 @@ private const val TABULAR_FIGURES = "tnum"
  * on a value that cannot change. It defaults to the real styles so a `@Preview` that forgets
  * `HabitsTheme` still renders in DM Sans rather than the platform default.
  */
-val LocalHabitsTextStyles = staticCompositionLocalOf { HabitsDarkTextStyles }
+val LocalHabitsTextStyles = staticCompositionLocalOf { DefaultHabitsTextStyles }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The one colour that cannot live in Color.kt.
+
+      A window background is painted by the platform before any Compose frame exists, so it has to
+      be an XML resource. Without it the window inherits the platform parent's #303030, which flashes
+      a lighter grey on cold start and shows behind the app in the recents snapshot.
+
+      This MUST equal HabitsDarkColorScheme.background. ThemeTest asserts exactly that, so the two
+      cannot drift apart silently.
+    -->
+    <color name="window_background">#FF111113</color>
+</resources>

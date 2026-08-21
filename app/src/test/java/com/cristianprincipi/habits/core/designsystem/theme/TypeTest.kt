@@ -82,37 +82,37 @@ class TypeTest {
     @Test
     fun `the screen title is tracked tight and the eyebrows widest`() {
         assertEquals((-0.025).em, HabitsTypography.headlineSmall.letterSpacing)
-        assertEquals(0.1.em, HabitsDarkTextStyles.eyebrow.letterSpacing)
-        assertEquals(0.1.em, HabitsDarkTextStyles.eyebrowSmall.letterSpacing)
-        assertEquals(0.025.em, HabitsDarkTextStyles.weekdayInitial.letterSpacing)
+        assertEquals(0.1.em, DefaultHabitsTextStyles.eyebrow.letterSpacing)
+        assertEquals(0.1.em, DefaultHabitsTextStyles.eyebrowSmall.letterSpacing)
+        assertEquals(0.025.em, DefaultHabitsTextStyles.weekdayInitial.letterSpacing)
     }
 
     @Test
     fun `the extended styles carry the sizes and weights the design asks for`() {
-        assertEquals(10.sp, HabitsDarkTextStyles.eyebrow.fontSize)
-        assertEquals(FontWeight.SemiBold, HabitsDarkTextStyles.eyebrow.fontWeight)
-        assertEquals(9.sp, HabitsDarkTextStyles.eyebrowSmall.fontSize)
-        assertEquals(10.sp, HabitsDarkTextStyles.weekdayInitial.fontSize)
-        assertEquals(FontWeight.Medium, HabitsDarkTextStyles.weekdayInitial.fontWeight)
-        assertEquals(30.sp, HabitsDarkTextStyles.statValue.fontSize)
-        assertEquals(24.sp, HabitsDarkTextStyles.metricValue.fontSize)
+        assertEquals(10.sp, DefaultHabitsTextStyles.eyebrow.fontSize)
+        assertEquals(FontWeight.SemiBold, DefaultHabitsTextStyles.eyebrow.fontWeight)
+        assertEquals(9.sp, DefaultHabitsTextStyles.eyebrowSmall.fontSize)
+        assertEquals(10.sp, DefaultHabitsTextStyles.weekdayInitial.fontSize)
+        assertEquals(FontWeight.Medium, DefaultHabitsTextStyles.weekdayInitial.fontWeight)
+        assertEquals(30.sp, DefaultHabitsTextStyles.statValue.fontSize)
+        assertEquals(24.sp, DefaultHabitsTextStyles.metricValue.fontSize)
     }
 
     @Test
     fun `the numeric styles request tabular figures`() {
         // Requested, and currently inert: DM Sans 4.004 ships no `tnum` feature — see the note on
-        // HabitsDarkTextStyles. This pins the intent so the request is not quietly dropped.
-        assertEquals("tnum", HabitsDarkTextStyles.statValue.fontFeatureSettings)
-        assertEquals("tnum", HabitsDarkTextStyles.metricValue.fontFeatureSettings)
+        // DefaultHabitsTextStyles. This pins the intent so the request is not quietly dropped.
+        assertEquals("tnum", DefaultHabitsTextStyles.statValue.fontFeatureSettings)
+        assertEquals("tnum", DefaultHabitsTextStyles.metricValue.fontFeatureSettings)
         assertNull(HabitsTypography.bodyMedium.fontFeatureSettings)
     }
 
     @Test
     fun `the mono styles are a different family from the sans styles`() {
-        assertNotEquals(HabitsTypography.bodyMedium.fontFamily, HabitsDarkTextStyles.mono.fontFamily)
-        assertEquals(HabitsDarkTextStyles.mono.fontFamily, HabitsDarkTextStyles.monoSmall.fontFamily)
-        assertEquals(14.sp, HabitsDarkTextStyles.mono.fontSize)
-        assertEquals(10.sp, HabitsDarkTextStyles.monoSmall.fontSize)
+        assertNotEquals(HabitsTypography.bodyMedium.fontFamily, DefaultHabitsTextStyles.mono.fontFamily)
+        assertEquals(DefaultHabitsTextStyles.mono.fontFamily, DefaultHabitsTextStyles.monoSmall.fontFamily)
+        assertEquals(14.sp, DefaultHabitsTextStyles.mono.fontSize)
+        assertEquals(10.sp, DefaultHabitsTextStyles.monoSmall.fontSize)
     }
 
     @Test

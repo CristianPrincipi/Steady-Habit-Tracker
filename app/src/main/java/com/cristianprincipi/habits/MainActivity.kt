@@ -11,19 +11,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Bootstrap entry point.
  *
- * The placeholder body is still scaffolding: `HabitsTheme` replaces `BootstrapTheme` in M2.4,
- * and the navigation host replaces the placeholder in M5.
+ * The theme is real as of M2.4. The body is still scaffolding: the navigation host replaces the
+ * placeholder in M5.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         setContent {
-            BootstrapTheme {
+            HabitsTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -50,12 +50,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-/** Placeholder for [com.cristianprincipi.habits.core.designsystem.theme] `HabitsTheme`, built in M2.4. */
-@Composable
-private fun BootstrapTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = darkColorScheme(), content = content)
 }
 
 @Composable
@@ -74,7 +68,7 @@ private fun BootstrapPlaceholder(modifier: Modifier = Modifier) {
 @Preview
 @Composable
 private fun BootstrapPlaceholderPreview() {
-    BootstrapTheme {
+    HabitsTheme {
         BootstrapPlaceholder()
     }
 }

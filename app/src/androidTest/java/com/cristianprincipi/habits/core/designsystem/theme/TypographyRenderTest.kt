@@ -66,14 +66,14 @@ class TypographyRenderTest {
             )
             assertNotEquals(
                 "DM Mono measured identically to the platform fallback",
-                measurer.widthOf(fallbackOf(HabitsDarkTextStyles.mono)),
-                measurer.widthOf(HabitsDarkTextStyles.mono),
+                measurer.widthOf(fallbackOf(DefaultHabitsTextStyles.mono)),
+                measurer.widthOf(DefaultHabitsTextStyles.mono),
             )
             // DM Sans and DM Mono are different designs at the same size; if either had fallen back
             // to the same platform face, these would match each other too.
             assertNotEquals(
                 "DM Sans and DM Mono measured identically",
-                measurer.widthOf(HabitsDarkTextStyles.mono),
+                measurer.widthOf(DefaultHabitsTextStyles.mono),
                 measurer.widthOf(HabitsTypography.bodyMedium),
             )
         }
@@ -105,13 +105,13 @@ class TypographyRenderTest {
 
     private fun extendedStyles(): List<TextStyle> =
         listOf(
-            HabitsDarkTextStyles.eyebrow,
-            HabitsDarkTextStyles.eyebrowSmall,
-            HabitsDarkTextStyles.weekdayInitial,
-            HabitsDarkTextStyles.statValue,
-            HabitsDarkTextStyles.metricValue,
-            HabitsDarkTextStyles.mono,
-            HabitsDarkTextStyles.monoSmall,
+            DefaultHabitsTextStyles.eyebrow,
+            DefaultHabitsTextStyles.eyebrowSmall,
+            DefaultHabitsTextStyles.weekdayInitial,
+            DefaultHabitsTextStyles.statValue,
+            DefaultHabitsTextStyles.metricValue,
+            DefaultHabitsTextStyles.mono,
+            DefaultHabitsTextStyles.monoSmall,
         )
 
     private companion object {
