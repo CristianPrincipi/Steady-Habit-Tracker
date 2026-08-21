@@ -110,4 +110,22 @@ class ThemeTest {
             context.getColor(R.color.window_background),
         )
     }
+
+    @Test
+    fun theLauncherIconColoursMatchThePalette() {
+        // The adaptive icon is XML all the way down and cannot read Color.kt, so its two colours are
+        // resources. Nothing about a wrong launcher icon fails a build or shows up in a screenshot of
+        // the app itself — it is only ever seen on the home screen, where nobody is looking for a bug.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+        assertEquals(
+            HabitsDarkColorScheme.primary.toArgb(),
+            context.getColor(R.color.ic_launcher_accent),
+        )
+        // An alias today. The assertion is what keeps it one.
+        assertEquals(
+            HabitsDarkColorScheme.background.toArgb(),
+            context.getColor(R.color.ic_launcher_background),
+        )
+    }
 }

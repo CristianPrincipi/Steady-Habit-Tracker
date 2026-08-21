@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher mark: nine days of a habit, six of them kept.
+
+  The prototype designs no app icon — it is a web mock in a phone frame — so this is invented,
+  but not from nothing: it is MonthDotGrid, the app's most distinctive component, at 3x3. The
+  staircase rising to the right reads as progress at 48dp, which a checkmark would not have
+  distinguished from every other habit app on the drawer.
+
+  THE SAFE ZONE IS A CIRCLE, NOT A SQUARE, and that is what sizes this mark. An adaptive icon is
+  108x108 with an inner 66x66 nominally guaranteed — but a launcher may mask it to a circle, and a
+  square inscribed in a 66 circle has a side of only 46.7, not 66. A first cut at 60 lost all four
+  corner cells to the circle mask on a Pixel. The grid is now 46 across (12 cell, 5 gap, corner
+  2.5, spanning 31..77), whose 65.1 diagonal fits inside the 66 circle with room for an
+  OEM squircle. The corner ratio is HabitsCorners.monthDot's 3-on-14, scaled.
+
+  The path data below was computed from those four numbers, not drawn. To change the mark,
+  recompute from them rather than nudging coordinates by eye.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- The six kept days, in the app's primary blue. -->
+    <path
+        android:fillColor="@color/ic_launcher_accent"
+        android:pathData="M67.5,31 H74.5 A2.5,2.5 0 0 1 77,33.5 V40.5 A2.5,2.5 0 0 1 74.5,43 H67.5 A2.5,2.5 0 0 1 65,40.5 V33.5 A2.5,2.5 0 0 1 67.5,31 Z M50.5,48 H57.5 A2.5,2.5 0 0 1 60,50.5 V57.5 A2.5,2.5 0 0 1 57.5,60 H50.5 A2.5,2.5 0 0 1 48,57.5 V50.5 A2.5,2.5 0 0 1 50.5,48 Z M67.5,48 H74.5 A2.5,2.5 0 0 1 77,50.5 V57.5 A2.5,2.5 0 0 1 74.5,60 H67.5 A2.5,2.5 0 0 1 65,57.5 V50.5 A2.5,2.5 0 0 1 67.5,48 Z M33.5,65 H40.5 A2.5,2.5 0 0 1 43,67.5 V74.5 A2.5,2.5 0 0 1 40.5,77 H33.5 A2.5,2.5 0 0 1 31,74.5 V67.5 A2.5,2.5 0 0 1 33.5,65 Z M50.5,65 H57.5 A2.5,2.5 0 0 1 60,67.5 V74.5 A2.5,2.5 0 0 1 57.5,77 H50.5 A2.5,2.5 0 0 1 48,74.5 V67.5 A2.5,2.5 0 0 1 50.5,65 Z M67.5,65 H74.5 A2.5,2.5 0 0 1 77,67.5 V74.5 A2.5,2.5 0 0 1 74.5,77 H67.5 A2.5,2.5 0 0 1 65,74.5 V67.5 A2.5,2.5 0 0 1 67.5,65 Z" />
+
+    <!--
+      The three that are not. Same blue, held back — the design's own way of saying "this day,
+      not done" (MonthDotGrid multiplies a tint by an opacity for exactly this).
+
+      The alpha is 0.28, NOT the grid's own 0.045. That value is tuned for a 14dp cell read at
+      arm's length inside a lit card; at launcher size on an unknown wallpaper it is invisible,
+      and three invisible cells make this a six-cell mark with a hole in it.
+    -->
+    <path
+        android:fillAlpha="0.28"
+        android:fillColor="@color/ic_launcher_accent"
+        android:pathData="M33.5,31 H40.5 A2.5,2.5 0 0 1 43,33.5 V40.5 A2.5,2.5 0 0 1 40.5,43 H33.5 A2.5,2.5 0 0 1 31,40.5 V33.5 A2.5,2.5 0 0 1 33.5,31 Z M50.5,31 H57.5 A2.5,2.5 0 0 1 60,33.5 V40.5 A2.5,2.5 0 0 1 57.5,43 H50.5 A2.5,2.5 0 0 1 48,40.5 V33.5 A2.5,2.5 0 0 1 50.5,31 Z M33.5,48 H40.5 A2.5,2.5 0 0 1 43,50.5 V57.5 A2.5,2.5 0 0 1 40.5,60 H33.5 A2.5,2.5 0 0 1 31,57.5 V50.5 A2.5,2.5 0 0 1 33.5,48 Z" />
+
+</vector>

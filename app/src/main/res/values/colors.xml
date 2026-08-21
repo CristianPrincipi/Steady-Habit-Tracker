@@ -11,4 +11,17 @@
       cannot drift apart silently.
     -->
     <color name="window_background">#FF111113</color>
+
+    <!--
+      The launcher icon's two colours. Same problem as above: a resource XML cannot read Color.kt.
+
+      The background is an alias, not a second copy of the hex — the icon's ground IS the app's
+      background, and aliasing means it cannot drift from window_background or from Compose.
+
+      The accent has to be a literal, because Primary lives only in Kotlin. ThemeTest asserts it
+      equals HabitsDarkColorScheme.primary, so if the palette ever moves, a test fails rather than
+      the launcher quietly showing last season's blue.
+    -->
+    <color name="ic_launcher_background">@color/window_background</color>
+    <color name="ic_launcher_accent">#FF4A9EFF</color>
 </resources>

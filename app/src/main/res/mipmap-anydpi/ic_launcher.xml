@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  There is no mipmap-hdpi/xhdpi/… beside this file, and no -v26 qualifier on the folder either.
+
+  minSdk is 26, which is the API adaptive icons arrived in. So every device that can install this
+  app can read this file: the raster fallbacks the Studio template ships for older launchers would
+  be five densities of dead weight, and the template's mipmap-anydpi-v26 folder would be a version
+  qualifier for a version below our floor — Android Lint flags exactly that as ObsoleteSdkInt. Both
+  are dividends of the minSdk 26 decision.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
+</adaptive-icon>
