@@ -2,3 +2,8 @@
 *.bat text eol=crlf
 *.jar binary
 *.png binary
+*.ttf binary
+
+# Bundled licence texts are redistributed verbatim, so git must not rewrite their line
+# endings — docs/attributions.md claims they are byte-for-byte the upstream OFL.txt files.
+app/src/main/assets/licences/** -text
