@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      The design system gallery, in the debug source set only.
+
+      A `BuildConfig.DEBUG` branch inside the main source set would have compiled the gallery into
+      the release APK and relied on the shrinker to remove it. This cannot: the release variant
+      never sees these sources, so there is nothing to strip and nothing to get wrong.
+
+      It gets its own launcher entry, which means a second icon beside the app in debug builds.
+      That is deliberate — the gallery has to be reachable without a navigation route, and M5 owns
+      the app's real navigation.
+    -->
+    <application>
+        <activity
+            android:name=".gallery.GalleryActivity"
+            android:exported="true"
+            android:label="@string/gallery_launcher_label"
+            android:theme="@style/Theme.MyHabitApp">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

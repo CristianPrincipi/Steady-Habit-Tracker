@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Debug-only strings. This file lives in the debug source set, so nothing here reaches a
+      release build or a translator.
+
+      The gallery's own labels are literals in Kotlin rather than resources, which is a deliberate
+      exception to CLAUDE.md §6 and the only one in the project: they are developer copy naming
+      styles and sizes ("labelSmall · 10sp/600"), not user-facing text, they will never be
+      localised, and putting sixty of them here would bury the app's real strings.
+    -->
+    <string name="gallery_launcher_label">Habits Gallery</string>
+</resources>
