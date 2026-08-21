@@ -3,11 +3,11 @@ package com.cristianprincipi.habits.domain.model
 /**
  * How many days in a row, now and at best.
  *
- * Both stat tiles in the design read from this (`docs/design-spec.md \u00a75`). It is a value, not a
+ * Both stat tiles in the design read from this (`docs/design-spec.md \§5`). It is a value, not a
  * calculation: `CalculateStreak` in `domain/usecase` produces it (M3.9) and is where the rules live.
  *
  * **Any missed day breaks a streak.** Schedules are deferred post-v1, so every habit is daily and
- * there is no "gap on a non-scheduled day" case (`CLAUDE.md \u00a71`). Do not add one back without the
+ * there is no "gap on a non-scheduled day" case (`CLAUDE.md \§1`). Do not add one back without the
  * schedule model that would justify it.
  */
 data class Streak(
@@ -22,7 +22,7 @@ data class Streak(
     }
 
     companion object {
-        /** A habit with no completions at all \u2014 the first-run and never-started case. */
+        /** A habit with no completions at all \— the first-run and never-started case. */
         val None = Streak(current = 0, best = 0)
     }
 }

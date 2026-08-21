@@ -12,7 +12,7 @@ package com.cristianprincipi.habits.domain.model
  * design system. The UI resolves it against `HabitsTheme.colors.habit.*`.
  *
  * These four are the whole palette a habit can be assigned. The design's other two colours are
- * spoken for: amber is `chart-5` and grey is the Settings tab (`docs/tokens.md \u00a71`).
+ * spoken for: amber is `chart-5` and grey is the Settings tab (`docs/tokens.md \§1`).
  */
 enum class HabitColor {
     BLUE,
