@@ -57,6 +57,31 @@ satisfies the OFL.
 
 ---
 
+## Icons
+
+All thirteen icons in the app come from **Lucide**, the set the prototype itself uses
+(`docs/tokens.md §5`). One family, deliberately — see ADR-024 for why a Lucide/Material mix was
+rejected, and why "Material Symbols are already available" turned out to be false.
+
+| Asset | Licence | Source |
+| --- | --- | --- |
+| `res/drawable/ic_*.xml` (13 icons) | ISC | [lucide-icons/lucide](https://github.com/lucide-icons/lucide) |
+
+> Copyright (c) 2026 Lucide Icons and Contributors
+>
+> Portions are held by Cole Bemis as part of Feather, from which Lucide is forked.
+
+The ISC licence permits use, copying, modification and redistribution provided the copyright notice
+and permission notice appear in all copies. It therefore ships inside the APK at
+`assets/licences/Lucide-ISC.txt`, for the same reason the font licences do — see the note under
+**What the OFL requires** about `isShrinkResources`.
+
+**This entry is deliberately ahead of the drawables.** The licence is committed and recorded at M2.5;
+the icons it covers arrive at M2.6. Recording it first is what stops it being discovered at release.
+`Plan.md` M11.8 (the About screen) is where all three licences surface to the user.
+
+---
+
 ## Images
 
 None yet. The Figma prototype carries four PNGs that `App.tsx` never references; fetching them is
