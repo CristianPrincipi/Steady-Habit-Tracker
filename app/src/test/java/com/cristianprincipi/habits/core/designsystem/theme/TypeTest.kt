@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.core.designsystem.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -94,16 +95,36 @@ class TypeTest {
         assertEquals(9.sp, DefaultHabitsTextStyles.eyebrowSmall.fontSize)
         assertEquals(10.sp, DefaultHabitsTextStyles.weekdayInitial.fontSize)
         assertEquals(FontWeight.Medium, DefaultHabitsTextStyles.weekdayInitial.fontWeight)
-        assertEquals(30.sp, DefaultHabitsTextStyles.statValue.fontSize)
-        assertEquals(24.sp, DefaultHabitsTextStyles.metricValue.fontSize)
+        assertEquals(30.sp, DefaultHabitsTextStyles.sansNumerals.statValue.fontSize)
+        assertEquals(24.sp, DefaultHabitsTextStyles.sansNumerals.metricValue.fontSize)
+    }
+
+    @Test
+    fun `the mono numerals are a stable-width alternative capped below the design's weight`() {
+        // DM Mono has no bold. The design specifies 700 for both numbers, so the tabular option
+        // cannot also be the specified weight — see ADR-021. Medium is the honest maximum, and
+        // FontSynthesis.None stops Compose faking the difference by smearing the glyphs.
+        val mono = DefaultHabitsTextStyles.monoNumerals
+
+        assertEquals(FontWeight.Medium, mono.statValue.fontWeight)
+        assertEquals(FontSynthesis.None, mono.statValue.fontSynthesis)
+        assertEquals(DefaultHabitsTextStyles.mono.fontFamily, mono.statValue.fontFamily)
+        assertNotEquals(
+            DefaultHabitsTextStyles.sansNumerals.statValue.fontFamily,
+            mono.statValue.fontFamily,
+        )
+        // Same size in both variants: only the family and weight differ, so the comparison at M2.8
+        // is about the typeface and nothing else.
+        assertEquals(DefaultHabitsTextStyles.sansNumerals.statValue.fontSize, mono.statValue.fontSize)
+        assertEquals(DefaultHabitsTextStyles.sansNumerals.metricValue.fontSize, mono.metricValue.fontSize)
     }
 
     @Test
     fun `the numeric styles request tabular figures`() {
         // Requested, and currently inert: DM Sans 4.004 ships no `tnum` feature — see the note on
         // DefaultHabitsTextStyles. This pins the intent so the request is not quietly dropped.
-        assertEquals("tnum", DefaultHabitsTextStyles.statValue.fontFeatureSettings)
-        assertEquals("tnum", DefaultHabitsTextStyles.metricValue.fontFeatureSettings)
+        assertEquals("tnum", DefaultHabitsTextStyles.sansNumerals.statValue.fontFeatureSettings)
+        assertEquals("tnum", DefaultHabitsTextStyles.sansNumerals.metricValue.fontFeatureSettings)
         assertNull(HabitsTypography.bodyMedium.fontFeatureSettings)
     }
 

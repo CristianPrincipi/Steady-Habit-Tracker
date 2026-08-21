@@ -116,6 +116,23 @@ object Sizing {
     /** `w-10 h-10` — the habit icon on a Week or Year card. */
     val habitIconLarge: Dp = 40.dp
 
+    /** `border` — the hairline on every card. Tailwind's default border width. */
+    val hairlineBorder: Dp = 1.dp
+
+    /** `box-shadow: 0 0 0 1.5px` — the ring the design puts around today's week pill. */
+    val todayRing: Dp = 1.5.dp
+
+    /** `stroke-width: 3` at 13px — the check inside a completed week pill. */
+    val checkStroke: Dp = 3.dp
+
+    /**
+     * The 13dp glyph box shared by the week pill's check and the four stat-tile icons.
+     *
+     * The first of `docs/tokens.md §5`'s icon sizes to be needed. M2.6 adds the rest — 22dp for the
+     * bottom nav, 18dp for `+` and the chevrons — when it builds the Lucide set (ADR-024).
+     */
+    val checkGlyph: Dp = 13.dp
+
     /** Android's minimum interactive size. Not from the prototype — the web mock has no touch. */
     val minimumTouchTarget: Dp = 48.dp
 }

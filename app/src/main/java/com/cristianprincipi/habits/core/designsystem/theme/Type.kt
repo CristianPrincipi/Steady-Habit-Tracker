@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontSynthesis
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
@@ -161,14 +162,29 @@ data class HabitsTextStyles(
     val eyebrowSmall: TextStyle,
     /** 10sp/500, `tracking-wide` — the `Mon…Sun` initials above the week pills. */
     val weekdayInitial: TextStyle,
-    /** 30sp/700 — the stat-tile value. */
-    val statValue: TextStyle,
-    /** 24sp/700 — the Year card's completion percentage. */
-    val metricValue: TextStyle,
+    /** The design's own numerals: DM Sans at the specified 700, digits that shift. */
+    val sansNumerals: NumeralStyles,
+    /** The alternative: DM Mono, digits that do not shift, capped at Medium 500. */
+    val monoNumerals: NumeralStyles,
     /** 14sp/400 DM Mono — the integration-token and database-ID fields. */
     val mono: TextStyle,
     /** 10sp/400 DM Mono — the Notion schema property chips. */
     val monoSmall: TextStyle,
+)
+
+/**
+ * The two numbers the design calls out as tabular: a stat-tile value and a completion percentage.
+ *
+ * Grouped so both can exist twice over while the choice between them is open — see
+ * [DefaultHabitsTextStyles] for what that choice actually is, and `Plan.md` M2.7/M2.8 for where it
+ * gets made. Once it is made, one of the two groups is deleted.
+ */
+@Immutable
+data class NumeralStyles(
+    /** 30sp — the stat-tile value, the largest text in the app. */
+    val statValue: TextStyle,
+    /** 24sp — the Year card's completion percentage. */
+    val metricValue: TextStyle,
 )
 
 /**
@@ -186,18 +202,40 @@ data class HabitsTextStyles(
  * binary, not assumed.
  *
  * So the feature is requested anyway and documented as inert: it costs nothing, it states the
- * intent, and it starts working the day the font gains the feature. Until then these values jitter
- * exactly as the prototype's do. [HabitsTextStyles.mono] is the escape hatch if that ever matters —
- * DM Mono's digits are all 600 units wide — but swapping a stat value to monospace is a visible
- * design change and is the user's call, not ours.
+ * intent, and it starts working the day the font gains the feature.
+ *
+ * **Both numeral sets are built, and the choice is the user's to make by eye (M2.8).** The framing
+ * that mattered, and that this file originally got wrong: matching the prototype here reproduces a
+ * *font failure*, not a design decision. `App.tsx` asks for `tabular-nums` on both numbers and
+ * `docs/tokens.md §2.3` says to carry it over — the request was simply ignored by a font that
+ * cannot honour it.
+ *
+ * Neither option is free:
+ *
+ * - [sansNumerals] keeps the specified 700 weight and the design's own typeface; digits shift as
+ *   values change.
+ * - [monoNumerals] holds every digit at 600 units so nothing shifts — but **DM Mono has no bold.**
+ *   The family tops out at Medium 500 while the design specifies 700, so the hero stat value cannot
+ *   be both tabular and bold. The design's "tabular" and its "700" are not jointly satisfiable.
+ *
+ * Worth weighing when judging: both numbers sit in fixed-size containers, so what moves is glyphs
+ * inside a stable box, never the layout around them — and they change about once a day.
  */
 val DefaultHabitsTextStyles: HabitsTextStyles =
     HabitsTextStyles(
         eyebrow = sansStyle(10.sp, 14.sp, FontWeight.SemiBold, TrackingWidest),
         eyebrowSmall = sansStyle(9.sp, 12.sp, FontWeight.SemiBold, TrackingWidest),
         weekdayInitial = sansStyle(10.sp, 14.sp, FontWeight.Medium, TrackingWide),
-        statValue = statValueStyle().copy(fontFeatureSettings = TABULAR_FIGURES),
-        metricValue = sansStyle(24.sp, 32.sp, FontWeight.Bold).copy(fontFeatureSettings = TABULAR_FIGURES),
+        sansNumerals =
+            NumeralStyles(
+                statValue = statValueStyle().copy(fontFeatureSettings = TABULAR_FIGURES),
+                metricValue = sansStyle(24.sp, 32.sp, FontWeight.Bold).copy(fontFeatureSettings = TABULAR_FIGURES),
+            ),
+        monoNumerals =
+            NumeralStyles(
+                statValue = monoNumeralStyle(30.sp, 36.sp),
+                metricValue = monoNumeralStyle(24.sp, 32.sp),
+            ),
         mono = TextStyle(fontFamily = DmMono, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
         monoSmall =
             TextStyle(
@@ -207,6 +245,25 @@ val DefaultHabitsTextStyles: HabitsTextStyles =
                 fontWeight = FontWeight.Normal,
             ),
     )
+
+/**
+ * A numeric value in DM Mono, at the heaviest weight the family actually has.
+ *
+ * [FontWeight.Medium], not the design's 700, and deliberately not `Bold`: asking a family for a
+ * weight it does not contain lets Compose synthesise one by smearing the glyphs, which on a
+ * monospaced face looks worse than simply being lighter than specified. Better to be honestly
+ * 500 than fake 700.
+ */
+private fun monoNumeralStyle(
+    size: TextUnit,
+    lineHeight: TextUnit,
+) = TextStyle(
+    fontFamily = DmMono,
+    fontSize = size,
+    lineHeight = lineHeight,
+    fontWeight = FontWeight.Medium,
+    fontSynthesis = FontSynthesis.None,
+)
 
 /** The OpenType tag CSS `font-variant-numeric: tabular-nums` resolves to. */
 private const val TABULAR_FIGURES = "tnum"

@@ -222,6 +222,34 @@ class TextEmphasis(
     val placeholder: Color = base.copy(alpha = 0.15f)
 }
 
+/**
+ * Per-state opacity for a day cell — `docs/design-spec.md §2`, `§3` and `§4`.
+ *
+ * These stack on top of the [HabitTintAlphas] fill rather than replacing it: an incomplete Month day
+ * is the habit colour at 14.9% alpha, drawn at 30% opacity, for an effective 4.5%. The prototype
+ * expresses that as a hex alpha byte plus a CSS `opacity`, and the two are kept separate here so
+ * each still traces back to its source.
+ *
+ * A plain object rather than part of the composition local, following [Spacing] and [Sizing]: these
+ * are the same in every theme, so there is nothing for a local to vary.
+ */
+object DayOpacity {
+    /** An incomplete day in `MonthDotGrid`. */
+    const val MONTH_INCOMPLETE = 0.30f
+
+    /** A Month day that is in the future, or before the habit started. */
+    const val MONTH_INACTIVE = 0.10f
+
+    /** An incomplete day in `YearDotGrid`. */
+    const val YEAR_INCOMPLETE = 0.28f
+
+    /** A Year day before the habit started. The faintest mark the design draws. */
+    const val YEAR_INACTIVE = 0.06f
+
+    /** A week pill for a day that has not happened yet, complete or not. */
+    const val WEEK_FUTURE = 0.30f
+}
+
 /** Focus affordances — `docs/tokens.md §1.1` (`borderInputFocus`) and `§1.2` (`ring`). */
 @Immutable
 data class FocusColors(
