@@ -31,8 +31,14 @@ interface HabitDao {
     /**
      * Insert or update the habit set from the Notion schema.
      *
-     * Upsert rather than replace, so that [HabitEntity.color] — which exists nowhere but this
-     * device — is not wiped by a sync. Only the mapper decides which columns a pull may overwrite.
+     * Upsert rather than replace, so that a habit's local history is not deleted and re-created —
+     * which would take its completions with it through the cascade.
+     *
+     * **It does not protect [HabitEntity.color].** An upsert writes every column of the row, so an
+     * entity built from the Notion schema with a default colour overwrites whatever the user chose,
+     * and colour exists nowhere but this device. The caller has to read the existing row and carry
+     * the colour forward. That caller is M4's pull path; there is no other, and this is the note
+     * that says so.
      */
     @Upsert
     suspend fun upsert(habits: List<HabitEntity>)
