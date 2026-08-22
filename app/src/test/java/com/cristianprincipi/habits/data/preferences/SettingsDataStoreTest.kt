@@ -2,12 +2,10 @@ package com.cristianprincipi.habits.data.preferences
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
+import com.cristianprincipi.habits.core.testing.FailingDataStore
+import com.cristianprincipi.habits.core.testing.InMemoryDataStore
 import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -101,24 +99,4 @@ class SettingsDataStoreTest {
 
             assertNull(repository.observeLastSyncedAt().first())
         }
-}
-
-/** A [DataStore] that keeps preferences in memory, with none of the file semantics. */
-private class InMemoryDataStore : DataStore<Preferences> {
-    private val state = MutableStateFlow(emptyPreferences())
-
-    override val data: Flow<Preferences> = state
-
-    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
-        transform(state.value).also { state.value = it }
-}
-
-/** A [DataStore] whose reads always fail, for the two paths a real file cannot easily produce. */
-private class FailingDataStore(
-    private val cause: Throwable,
-) : DataStore<Preferences> {
-    override val data: Flow<Preferences> = flow { throw cause }
-
-    override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences =
-        transform(emptyPreferences())
 }
