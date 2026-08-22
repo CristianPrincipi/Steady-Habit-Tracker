@@ -294,10 +294,15 @@ Neither blocks M4.2–M4.8. Both are recorded so nobody later assumes they were 
    burst bucket we would be inventing. Do not hardcode a burst number found in a blog post.
 2. **`in_trash` vs `is_archived` on `PATCH /v1/pages`.** §2.1 says `archived` became `in_trash`
    "across all request parameters and response bodies", but the update-page and query pages also
-   mention `is_archived`. **Resolve this at M4.5, against a real request, if it is ever needed.**
-   It very likely never is: **ADR-036 established that v1 deletes and archives nothing.** `Plan.md`
-   M4.5 lists "archive page" in the client surface — that is now optional, and should not be built
-   speculatively.
+   mention `is_archived`.
+
+   **Half-answered in M4.5, for responses only.** The page object in the live reference carries
+   **both fields, side by side** (§13). So a *read* must consider both, and `NotionPageDto.isGone`
+   is `in_trash || is_archived` rather than betting a pull on which one a given page sets.
+
+   **For requests it stays open, and stays irrelevant.** ADR-036 established that v1 deletes and
+   archives nothing, so no code path writes either field. `Plan.md` M4.5 listed "archive page" in
+   the client surface; it was deliberately **not built**.
 
 ---
 
@@ -313,9 +318,57 @@ explicitly: "`id` may be used in place of name when creating or updating pages."
 object, it states the rule as a positive capability with its rationale (the id is stable across
 renames), and a second source confirmed the keys "are the names or IDs of the property".
 
-**Verify it with one real request at M4.5 anyway.** It is a single call to check, and §9's whole
-design rests on it. If it turns out to be name-only, the mapping stays keyed on `id` regardless —
-only the push path changes, resolving id → current name from the schema it already fetches.
+**Still to be verified with one real request — and M4.5 could not do it.** Verifying it needs the
+user's own token against their own workspace, and `CLAUDE.md` §6 and §8 forbid pointing any
+automated test at the live API. So M4.5 built the write path keyed on `id`, as §9 decided, and the
+confirmation moved to **M4.15**, the manual round trip on a *duplicate* of the user's database. It
+is the first thing that run should check.
+
+If it turns out to be name-only, the mapping stays keyed on `id` regardless — only the push path
+changes, resolving id → current name from the schema it already fetches. `NotionApi.updatePage`
+takes the property keys from its caller precisely so that change would land in one place.
+
+---
+
+## 13. Object shapes, confirmed in M4.5
+
+M4.1 recorded the endpoints, pagination and limits. Writing the client needed the **shapes** of what
+comes back, which were read from the live reference on 2026-08-22 (sources below).
+
+### The data source object has a `title`, not a `name`
+
+`GET /v1/data_sources/{id}` returns `object`, `id`, `properties`, `parent`, `database_parent`,
+`created_time` / `created_by`, `last_edited_time` / `last_edited_by`, `title`, `description`, `icon`,
+`archived`, `in_trash`.
+
+**`title` is an array of rich-text objects, and there is no `name` field.** That matters because the
+`data_sources[]` entries on a *database* object are stubs of exactly `{id, name}` — a plain string.
+Two shapes describing the same thing, so the client models them as two types (`NotionDataSourceDto`
+and `NotionDataSourceRefDto`) rather than one nullable-everything type that cannot say which it is.
+
+### The page object carries both `in_trash` and `is_archived`
+
+Fields: `object`, `id`, `created_time` / `created_by`, `last_edited_time` / `last_edited_by`,
+`in_trash`, `is_archived`, `is_locked`, `url`, `public_url`, `parent`, `properties`, `icon`, `cover`.
+
+This is the half-answer to §10's second open item. See it there.
+
+### The list envelope carries `request_status` everywhere
+
+Both `POST /v1/search` and `POST /v1/data_sources/{id}/query` return
+`{object: "list", type: "page_or_data_source", results, next_cursor, has_more, request_status}`,
+with `request_status` being `{type: "complete" | "incomplete", incomplete_reason}`. That is the same
+envelope §5 describes, and it is why one generic type models every list endpoint.
+
+**Not every response includes it.** The client treats an absent `request_status` as complete —
+"unknown, therefore suspect" would make a pull refuse to finish on any endpoint that omits it.
+
+### What M4.5 did not confirm
+
+The `Notion-Version: 2026-03-11` pin, the endpoint paths and the request bodies are all built from
+this document, and **all of them are still unexercised against the live API.** Every test uses Ktor's
+`MockEngine`, which answers whatever it is told to; a fake cannot notice that a real endpoint moved.
+The first contact with the real API is M4.12, and the first deliberate check of it is M4.15.
 
 ---
 
@@ -337,5 +390,7 @@ All read 2026-08-22.
 - [Create a page](https://developers.notion.com/reference/post-page)
 - [Update page](https://developers.notion.com/reference/patch-page)
 - [Search](https://developers.notion.com/reference/post-search)
+- [Data source object](https://developers.notion.com/reference/data-source) — read 2026-08-22, M4.5
+- [Database object](https://developers.notion.com/reference/database) — read 2026-08-22, M4.5
 - [Authorization](https://developers.notion.com/docs/authorization)
 - [Create an integration](https://developers.notion.com/docs/create-a-notion-integration)
