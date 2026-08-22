@@ -39,6 +39,12 @@ interface HabitDao {
      * and colour exists nowhere but this device. The caller has to read the existing row and carry
      * the colour forward. That caller is M4's pull path; there is no other, and this is the note
      * that says so.
+     *
+     * **It also does not enforce the unique index on [HabitEntity.notionPropertyId]** (ADR-035).
+     * Room catches the constraint failure and falls back to `UPDATE ... WHERE id = ?`; for a new
+     * row that key does not exist, so the update matches nothing and this returns normally having
+     * written nothing. No exception and no return value say so. The pull path has to reject
+     * duplicate property ids before calling this.
      */
     @Upsert
     suspend fun upsert(habits: List<HabitEntity>)

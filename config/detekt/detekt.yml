@@ -32,10 +32,14 @@ style:
     # CLAUDE.md §6 bans raw values in composables and sends them to the design system instead —
     # so core/designsystem/theme is precisely where the literal numbers are SUPPOSED to live.
     # Everything outside it stays covered.
+    # core/ui/preview is the other place literal numbers ARE the content: sample start dates,
+    # keep-rates and an LCG's constants. Naming each one would produce a wall of single-use
+    # constants that says less than the call site it replaced.
     excludes:
       - '**/test/**'
       - '**/androidTest/**'
       - '**/core/designsystem/theme/**'
+      - '**/core/ui/preview/**'
       - '**/*.kts'
   MaxLineLength:
     # ktlint owns line length (see .editorconfig). Two tools reporting the same violation is noise,

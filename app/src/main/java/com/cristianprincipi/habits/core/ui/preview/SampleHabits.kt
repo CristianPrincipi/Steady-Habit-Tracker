@@ -1,0 +1,138 @@
+package com.cristianprincipi.habits.core.ui.preview
+
+import com.cristianprincipi.habits.domain.model.Completion
+import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.HabitId
+import java.time.LocalDate
+
+/**
+ * A realistic habit set with realistic history, for `@Preview`s and for tests.
+ *
+ * **Why this exists.** Every screen from M6 on renders a list of habits with months of completions
+ * behind it, and a preview built from three hand-written completions shows none of the things that
+ * actually go wrong: a ragged month, a streak that breaks mid-week, a habit that started part-way
+ * through the window. Sparse fixtures make previews that look fine and screens that do not.
+ *
+ * **The five habits are the user's real ones**, with their exact property names taken from
+ * `docs/notion-schema.md` §2.3 — which is itself taken from the raw bytes of a Notion export, not
+ * transcribed from a screenshot. Two of the five emoji were misidentified that way once already, and
+ * `Journal` carries a `U+FE0F` variation selector the others do not. They are written here as Kotlin
+ * escapes for the same reason the schema doc gives: a mangled emoji still looks right on screen.
+ *
+ * **Deterministic, and that matters more than it sounds.** The completions come from a seeded
+ * generator rather than `Random`, so a preview renders identically on every recomposition and two
+ * runs of a screenshot test compare equal. A preview that reshuffles itself is a preview nobody can
+ * review a change against.
+ *
+ * Nothing here reads a clock. Callers pass the day the data should end on, so a preview is as
+ * reproducible in a year as it is today.
+ */
+object SampleHabits {
+    /** The day the sample history ends on, when a caller does not name one. */
+    val referenceDate: LocalDate = LocalDate.of(2026, 8, 22)
+
+    /**
+     * The five habits, in the order the Notion schema lists them.
+     *
+     * Their start dates are staggered on purpose: `Focus` begins part-way through the year, so any
+     * preview built from this set exercises `DayState.BEFORE_START` without the caller arranging it.
+     */
+    fun habits(reference: LocalDate = referenceDate): List<Habit> =
+        listOf(
+            sample("read", "📖 Read", HabitColor.BLUE, reference.minusDays(400)),
+            sample("journal", "✒️ Journal", HabitColor.PURPLE, reference.minusDays(400)),
+            sample("quote", "📜 Quote", HabitColor.GREEN, reference.minusDays(260)),
+            sample("diet", "🥕 Diet", HabitColor.ORANGE, reference.minusDays(180)),
+            sample("focus", "🎯 Focus", HabitColor.BLUE, reference.minusDays(95)),
+        )
+
+    /**
+     * Completions for [habits], from each habit's start date up to [reference].
+     *
+     * Each habit gets its own keep-rate, so a screen showing all five shows a believable spread
+     * rather than five identical densities: `Read` is kept most days, `Diet` about half.
+     */
+    fun completions(reference: LocalDate = referenceDate): List<Completion> =
+        habits(reference).flatMap { habit ->
+            val rate = KEEP_RATES.getValue(habit.id.value)
+            generate(habit.id, from = habit.startDate, to = reference, keepRate = rate)
+        }
+
+    /** One habit and its history — for a preview of a single card. */
+    fun habitWithHistory(
+        id: String = "read",
+        reference: LocalDate = referenceDate,
+    ): Pair<Habit, List<Completion>> {
+        val habit = habits(reference).first { it.id.value == id }
+        return habit to generate(habit.id, habit.startDate, reference, KEEP_RATES.getValue(id))
+    }
+
+    /**
+     * A run of consecutive days ending on [reference] — for previewing a streak that is alive.
+     *
+     * The generated history above will not reliably contain one, and "current streak: 0" is the
+     * least useful thing a stat tile preview can show.
+     */
+    fun unbrokenRun(
+        id: String = "read",
+        days: Int = 12,
+        reference: LocalDate = referenceDate,
+    ): List<Completion> = (0 until days).map { Completion(HabitId(id), reference.minusDays(it.toLong())) }
+
+    private fun sample(
+        id: String,
+        propertyName: String,
+        color: HabitColor,
+        startDate: LocalDate,
+    ): Habit {
+        val emoji = propertyName.substringBefore(' ')
+        return Habit(
+            id = HabitId(id),
+            name = propertyName.substringAfter(' '),
+            emoji = emoji,
+            color = color,
+            startDate = startDate,
+            isActive = true,
+        )
+    }
+
+    /**
+     * A seeded linear congruential generator, the same shape the prototype used for its demo data.
+     *
+     * Not `Random` and not `Random(seed)`: the seed is derived from the habit id, so each habit's
+     * history is stable in isolation. Adding a sixth habit does not shift the other five, which is
+     * what would otherwise make every existing preview change in a diff about something else.
+     */
+    private fun generate(
+        habitId: HabitId,
+        from: LocalDate,
+        to: LocalDate,
+        keepRate: Double,
+    ): List<Completion> {
+        var seed = habitId.value.fold(SEED_BASE) { acc, char -> acc + char.code }
+
+        fun next(): Double {
+            seed = (seed * MULTIPLIER + INCREMENT) and MASK
+            return seed / MASK.toDouble()
+        }
+        return generateSequence(from) { day -> day.plusDays(1).takeIf { it <= to } }
+            .filter { next() < keepRate }
+            .map { Completion(habitId, it) }
+            .toList()
+    }
+
+    private val KEEP_RATES =
+        mapOf(
+            "read" to 0.86,
+            "journal" to 0.61,
+            "quote" to 0.74,
+            "diet" to 0.48,
+            "focus" to 0.69,
+        )
+
+    private const val SEED_BASE = 1_013L
+    private const val MULTIPLIER = 1_664_525L
+    private const val INCREMENT = 1_013_904_223L
+    private const val MASK = 0x7fffffffL
+}
