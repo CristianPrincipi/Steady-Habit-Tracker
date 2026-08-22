@@ -9,12 +9,14 @@
 
       v1 declares no POST_NOTIFICATIONS: reminders are deferred post-v1 (ADR-009).
 
-      M4.3's connectivity observer will likely need ACCESS_NETWORK_STATE — ConnectivityManager's
-      callback API requires it. It is NOT declared here: it gets added in M4.3, next to the code
-      that needs it, with its own reason. Declaring a permission before anything uses it is how
-      an APK ends up asking for things nobody can explain.
+      ACCESS_NETWORK_STATE is for AndroidConnectivityObserver (M4.3) and nothing else. It is a
+      normal permission — granted at install, no runtime prompt — and it reads network state
+      only; it grants no access to traffic or to any network the user has not already joined.
+      The observer is ADVISORY: it decides when a sync is worth attempting. Nothing in the
+      check-off path awaits it (CLAUDE.md §1).
     -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".HabitsApplication"
