@@ -297,7 +297,7 @@ Neither blocks M4.2–M4.8. Both are recorded so nobody later assumes they were 
    mention `is_archived`.
 
    **Half-answered in M4.5, for responses only.** The page object in the live reference carries
-   **both fields, side by side** (§13). So a *read* must consider both, and `NotionPageDto.isGone`
+   **both fields, side by side** (§12). So a *read* must consider both, and `NotionPageDto.isGone`
    is `in_trash || is_archived` rather than betting a pull on which one a given page sets.
 
    **For requests it stays open, and stays irrelevant.** ADR-036 established that v1 deletes and
@@ -330,7 +330,7 @@ takes the property keys from its caller precisely so that change would land in o
 
 ---
 
-## 13. Object shapes, confirmed in M4.5
+## 12. Object shapes, confirmed in M4.5
 
 M4.1 recorded the endpoints, pagination and limits. Writing the client needed the **shapes** of what
 comes back, which were read from the live reference on 2026-08-22 (sources below).
@@ -372,7 +372,61 @@ The first contact with the real API is M4.12, and the first deliberate check of 
 
 ---
 
-## 12. Sources
+## 13. Property values — every shape, confirmed in M4.6
+
+§8 recorded the four types this app reads. Writing the codec needed the rest of the set the user's
+database holds, plus the definitive read-only list. Read from the live page-property-values and
+property-object references on 2026-08-22.
+
+### The value shapes
+
+```jsonc
+{ "checkbox": true }
+{ "number": 42 }
+{ "date": { "start": "2023-02-07", "end": null, "time_zone": null } }
+{ "select":       { "id": "ou@_", "name": "jQuery",     "color": "purple" } }
+{ "multi_select": [ { "id": "tC;=", "name": "TypeScript", "color": "purple" } ] }
+{ "title":     [ { "type": "text", "text": { "content": "…" }, "plain_text": "…" } ] }
+{ "rich_text": [ { "type": "text", "text": { "content": "…" }, "plain_text": "…" } ] }
+{ "formula": { "type": "number", "number": 56 } }
+{ "rollup":  { "type": "number", "number": 2, "function": "count" } }
+```
+
+**`date.start` "accepts dates with optional times in ISO 8601 format"** — `"2023-02-23"` *or*
+`"2020-12-08T12:00:00Z"`. The user's property is date-only today (`docs/notion-schema.md` §2.4), but
+the codec parses all three shapes it can arrive in, and **takes the date as written rather than
+converting it to the device's zone**. `CLAUDE.md` §6: a habit checked at 23:00 belongs to that day
+regardless of timezone, and re-zoning `2026-08-19T23:30:00-05:00` would move it to the 20th.
+
+### The read-only list, in full
+
+Seven types state they cannot be updated through the API:
+
+| Type | Wording |
+| --- | --- |
+| `formula` | "the value can't be updated through the API" |
+| `rollup` | "the API does not support updating `rollup` page property values" |
+| `created_by` · `created_time` | "can't be updated" |
+| `last_edited_by` · `last_edited_time` | "can't be updated" |
+| `unique_id` | auto-incrementing; "cannot be updated with the API" |
+
+`NotionPropertyType.isReadOnly` is exactly this set and nothing else. **Everything outside it means
+"not documented as read-only", which is weaker than "we have written it and it worked"** — enough for
+the job `CLAUDE.md` §3.2 gives it (*prevent* a read-only property being chosen as a write target),
+because preventing needs only the exclusions to be right. What v1 actually writes is narrower still:
+a checkbox and a date, enforced by `NotionPropertyValue.Writable` (ADR-044).
+
+### Every property type a schema can hold
+
+`checkbox` · `created_by` · `created_time` · `date` · `email` · `files` · `formula` ·
+`last_edited_by` · `last_edited_time` · `multi_select` · `number` · `people` · `phone_number` ·
+`place` · `relation` · `rich_text` · `rollup` · `select` · `status` · `title` · `unique_id` · `url`
+
+Twenty-two. `docs/notion-schema.md` §2 says the user's database uses six of them.
+
+---
+
+## 14. Sources
 
 All read 2026-08-22.
 
@@ -392,5 +446,7 @@ All read 2026-08-22.
 - [Search](https://developers.notion.com/reference/post-search)
 - [Data source object](https://developers.notion.com/reference/data-source) — read 2026-08-22, M4.5
 - [Database object](https://developers.notion.com/reference/database) — read 2026-08-22, M4.5
+- [Page property values](https://developers.notion.com/reference/page-property-values) — re-read 2026-08-22, M4.6
+- [Property object](https://developers.notion.com/reference/property-object) — re-read 2026-08-22, M4.6
 - [Authorization](https://developers.notion.com/docs/authorization)
 - [Create an integration](https://developers.notion.com/docs/create-a-notion-integration)
