@@ -97,11 +97,21 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
+    // The Notion client. CLAUDE.md §6: data/remote/notion is the only package that may touch the
+    // network, and api.notion.com is the only host this app may ever contact (§8).
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.mockk)
     testImplementation(libs.androidx.room.testing)
+    // Ktor's MockEngine — the fake transport M4.14's fake Notion API is built on. CLAUDE.md §6:
+    // never point an automated test at the live API.
+    testImplementation(libs.ktor.client.mock)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     // Declared explicitly to OVERRIDE the espresso 3.5.0 / runner 1.5.0 that Compose UI test pulls

@@ -10,10 +10,14 @@
 # alpha/beta/rc (datastore 1.3.0-alpha10, navigation 2.10.0-rc01, lifecycle 2.12.0-alpha01,
 # work 2.12.0-rc01). This project pins stable only.
 #
-# TWO VERSIONS ARE CONSTRAINED, NOT SIMPLY "LATEST" — do not bump them in isolation:
+# THREE VERSIONS ARE CONSTRAINED, NOT SIMPLY "LATEST" — do not bump them in isolation:
 #   kotlin  2.2.10        the KGP version AGP 9.3.1 itself ships; AGP 9 compiles Kotlin. ADR-011.
 #   ksp     2.2.10-2.0.2  KSP's version prefix MUST equal the Kotlin version. The newest KSP is
 #                         2.3.11, which is for Kotlin 2.3.x and will refuse to run here. ADR-011.
+#   ktor    3.3.3         NOT the newest (3.5.2). Ktor 3.4.0 moved to kotlin-stdlib 2.3.x, and
+#                         Gradle resolves the stdlib UP — handing a 2.2.10 compiler metadata it
+#                         cannot read. 3.3.3 is the last release still on Kotlin 2.2.x. It moves
+#                         when Kotlin moves, and Kotlin moves as a trio. ADR-039.
 
 [versions]
 agp = "9.3.1"
@@ -32,6 +36,10 @@ datastore = "1.2.1"
 navigation = "2.9.8"
 coroutines = "1.11.0"
 serializationJson = "1.11.0"
+# Resolved live 2026-08-22 from repo1.maven.org. Latest stable is 3.5.2 — see the header for
+# why this is not that. All four ktor-* artifacts below share this version by construction:
+# mixing Ktor module versions is unsupported.
+ktor = "3.3.3"
 
 detekt = "1.23.8"
 ktlint = "1.8.0"
@@ -76,6 +84,16 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
+
+# The Notion client. data/remote/notion is the ONLY package allowed to use these (CLAUDE.md §6).
+# There is deliberately NO ktor-client-logging here yet: CLAUDE.md §3.6 requires the Authorization
+# header to be redacted BEFORE logging is switched on at any level, and that redaction is built in
+# M4.5. Adding the artifact first is how a token ends up in logcat.
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock", version.ref = "ktor" }
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }

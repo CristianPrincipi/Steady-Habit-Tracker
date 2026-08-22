@@ -2,10 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      No permissions are declared yet. INTERNET arrives in M4.2, for Notion sync and
-      nothing else (CLAUDE.md §8). v1 declares no POST_NOTIFICATIONS — reminders are
-      deferred post-v1 (ADR-009).
+      ONE permission, and it exists for one reason: Notion sync (CLAUDE.md §8). `api.notion.com`
+      is the only host this app may ever contact. A second host — analytics, crash reporting, a
+      CDN, an image loader pointed at the open web, a remote font — requires asking the user
+      first. This app has no telemetry.
+
+      v1 declares no POST_NOTIFICATIONS: reminders are deferred post-v1 (ADR-009).
+
+      M4.3's connectivity observer will likely need ACCESS_NETWORK_STATE — ConnectivityManager's
+      callback API requires it. It is NOT declared here: it gets added in M4.3, next to the code
+      that needs it, with its own reason. Declaring a permission before anything uses it is how
+      an APK ends up asking for things nobody can explain.
     -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".HabitsApplication"
