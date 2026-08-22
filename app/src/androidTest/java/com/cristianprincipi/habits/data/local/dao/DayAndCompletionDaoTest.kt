@@ -120,7 +120,7 @@ class DayAndCompletionDaoTest {
         runTest {
             // Stored by name rather than ordinal. An ordinal would make reordering the enum a
             // silent data corruption; this is the assertion that the converter is doing its job.
-            days.upsert(dayRow(day1, state = SyncState.PENDING_DELETE))
+            days.upsert(dayRow(day1, state = SyncState.CONFLICT))
 
             val stored =
                 database.openHelper.readableDatabase
@@ -130,7 +130,7 @@ class DayAndCompletionDaoTest {
                         it.getString(0)
                     }
 
-            assertEquals("PENDING_DELETE", stored)
+            assertEquals("CONFLICT", stored)
         }
 
     @Test
