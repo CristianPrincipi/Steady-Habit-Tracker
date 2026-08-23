@@ -37,8 +37,18 @@ class FakeHabitDao(
             byId.values.sortedWith(compareByDescending<HabitEntity> { it.isActive }.thenBy { it.sortOrder })
         }
 
+    override suspend fun findAll(): List<HabitEntity> = current
+
     override suspend fun upsert(habits: List<HabitEntity>) {
         rows.value = rows.value + habits.associateBy { it.id }
+    }
+
+    override suspend fun setStartDate(
+        habitId: String,
+        epochDay: Long,
+    ) {
+        val habit = rows.value[habitId] ?: return
+        rows.value = rows.value + (habitId to habit.copy(startDateEpochDay = epochDay))
     }
 
     override suspend fun deactivateAllExcept(activeIds: List<String>) {
@@ -65,6 +75,16 @@ class FakeDayDao(
     /** Direct read for assertions, and for wiring [FakeCompletionDao]'s foreign key check. */
     val current: Map<Long, DayEntity> get() = rows
 
+    /**
+     * Mirrors `ON DELETE CASCADE` from `habit_completions` to `days`.
+     *
+     * A `var` rather than a constructor parameter because the two fakes point at each other — the
+     * completion dao checks this one for its foreign key, and this one has to reach back into it.
+     * Set it after both exist; a test that forgets simply gets no cascade, which the real database
+     * would never do.
+     */
+    var onDelete: (Long) -> Unit = {}
+
     override suspend fun find(epochDay: Long): DayEntity? = rows[epochDay]
 
     override suspend fun upsert(day: DayEntity) {
@@ -79,6 +99,13 @@ class FakeDayDao(
             .mapNotNull {
                 it.remoteLastEditedAtEpochMillis
             }.maxOrNull()
+
+    override suspend fun earliestDay(): Long? = rows.keys.minOrNull()
+
+    override suspend fun delete(epochDay: Long) {
+        rows.remove(epochDay)
+        onDelete(epochDay)
+    }
 }
 
 class FakeCompletionDao(
@@ -108,6 +135,14 @@ class FakeCompletionDao(
             it.epochDay ==
                 epochDay
         }
+
+    override suspend fun earliestDayFor(habitId: String): Long? =
+        rows.value.filter { it.habitId == habitId }.minOfOrNull { it.epochDay }
+
+    /** What the foreign key's cascade does when a day is deleted. Wire it to [FakeDayDao.onDelete]. */
+    fun dropDay(epochDay: Long) {
+        rows.value = rows.value.filterNot { it.epochDay == epochDay }.toSet()
+    }
 
     override suspend fun insert(completion: HabitCompletionEntity) {
         check(dayExists(completion.epochDay)) {

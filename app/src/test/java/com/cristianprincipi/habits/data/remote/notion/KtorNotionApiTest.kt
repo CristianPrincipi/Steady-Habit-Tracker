@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -194,6 +195,24 @@ class KtorNotionApiTest {
             // Relying on that default is how a pull window silently moves by hours.
             assertTrue("Expected an explicit offset in $after", after.endsWith("Z"))
             assertEquals("2026-08-22T09:00:00Z", after)
+        }
+
+    @Test
+    fun everyQueryAsksForAscendingLastEditedOrder() =
+        runTest {
+            // ⭐ Not a nicety. The pull's resume point is MAX(remoteLastEditedAt) over the days
+            // already stored, and docs/notion-api.md §14 records that Notion "doesn't guarantee any
+            // particular sort order when no sort parameters are provided". Unsorted, a run killed
+            // halfway through pagination advances that watermark past pages it never applied, and
+            // the next run — asking for everything edited *after* it — never sees them again.
+            api(Canned(emptyListBody)).queryPages(dataSourceId = "ds-1")
+
+            val sorts = NotionJson.parseToJsonElement(sent.single().bodyText()).jsonObject["sorts"]!!.jsonArray
+            val sort = sorts.single().jsonObject
+            // A TIMESTAMP sort, not a property sort: a property sort would name a column in the
+            // user's schema, which CLAUDE.md §3.4 forbids depending on.
+            assertEquals("last_edited_time", sort["timestamp"]!!.jsonPrimitive.content)
+            assertEquals("ascending", sort["direction"]!!.jsonPrimitive.content)
         }
 
     @Test

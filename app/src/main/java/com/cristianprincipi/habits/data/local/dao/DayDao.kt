@@ -34,4 +34,25 @@ interface DayDao {
     /** The most recent day pulled from Notion, for the incremental pull filter (`CLAUDE.md` §3.5). */
     @Query("SELECT MAX(remoteLastEditedAtEpochMillis) FROM days")
     suspend fun latestRemoteEditMillis(): Long?
+
+    /**
+     * The oldest day the app knows about, or null on a first run.
+     *
+     * The fallback for inferring a habit's start date: a habit with no completions at all has no
+     * first check-off to date it from, and the earliest page in the database is the earliest moment
+     * it could plausibly have existed (`docs/notion-schema.md` §3 — Notion holds no start date).
+     */
+    @Query("SELECT MIN(epochDay) FROM days")
+    suspend fun earliestDay(): Long?
+
+    /**
+     * Forgets a day whose page is gone from Notion, taking its completions with it by cascade.
+     *
+     * **The one place anything local is deleted, and it is not a local delete** — ADR-036's rule
+     * stands. This is the *remote* delete `CLAUDE.md` §3.5 distinguishes: Notion no longer has the
+     * page, so keeping the day would be inventing data. The engine calls it only for a day with no
+     * unpushed local edit; a day that has one becomes a conflict instead.
+     */
+    @Query("DELETE FROM days WHERE epochDay = :epochDay")
+    suspend fun delete(epochDay: Long)
 }

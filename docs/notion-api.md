@@ -426,7 +426,47 @@ Twenty-two. `docs/notion-schema.md` §2 says the user's database uses six of the
 
 ---
 
-## 14. Sources
+## 14. ⭐ A remote delete is invisible to an incremental pull — confirmed in M4.8
+
+**Read from the live query-a-data-source reference, 2026-08-23** (`CLAUDE.md` §3.2 — not remembered).
+
+Two sentences, and together they close a question `CLAUDE.md` §3.5 left implicit when it said a page
+deleted or archived in Notion is "a *remote* delete discovered on pull":
+
+> **"By default, this endpoint returns non-archived pages."** Archived pages are reachable only by
+> asking for them, with `is_archived: true` — which returns them *instead of*, not as well as, the
+> normal set.
+>
+> **"`in_trash` is not a supported query body parameter for this endpoint."** A trashed page is not
+> returned at all, and there is no parameter that would include it.
+
+**So a page the user deleted is not "discovered on pull". It simply stops appearing.** An
+incremental pull asks for pages edited since a watermark and gets a list; a page that was trashed is
+absent from that list exactly as a page that was never touched is absent. Nothing distinguishes them
+without re-fetching **every** page and diffing against local — which is the full-database refetch
+`CLAUDE.md` §3.5 forbids on every run.
+
+### What M4.8 does about it
+
+1. **`NotionPageDto.isGone` is still honoured on pull**, because the field exists and costs one
+   branch — but on this evidence it will essentially never be true in a query response. It is a
+   belt for a page that arrives flagged, not the mechanism.
+2. **The real detection happens on push**, at the only moment it matters: writing to a page that is
+   gone returns `404`, which this client maps to `NotionError.MissingOrNotShared`. The engine
+   answers by **clearing the local page id** and leaving the day owed, so the next run recreates it.
+3. **That is safe only because the date is the identity and the page id is a cache.** The pull
+   matches a page to a day by its `Date` property, never by a remembered id, so a cleared id is
+   re-adopted the moment the page turns out to still exist — which is also what covers the §3.3
+   case, where the `404` meant "lost access" rather than "deleted".
+
+**What is deliberately not built:** a periodic full reconciliation that would diff the whole
+database to find deletions. It is the only way to detect one properly, it costs a full refetch, and
+`ADR-036` already established that this app deletes nothing — so the only source of a remote delete
+is the user acting in Notion, on a day they can equally well re-create there.
+
+---
+
+## 15. Sources
 
 All read 2026-08-22.
 
@@ -450,3 +490,4 @@ All read 2026-08-22.
 - [Property object](https://developers.notion.com/reference/property-object) — re-read 2026-08-22, M4.6
 - [Authorization](https://developers.notion.com/docs/authorization)
 - [Create an integration](https://developers.notion.com/docs/create-a-notion-integration)
+- [Query a data source](https://developers.notion.com/reference/query-a-data-source) — re-read 2026-08-23, M4.8 (§14)

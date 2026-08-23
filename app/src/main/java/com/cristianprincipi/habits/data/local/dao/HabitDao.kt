@@ -29,6 +29,16 @@ interface HabitDao {
     fun observeAll(): Flow<List<HabitEntity>>
 
     /**
+     * The whole habit set, once, for the sync engine.
+     *
+     * Not a `Flow`: the engine is not an observer, and it needs the existing rows *before* it
+     * upserts — to carry [HabitEntity.color] forward, which `upsert` would otherwise overwrite, and
+     * to reuse each habit's local [HabitEntity.id] so the completions pointing at it survive.
+     */
+    @Query("SELECT * FROM habits")
+    suspend fun findAll(): List<HabitEntity>
+
+    /**
      * Insert or update the habit set from the Notion schema.
      *
      * Upsert rather than replace, so that a habit's local history is not deleted and re-created —
@@ -56,6 +66,20 @@ interface HabitDao {
      */
     @Query("UPDATE habits SET isActive = 0 WHERE id NOT IN (:activeIds)")
     suspend fun deactivateAllExcept(activeIds: List<String>)
+
+    /**
+     * Sets a habit's inferred start date.
+     *
+     * A targeted update rather than another upsert, because the start date is *derived* from the
+     * completions that were just pulled — recomputing it means writing one column, and routing that
+     * through `upsert` would need the whole entity rebuilt and would risk clobbering the colour
+     * again for nothing.
+     */
+    @Query("UPDATE habits SET startDateEpochDay = :epochDay WHERE id = :habitId")
+    suspend fun setStartDate(
+        habitId: String,
+        epochDay: Long,
+    )
 
     @Query("UPDATE habits SET color = :color WHERE id = :habitId")
     suspend fun setColor(

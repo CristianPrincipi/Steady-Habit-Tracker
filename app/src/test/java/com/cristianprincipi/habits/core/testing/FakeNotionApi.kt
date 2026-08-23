@@ -1,0 +1,195 @@
+package com.cristianprincipi.habits.core.testing
+
+import com.cristianprincipi.habits.data.remote.notion.NotionApi
+import com.cristianprincipi.habits.data.remote.notion.NotionError
+import com.cristianprincipi.habits.data.remote.notion.NotionResult
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionDatabaseDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionListDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import java.time.Instant
+
+/**
+ * A Notion workspace in memory. **The only Notion the tests ever talk to** (`CLAUDE.md` §6, §8).
+ *
+ * Built in M4.8 for the sync engine and deliberately a little more capable than that step needs,
+ * because M4.14 owns the full scenario matrix and should grow this rather than start again.
+ *
+ * Three behaviours are modelled on purpose, because the engine's correctness rests on them:
+ *
+ * - **Query results are filtered by `editedAfter` and sorted ascending by edit time**, exactly as
+ *   `QueryDataSourceRequest` asks the real endpoint to. That is what makes a killed run resumable,
+ *   so a fake that returned everything in insertion order would hide the bug it prevents.
+ * - **Pagination is real.** [pageSize] is small by default so the walk over `cursorForNextPage` is
+ *   exercised by ordinary tests rather than by one that remembers to.
+ * - **Writes move the clock forward.** Every create and update stamps a new `last_edited_time`, so
+ *   the pull that follows a push sees what Notion would actually report.
+ */
+class FakeNotionApi(
+    var schema: NotionDataSourceDto,
+    private val pageSize: Int = 2,
+) : NotionApi {
+    private val pages = LinkedHashMap<String, NotionPageDto>()
+
+    /** Fails every call. For the offline and revoked-token paths. */
+    var failEverythingWith: NotionError? = null
+
+    /** Fails only `queryPages`, leaving the schema readable. */
+    var failQueryWith: NotionError? = null
+
+    /** Fails only `updatePage`. The `404` case is how a deleted page is discovered (§14). */
+    var failUpdateWith: NotionError? = null
+
+    /** Every `editedAfter` the engine has asked with, in order. The incremental-pull assertion. */
+    val queriedEditedAfter = mutableListOf<Instant?>()
+
+    /** Property maps sent to `createPage`, in order. */
+    val created = mutableListOf<Map<String, JsonElement>>()
+
+    /** Page id and property map for each `updatePage`, in order. */
+    val updated = mutableListOf<Pair<String, Map<String, JsonElement>>>()
+
+    /**
+     * Returns trashed and archived pages from `queryPages`, **which the real endpoint never does**.
+     *
+     * `docs/notion-api.md` §14: a trashed page is not returned and an archived one is excluded by
+     * default, which is exactly why a remote delete is invisible to an incremental pull. The default
+     * here models that. This flag exists so the engine's defensive `isGone` branch can be exercised
+     * — a page arriving flagged is the case the page object's two side-by-side fields leave open —
+     * and turning it on is a test saying so out loud rather than a fixture drifting from reality.
+     */
+    var includeTrashedInQuery: Boolean = false
+
+    /**
+     * Runs just before a write reaches the store, while the engine is mid-request.
+     *
+     * The only way to reproduce the race that matters on a device: the user checking a habit off
+     * while a push for that day is in flight.
+     */
+    var duringWrite: (suspend () -> Unit)? = null
+
+    private var nextEditMillis = 1_000L
+    private var nextPageNumber = 1
+
+    /** The pages currently in the workspace, oldest edit first. */
+    val currentPages: List<NotionPageDto> get() = pages.values.sortedBy { it.lastEditedTime }
+
+    fun page(id: String): NotionPageDto? = pages[id]
+
+    /** Puts a page into the workspace as though the user had made it there. */
+    fun givePage(page: NotionPageDto): NotionPageDto {
+        pages[page.id] = page
+        return page
+    }
+
+    /** The `last_edited_time` the next write will stamp, so a test can line timestamps up. */
+    fun nextEditedTime(): String = Instant.ofEpochMilli(nextEditMillis).toString()
+
+    override suspend fun searchDataSources(
+        query: String?,
+        startCursor: String?,
+    ): NotionResult<NotionListDto<NotionDataSourceDto>> =
+        failEverythingWith?.let { NotionResult.Failure(it) }
+            ?: NotionResult.Success(NotionListDto(results = listOf(schema)))
+
+    override suspend fun retrieveDatabase(databaseId: String): NotionResult<NotionDatabaseDto> =
+        failEverythingWith?.let { NotionResult.Failure(it) }
+            ?: NotionResult.Success(NotionDatabaseDto(id = databaseId))
+
+    override suspend fun retrieveDataSource(dataSourceId: String): NotionResult<NotionDataSourceDto> =
+        failEverythingWith?.let { NotionResult.Failure(it) }
+            ?: NotionResult.Success(schema)
+
+    override suspend fun queryPages(
+        dataSourceId: String,
+        editedAfter: Instant?,
+        startCursor: String?,
+    ): NotionResult<NotionListDto<NotionPageDto>> {
+        (failEverythingWith ?: failQueryWith)?.let { return NotionResult.Failure(it) }
+        // Recorded once per paginated run rather than once per page: the cursor pages of one walk
+        // all carry the same filter, and a test asserting the pull window wants the window.
+        if (startCursor == null) queriedEditedAfter += editedAfter
+
+        // A trashed page is never returned by the real endpoint (`docs/notion-api.md` §14), which is
+        // why a remote delete is invisible to an incremental pull. Modelled here so no test can
+        // accidentally rely on the engine being told.
+        val visible =
+            pages.values
+                .filterNot { it.isGone && !includeTrashedInQuery }
+                .filter { editedAfter == null || Instant.parse(it.lastEditedTime).isAfter(editedAfter) }
+                .sortedBy { it.lastEditedTime }
+
+        val from = startCursor?.toInt() ?: 0
+        val window = visible.drop(from).take(pageSize)
+        val next = from + window.size
+        val hasMore = next < visible.size
+        return NotionResult.Success(
+            NotionListDto(
+                results = window,
+                hasMore = hasMore,
+                nextCursor = if (hasMore) next.toString() else null,
+            ),
+        )
+    }
+
+    override suspend fun createPage(
+        dataSourceId: String,
+        properties: Map<String, JsonElement>,
+    ): NotionResult<NotionPageDto> {
+        failEverythingWith?.let { return NotionResult.Failure(it) }
+        duringWrite?.invoke()
+        created += properties
+        val page =
+            NotionPageDto(
+                id = "created-${nextPageNumber++}",
+                lastEditedTime = stamp(),
+                properties = properties.mapValues { (_, value) -> value as JsonObject },
+            )
+        pages[page.id] = page
+        return NotionResult.Success(page)
+    }
+
+    override suspend fun updatePage(
+        pageId: String,
+        properties: Map<String, JsonElement>,
+    ): NotionResult<NotionPageDto> {
+        (failEverythingWith ?: failUpdateWith)?.let { return NotionResult.Failure(it) }
+        duringWrite?.invoke()
+        updated += pageId to properties
+        // A partial update: the properties sent are merged over what the page already holds, which
+        // is what keeps `Weight`, `Sleep` and `Area` alive through a sync (docs/notion-schema.md §7).
+        // A fake that replaced the map would make that impossible to get wrong, and it is the exact
+        // thing worth being able to get wrong in a test.
+        return pages[pageId]?.let { existing ->
+            val merged =
+                existing.properties +
+                    properties.entries.associate { (id, value) ->
+                        keyFor(existing, id) to value as JsonObject
+                    }
+            val page = existing.copy(lastEditedTime = stamp(), properties = merged)
+            pages[pageId] = page
+            NotionResult.Success(page)
+        } ?: NotionResult.Failure(NotionError.MissingOrNotShared)
+    }
+
+    /**
+     * The map key a property id sits under on this page — its **name**, or the id itself for a
+     * property the page does not have yet.
+     *
+     * The real API keys a page's `properties` by name on the way out and takes ids on the way in
+     * (ADR-038), and reproducing that asymmetry is what stops a test passing because both sides
+     * happened to use the same string.
+     */
+    private fun keyFor(
+        page: NotionPageDto,
+        propertyId: String,
+    ): String =
+        page.properties.entries
+            .firstOrNull { (_, value) -> value["id"]?.toString()?.trim('"') == propertyId }
+            ?.key
+            ?: propertyId
+
+    private fun stamp(): String = Instant.ofEpochMilli(nextEditMillis.also { nextEditMillis += 1_000 }).toString()
+}

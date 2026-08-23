@@ -267,4 +267,52 @@ class DayAndCompletionDaoTest {
             assertTrue(completions.forDay(day1).isEmpty())
             assertEquals(1, completions.forDay(day2).size)
         }
+
+    @Test
+    fun theDaoDeleteCascadesTheSameWayTheRawSqlDoes() =
+        runTest {
+            // The test above proves the constraint; this proves the query that leans on it. The
+            // sync engine calls it for a page Notion no longer has (docs/notion-api.md §14) — the
+            // one place anything local is removed.
+            completions.insert(HabitCompletionEntity(read, day1))
+
+            days.delete(day1)
+
+            assertNull(days.find(day1))
+            assertTrue(completions.forDay(day1).isEmpty())
+        }
+
+    @Test
+    fun theEarliestDayIsTheOldestOnRecord() =
+        runTest {
+            // The fallback for a habit that has never been checked off.
+            assertEquals(day1, days.earliestDay())
+        }
+
+    @Test
+    fun theEarliestDayOfNothingIsNull() =
+        runTest {
+            listOf(day1, day2, day3).forEach { days.delete(it) }
+
+            assertNull(days.earliestDay())
+        }
+
+    @Test
+    fun aHabitIsDatedFromItsFirstCompletion() =
+        runTest {
+            // MIN over one habit's rows, not over the table: two habits checked off on different
+            // days must not date each other.
+            completions.insert(HabitCompletionEntity(read, day3))
+            completions.insert(HabitCompletionEntity(read, day2))
+            completions.insert(HabitCompletionEntity(water, day1))
+
+            assertEquals(day2, completions.earliestDayFor(read))
+        }
+
+    @Test
+    fun aHabitWithNoCompletionsHasNoFirstDay() =
+        runTest {
+            // Null, not zero. Zero is 1970 and would date the habit to the epoch.
+            assertNull(completions.earliestDayFor(read))
+        }
 }

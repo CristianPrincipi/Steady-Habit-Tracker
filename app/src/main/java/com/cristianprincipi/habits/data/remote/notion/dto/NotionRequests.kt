@@ -45,8 +45,38 @@ internal data class SearchFilter(
 @Serializable
 internal data class QueryDataSourceRequest(
     val filter: LastEditedTimeFilter? = null,
+    /**
+     * ⭐ **Always sorted by `last_edited_time` ascending, and this is a correctness requirement.**
+     *
+     * `docs/notion-api.md` §14: *"Notion doesn't guarantee any particular sort order when no sort
+     * parameters are provided."* The pull's resume point is `MAX(remoteLastEditedAtEpochMillis)` over
+     * the days already stored, so with results in arbitrary order a run killed halfway through
+     * pagination advances that watermark past pages it never applied — and the next run, asking for
+     * everything edited *after* the watermark, never sees them again. Silent, permanent, and
+     * invisible in any test that returns one page.
+     *
+     * Ascending edit order makes every prefix of the result set a valid stopping point, which is
+     * what `CLAUDE.md` §3.5's "idempotent and resumable — it *will* be killed mid-run" actually
+     * requires. It is equally what saves the 10,000-result ceiling (§5): a truncated set is then a
+     * prefix too, and the next run continues from where it stopped.
+     */
+    val sorts: List<TimestampSort> = listOf(TimestampSort()),
     @SerialName("start_cursor") val startCursor: String? = null,
     @SerialName("page_size") val pageSize: Int = NotionApiSpec.MAX_PAGE_SIZE,
+)
+
+/**
+ * A **timestamp** sort, not a property sort.
+ *
+ * The distinction matters: a property sort names a column in the user's schema, which
+ * `CLAUDE.md` §3.4 forbids depending on. This sorts on the page's own `last_edited_time`, which
+ * every page has whatever the schema looks like — the same reason `LastEditedTimeFilter` works on
+ * a database with no last-edited property. Shape confirmed live in M4.8 (`docs/notion-api.md` §14).
+ */
+@Serializable
+internal data class TimestampSort(
+    val timestamp: String = "last_edited_time",
+    val direction: String = "ascending",
 )
 
 /**

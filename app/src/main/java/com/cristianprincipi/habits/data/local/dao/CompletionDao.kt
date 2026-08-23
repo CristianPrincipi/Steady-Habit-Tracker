@@ -33,6 +33,18 @@ interface CompletionDao {
     suspend fun forDay(epochDay: Long): List<HabitCompletionEntity>
 
     /**
+     * The first day this habit was ever checked off, or null if it never was.
+     *
+     * **This is how a habit gets a start date**, because Notion has none to give
+     * (`docs/notion-schema.md` §3) and the data cannot supply a better answer: an old page carries
+     * `false` for a habit that did not exist then and for one that was simply not done, and the API
+     * returns the two identically. The first check-off is the earliest day the habit is *known* to
+     * have existed — see ADR-046 for why that beats the alternatives.
+     */
+    @Query("SELECT MIN(epochDay) FROM habit_completions WHERE habitId = :habitId")
+    suspend fun earliestDayFor(habitId: String): Long?
+
+    /**
      * Record a completion, or do nothing if it is already recorded.
      *
      * `IGNORE` is what makes checking off idempotent at the storage layer, and it has to be: a sync

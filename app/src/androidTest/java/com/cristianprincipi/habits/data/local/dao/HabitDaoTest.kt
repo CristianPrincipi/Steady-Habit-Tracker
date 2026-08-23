@@ -202,4 +202,43 @@ class HabitDaoTest {
             // spinner forever instead of showing an empty state.
             assertEquals(emptyList<HabitEntity>(), dao.observeActive().first())
         }
+
+    @Test
+    fun findAllSeesInactiveHabitsToo() =
+        runTest {
+            // The sync engine reads this before it upserts, to carry each habit's local id and
+            // colour forward. Missing the inactive ones would mint a new id for a habit whose
+            // property came back, orphaning its history.
+            dao.upsert(listOf(habit("a", sortOrder = 0), habit("b", sortOrder = 1, isActive = false)))
+
+            assertEquals(listOf("a", "b"), dao.findAll().map { it.id }.sorted())
+        }
+
+    @Test
+    fun theStartDateCanBeSetWithoutDisturbingTheColour() =
+        runTest {
+            // Which is the whole reason it is its own query: the start date is recomputed on every
+            // sync, and routing that through an upsert would risk repainting a habit each time.
+            dao.upsert(listOf(habit("a", sortOrder = 0, color = HabitColor.PURPLE)))
+
+            dao.setStartDate(habitId = "a", epochDay = 20_000)
+
+            val habit = dao.findAll().single()
+            assertEquals(20_000L, habit.startDateEpochDay)
+            assertEquals(HabitColor.PURPLE.name, habit.color)
+        }
+
+    @Test
+    fun deactivatingWithAnEmptyListDeactivatesEverything() =
+        runTest {
+            // `WHERE id NOT IN ()` — legal in SQLite, and reachable from a mapping with no habits
+            // chosen yet. Proved here because a syntax error would only show up on a device, on a
+            // path the JVM fakes cannot reproduce.
+            dao.upsert(listOf(habit("a", sortOrder = 0), habit("b", sortOrder = 1)))
+
+            dao.deactivateAllExcept(emptyList())
+
+            assertEquals(emptyList<HabitEntity>(), dao.observeActive().first())
+            assertEquals(2, dao.findAll().size)
+        }
 }
