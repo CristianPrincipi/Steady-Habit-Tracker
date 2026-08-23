@@ -36,9 +36,15 @@ class SyncWorker
         @Assisted appContext: Context,
         @Assisted parameters: WorkerParameters,
         private val syncEngine: SyncEngine,
+        private val lastFailure: LastSyncFailureStore,
     ) : CoroutineWorker(appContext, parameters) {
         override suspend fun doWork(): Result {
             val outcome = syncEngine.sync()
+            // Recorded before the Result is decided, and for every outcome including the good ones.
+            // WorkManager's own state says whether a run happened; only this says how it went, and
+            // a failure that reached no further than this method is a failure nobody can be told
+            // about (`CLAUDE.md` §3.5). A success clears whatever the last failure was.
+            lastFailure.record(outcome)
             return if (outcome.isWorthRetrying) Result.retry() else Result.success()
         }
     }

@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.data.repository
 
 import com.cristianprincipi.habits.domain.repository.HabitRepository
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
+import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -25,4 +26,8 @@ interface RepositoryModule {
     @Binds
     @Singleton
     fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    @Singleton
+    fun bindSyncStatusRepository(impl: SyncStatusRepositoryImpl): SyncStatusRepository
 }

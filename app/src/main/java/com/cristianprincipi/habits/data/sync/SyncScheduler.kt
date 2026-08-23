@@ -8,12 +8,18 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.minutes
@@ -43,6 +49,19 @@ interface SyncScheduler {
      * the day stays `PENDING_PUSH` until some run picks it up.
      */
     fun syncNow()
+
+    /**
+     * Whether a run is happening **right now**.
+     *
+     * The "syncing" half of [com.cristianprincipi.habits.domain.model.SyncStatus], and the reason
+     * this interface exists rather than the repository holding a `WorkManager`: WorkManager is the
+     * only thing that knows, and it needs a `Context` to ask.
+     *
+     * Queued is not running. A periodic request sits `ENQUEUED` between runs and a retry sits
+     * `ENQUEUED` through its backoff — reporting either as "syncing" would leave a spinner turning
+     * for fifteen minutes at a time.
+     */
+    fun observeRunning(): Flow<Boolean>
 }
 
 @Singleton
@@ -90,6 +109,31 @@ class WorkManagerSyncScheduler
                 request,
             )
         }
+
+        /**
+         * Both unique names, folded into one boolean.
+         *
+         * The two are asked for separately because `getWorkInfosForUniqueWorkFlow` takes one name,
+         * and either can be the run in progress: the periodic schedule fires on its own, and
+         * [syncNow] enqueues beside it rather than replacing it.
+         *
+         * **`getInstance` is called on collection, not when the flow is built.** The same
+         * initialisation-order trap the constructor comment describes — a caller could otherwise
+         * construct this flow during Hilt's own graph construction and trigger WorkManager's
+         * on-demand initialisation before `HabitsApplication` has finished starting.
+         */
+        override fun observeRunning(): Flow<Boolean> =
+            flow {
+                val workManager = WorkManager.getInstance(context)
+                emitAll(
+                    combine(
+                        workManager.getWorkInfosForUniqueWorkFlow(PERIODIC_WORK),
+                        workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK),
+                    ) { periodic, onDemand ->
+                        (periodic + onDemand).any { it.state == WorkInfo.State.RUNNING }
+                    },
+                )
+            }.distinctUntilChanged()
 
         /**
          * A connection, and nothing else.
