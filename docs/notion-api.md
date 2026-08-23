@@ -372,6 +372,43 @@ The first contact with the real API is M4.12, and the first deliberate check of 
 
 ---
 
+## 12b. ⭐ FIRST REAL CONTACT — 2026-08-23, in M4.13
+
+Every earlier note in this file, and in `Plan.md`, carried the same warning: **nothing in this client
+had ever talked to Notion.** Every test answered through `MockEngine` or `FakeNotionApi`, and a fake
+cannot notice that an endpoint moved, a header was renamed, or a body shape changed.
+
+**That is no longer true, in part.** The app was run on the emulator, a deliberately invalid token
+(`ntn_notarealtoken`) was typed into the connection wizard, and `POST /v1/search` was sent to the
+real `api.notion.com`. Notion answered **`401`**, which the client decoded to
+`NotionError.Unauthorized`, mapped to `SyncFailure.TokenRejected`, and the screen rendered as
+*"Notion wouldn't accept that token."*
+
+**Why that is proof and not a guess.** `NotionError.Unauthorized` is constructed in exactly one
+place — `HttpResponse.toNotionError`, on `status.value == 401` — and an `HttpResponse` only exists if
+a server replied. The control was airplane mode: the same attempt with no network produced
+`NotionError.Network` → *"Couldn't reach Notion"*, a different sentence. The two are distinguishable,
+so the first one was a response.
+
+### What this does and does not establish
+
+| Verified against the live API | Still unverified |
+| --- | --- |
+| The base URL and TLS reach `api.notion.com` | **Any `2xx` at all** — no successful response has ever been parsed |
+| The pinned `Notion-Version` header is accepted (a bad version is `400 missing_version`, not `401`) | Every object shape in §12 — still read from docs, never observed |
+| `Authorization: Bearer …` is the right shape | Whether a property `id` works as a write key (§11) |
+| A `401` decodes and reaches the UI as the right sentence | Pagination, the day-key filter, and every write path |
+| The offline path produces a *different*, correct failure | The whole of a successful sync |
+
+**No secret was involved and nothing was written.** The token was nonsense by construction, the call
+was a read, and it failed at authentication.
+
+M4.15 still owns the real round trip — against a **duplicate** of the user's database, never the live
+one. This entry exists so a later session neither repeats "nothing has ever talked to Notion" (it
+has) nor overstates it (one `401` is not a working integration).
+
+---
+
 ## 13. Property values — every shape, confirmed in M4.6
 
 §8 recorded the four types this app reads. Writing the codec needed the rest of the set the user's
