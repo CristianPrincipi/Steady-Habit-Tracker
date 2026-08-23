@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       ONE permission, and it exists for one reason: Notion sync (CLAUDE.md §8). `api.notion.com`
@@ -14,6 +15,27 @@
       only; it grants no access to traffic or to any network the user has not already joined.
       The observer is ADVISORY: it decides when a sync is worth attempting. Nothing in the
       check-off path awaits it (CLAUDE.md §1).
+
+      FOUR MORE PERMISSIONS ARRIVE FROM WORKMANAGER'S OWN MANIFEST (M4.10) and are not declared
+      here, because they are not ours to declare — they are the library's. Verified in the
+      MERGED manifest, the way ADR-040 established:
+
+        WAKE_LOCK                 held while a job runs, so a sync survives the screen going off
+        RECEIVE_BOOT_COMPLETED    WorkManager restores its own queue after a reboot, which is
+                                  exactly what Plan.md M4.10 asks for
+        FOREGROUND_SERVICE        declared unconditionally by the library. THIS APP NEVER USES
+                                  IT: it is for expedited and long-running work, and SyncWorker
+                                  is neither (see SyncWorker's KDoc for why not). It is left in
+                                  place rather than removed with tools:node="remove", because
+                                  removing it would turn a future setExpedited() into a runtime
+                                  SecurityException instead of a compile-time decision.
+        ...DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+                                  a signature permission the library defines for its own
+                                  broadcast receivers. Scoped to this app; grants nothing.
+
+      All four are normal (install-time) permissions with no runtime prompt, and none of them
+      widens what §8 actually guards: api.notion.com is still the only host this app contacts,
+      and there is still no telemetry.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -38,6 +60,30 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          ⚠ WORKMANAGER'S DEFAULT INITIALISER IS REMOVED ON PURPOSE. Do not "restore" it.
+
+          HabitsApplication implements Configuration.Provider to supply a HiltWorkerFactory, and
+          the official documentation is explicit that the default initialiser must be removed for
+          a custom configuration to take effect (verified live, M4.10). Leave it in and the
+          configuration is built and then ignored: WorkManager uses the default factory, which
+          cannot construct a worker that has constructor dependencies. The failure is at RUNTIME,
+          inside a background job, and it names the worker class rather than this file.
+
+          Only WorkManager's entry is removed, not the whole provider — androidx.startup is shared,
+          and node="merge" keeps it available for anything else that registers there.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>

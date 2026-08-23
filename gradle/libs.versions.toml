@@ -34,6 +34,9 @@ androidxHilt = "1.4.0"
 room = "2.8.4"
 datastore = "1.2.1"
 navigation = "2.9.8"
+# Resolved live 2026-08-23 from dl.google.com. Newest overall is 2.12.0-rc01; this
+# catalog pins stable only, and 2.11.2 is the newest stable. See the header.
+work = "2.11.2"
 coroutines = "1.11.0"
 serializationJson = "1.11.0"
 # Resolved live 2026-08-22 from repo1.maven.org. Latest stable is 3.5.2 — see the header for
@@ -72,6 +75,11 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "androidxHilt" }
+# The Hilt/WorkManager bridge: @HiltWorker and HiltWorkerFactory. Its processor is androidx's
+# own hilt-compiler, which is a DIFFERENT artifact from Dagger's hilt-android-compiler above —
+# both are needed, and leaving this one out fails at runtime rather than at build time.
+androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "androidxHilt" }
+androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "androidxHilt" }
 
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
@@ -80,6 +88,7 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
