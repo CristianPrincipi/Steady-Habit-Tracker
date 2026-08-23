@@ -1,5 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">My Habit App</string>
-    <string name="bootstrap_placeholder">Project bootstrap — no screens yet</string>
+
+    <!--
+      The Notion connection wizard (M4.12).
+
+      Two rules govern every string below. Nothing names a Notion property — CLAUDE.md §3.4 makes
+      the schema user data, so "Date" and "📖 Read" appear only because Notion said so at runtime.
+      And every failure line names the fix rather than the fault: the user cannot act on "404".
+    -->
+    <string name="setup_step_counter">Step %1$d of %2$d</string>
+    <string name="setup_back">Back</string>
+    <string name="setup_working">Working…</string>
+
+    <!-- Step 1 — the token -->
+    <string name="setup_token_title">Connect to Notion</string>
+    <string name="setup_token_body">Your habits live in a Notion database. Paste a token so this app can read and update it.</string>
+    <string name="setup_token_label">NOTION TOKEN</string>
+    <string name="setup_token_placeholder">ntn_…</string>
+    <!--
+      The wording of this path was confirmed against the live docs in M4.1 (docs/notion-api.md §3).
+      Notion renamed "internal integration" to "personal access token" and "integrations" to
+      "connections" — sending the user to look for the old names sends them looking for nothing.
+    -->
+    <string name="setup_token_helper">In Notion: Developer portal → Personal access tokens → New token. Notion shows it once, so copy it before closing.</string>
+    <string name="setup_token_continue">Continue</string>
+
+    <!-- Step 2 — which database -->
+    <string name="setup_database_title">Pick your habit database</string>
+    <string name="setup_database_body">These are the databases your token can reach.</string>
+    <string name="setup_database_untitled">Untitled database</string>
+    <string name="setup_database_continue">Continue</string>
+    <string name="setup_database_use_link">Don\'t see it? Paste a link instead</string>
+    <string name="setup_link_label">DATABASE LINK</string>
+    <string name="setup_link_placeholder">https://www.notion.so/…</string>
+    <string name="setup_link_helper">In Notion: open the database → ••• → Copy link.</string>
+    <string name="setup_link_submit">Find it</string>
+    <string name="setup_link_unreadable">That doesn\'t look like a Notion link. Copy the database\'s link from Notion and paste the whole thing.</string>
+
+    <!-- Step 3 — the mapping -->
+    <string name="setup_mapping_title">Which columns are what?</string>
+    <string name="setup_mapping_body">In this database each page is one day, and each habit is a checkbox on it.</string>
+    <string name="setup_mapping_day_eyebrow">WHICH COLUMN IS THE DAY?</string>
+    <string name="setup_mapping_day_empty">This database has no date column, so there is no way to tell which day a page is. Add one in Notion, then come back.</string>
+    <string name="setup_mapping_habits_eyebrow">WHICH COLUMNS ARE HABITS?</string>
+    <string name="setup_mapping_habits_empty">This database has no checkbox columns, so there are no habits to import.</string>
+    <string name="setup_mapping_unavailable_eyebrow">NOT AVAILABLE</string>
+    <!--
+      docs/notion-schema.md §7: Weight, Sleep, Area and Progress share the database and must come
+      through a sync untouched. Saying so is what stops "where is my Progress column?" being a bug
+      report. CLAUDE.md §3.2 wants the UI to PREVENT a read-only property being picked — these are
+      shown, and not selectable.
+    -->
+    <string name="setup_mapping_unavailable_body">These aren\'t dates or checkboxes, so they can\'t be a day or a habit. Sync leaves them exactly as they are.</string>
+    <string name="setup_mapping_submit">Save and import</string>
+    <string name="setup_mapping_needs_habit">Pick at least one habit.</string>
+
+    <!-- Done -->
+    <string name="setup_done_title">Connected</string>
+    <plurals name="setup_done_body">
+        <item quantity="one">%1$d day imported from Notion.</item>
+        <item quantity="other">%1$d days imported from Notion.</item>
+    </plurals>
+    <string name="setup_done_body_empty">No days to import yet. Check a habit off and it will appear in Notion.</string>
+
+    <!--
+      Failure sentences — one per SyncFailure case. The `when` that picks between them is
+      exhaustive, so adding a way to fail makes the compiler point at this list.
+    -->
+    <string name="setup_failure_not_connected">No token is stored. Paste one to continue.</string>
+    <string name="setup_failure_token_rejected">Notion wouldn\'t accept that token. Check you copied all of it, or create a new one.</string>
+    <string name="setup_failure_missing_capability">That token isn\'t allowed to do this. In Notion, give the connection permission to read and update content.</string>
+    <!--
+      ⭐ CLAUDE.md §3.3 and docs/notion-api.md §3.1. Notion returns the same 404 for "doesn't exist"
+      and "not shared with the connection", and gives no way to tell them apart. Sharing is the fix
+      far more often, so that is the instruction — never "not found".
+    -->
+    <string name="setup_failure_database_not_shared">No database is shared with this connection yet. In Notion, open your habit database → ••• (top right) → Connections → add your connection, then try again.</string>
+    <string name="setup_failure_mapping_broken">Your database has changed since it was set up.</string>
+    <string name="setup_failure_offline">Couldn\'t reach Notion. Check your connection and try again.</string>
+    <string name="setup_failure_notion_unavailable">Notion is busy or having trouble. Try again in a moment.</string>
+    <string name="setup_failure_app_out_of_date">This app and Notion disagree about something. There\'s nothing to fix here — the app needs updating.</string>
+
+    <!-- Mapping problems, listed under setup_failure_mapping_broken. -->
+    <string name="setup_issue_day_key_missing">The day column was deleted.</string>
+    <string name="setup_issue_day_key_retyped">The day column is now a %1$s.</string>
+    <string name="setup_issue_habit_missing">A habit column was deleted.</string>
+    <string name="setup_issue_habit_retyped">“%1$s” is now a %2$s.</string>
+    <string name="setup_issue_wrong_data_source">The saved setup points at a different database.</string>
+
+    <!-- Content descriptions -->
+    <string name="setup_selected">Selected</string>
 </resources>

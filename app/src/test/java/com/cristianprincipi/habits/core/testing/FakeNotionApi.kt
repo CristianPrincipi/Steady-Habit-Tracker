@@ -4,6 +4,7 @@ import com.cristianprincipi.habits.data.remote.notion.NotionApi
 import com.cristianprincipi.habits.data.remote.notion.NotionError
 import com.cristianprincipi.habits.data.remote.notion.NotionResult
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceRefDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDatabaseDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionListDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
@@ -44,6 +45,20 @@ class FakeNotionApi(
 
     /** Every `editedAfter` the engine has asked with, in order. The incremental-pull assertion. */
     val queriedEditedAfter = mutableListOf<Instant?>()
+
+    /**
+     * What the search finds. `null` means the one [schema], which is what every sync test wants.
+     *
+     * Set it to an empty list for the case `CLAUDE.md` §3.3 is about: a valid token shared with
+     * nothing, which returns **zero results** rather than an error.
+     */
+    var searchResults: List<NotionDataSourceDto>? = null
+
+    /** The stubs `retrieveDatabase` reports. Empty is a legal answer and the setup flow must cope. */
+    var databaseDataSources: List<NotionDataSourceRefDto> = emptyList()
+
+    /** Ids passed to `retrieveDatabase`, in order — where the link parser's output is asserted. */
+    val retrievedDatabaseIds = mutableListOf<String>()
 
     /** Property maps sent to `createPage`, in order. */
     val created = mutableListOf<Map<String, JsonElement>>()
@@ -87,16 +102,36 @@ class FakeNotionApi(
     /** The `last_edited_time` the next write will stamp, so a test can line timestamps up. */
     fun nextEditedTime(): String = Instant.ofEpochMilli(nextEditMillis).toString()
 
+    /**
+     * Paginated, like the query endpoint, and for the same reason: the setup flow walks every page
+     * of the search, and a fake that answered in one shot would let a first-page-only bug ship in a
+     * workspace big enough to have a second page.
+     */
     override suspend fun searchDataSources(
         query: String?,
         startCursor: String?,
-    ): NotionResult<NotionListDto<NotionDataSourceDto>> =
-        failEverythingWith?.let { NotionResult.Failure(it) }
-            ?: NotionResult.Success(NotionListDto(results = listOf(schema)))
+    ): NotionResult<NotionListDto<NotionDataSourceDto>> {
+        failEverythingWith?.let { return NotionResult.Failure(it) }
 
-    override suspend fun retrieveDatabase(databaseId: String): NotionResult<NotionDatabaseDto> =
-        failEverythingWith?.let { NotionResult.Failure(it) }
-            ?: NotionResult.Success(NotionDatabaseDto(id = databaseId))
+        val visible = searchResults ?: listOf(schema)
+        val from = startCursor?.toInt() ?: 0
+        val window = visible.drop(from).take(pageSize)
+        val next = from + window.size
+        val hasMore = next < visible.size
+        return NotionResult.Success(
+            NotionListDto(
+                results = window,
+                hasMore = hasMore,
+                nextCursor = if (hasMore) next.toString() else null,
+            ),
+        )
+    }
+
+    override suspend fun retrieveDatabase(databaseId: String): NotionResult<NotionDatabaseDto> {
+        failEverythingWith?.let { return NotionResult.Failure(it) }
+        retrievedDatabaseIds += databaseId
+        return NotionResult.Success(NotionDatabaseDto(id = databaseId, dataSources = databaseDataSources))
+    }
 
     override suspend fun retrieveDataSource(dataSourceId: String): NotionResult<NotionDataSourceDto> =
         failEverythingWith?.let { NotionResult.Failure(it) }

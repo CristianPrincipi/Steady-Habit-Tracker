@@ -21,6 +21,16 @@ complexity:
     # A stateless composable takes its whole state plus one lambda per event — CLAUDE.md §6
     # requires exactly that shape ("data down, events up"), so the count is by design.
     ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    # A file of small composables is a design-system module, not a god object. Splitting one to
+    # satisfy a count makes it harder to find things, which is the same trade LongMethod refuses
+    # above. Note the key is `ignoreAnnotatedFunctions`, not `ignoreAnnotated` — this rule spells
+    # it differently from its neighbours.
+    ignoreAnnotatedFunctions: ['Composable']
+    # A ViewModel written to CLAUDE.md §6 has exactly ONE public function — `onEvent` — plus one
+    # private handler per event in the sealed set. The rule counts the handlers; the convention is
+    # what produced them, and the alternative is fewer, fatter functions.
+    ignorePrivate: true
 
 naming:
   FunctionNaming:

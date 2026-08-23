@@ -466,6 +466,39 @@ is the user acting in Notion, on a day they can equally well re-create there.
 
 ---
 
+## 16. ⭐ Database ids in a URL — confirmed in M4.12
+
+The setup screen offers a paste-a-link fallback beside the database picker (`docs/design-spec.md`
+§6's "a paste field is a fallback, not the ideal"), so it has to turn what a user can copy into an
+id. Both halves below are quoted from the live reference, read **2026-08-23**, not remembered.
+
+| Question | Answer, verbatim |
+| --- | --- |
+| Where is the id in a URL? | *"The ID is the 32-character alphanumeric string between the slash following the workspace name (if applicable) and the question mark."* |
+| Dashed or not? | *"When you receive the database ID from the API (e.g. the search endpoint), it will contain hyphens in the UUIDv4 format. You may use either the hyphenated or un-hyphenated ID when calling the API."* |
+| What is an id, generally? | *"Top-level resources are addressable by a UUIDv4 `id` property. You may omit dashes from the ID when making requests to the API, e.g. when copying the ID from a Notion URL."* |
+
+**Three consequences for `NotionDatabaseLink`.**
+
+1. **The query string is not part of the id, and it contains a decoy.** A database URL carries
+   `?v=<32 hex>` — the *view* id, which is the same shape as the database id and is not it. The
+   reference draws the boundary at the question mark, so everything from `?` is dropped before
+   anything is matched. A parser that simply looked for "a 32-character hex run" would find the view
+   id in URLs that have one, and would fail in a way that looks like a permissions problem.
+2. **Both forms have to be accepted, because both are things the user can hold.** A URL gives the
+   un-hyphenated form; an id copied out of an API response or Notion's *Copy link to view* gives the
+   hyphenated one. Dashes are stripped on the way in so only one shape is ever sent.
+3. **The id is last in the path.** Notion prefixes it with a title slug — `My-Habits-<32 hex>` — and
+   the slug's own words are dash-separated, so the match is taken from the **end** rather than the
+   start.
+
+**A page URL parses fine and is still wrong**, and nothing local can tell the difference: a page id
+and a database id are both UUIDv4. It surfaces as `404 object_not_found`, which §3.1 records as
+indistinguishable from *not shared*. The setup screen therefore names both possibilities when a
+pasted link fails.
+
+---
+
 ## 15. Sources
 
 All read 2026-08-22.

@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,17 +10,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Proves the Compose UI test harness can launch a Hilt-injected activity and find a node.
+ * That the app launches into the Notion connection wizard and it renders.
  *
- * The assertion is deliberately thin — the placeholder it looks for is replaced by the real
- * navigation host in M5. What matters here is that `createAndroidComposeRule` works against an
- * `@AndroidEntryPoint` activity at all, which is the thing later flow tests depend on
- * (`CLAUDE.md` §6: "Compose UI tests for the primary flows").
+ * ⚠ **The assertions are deliberately thin, and the reason has changed since M1.** This used to look
+ * for a bootstrap placeholder; it now looks at the real first screen, because M4.12 hosts
+ * `NotionSetupScreen` directly in `MainActivity` until M5's navigation host exists. When M5 lands,
+ * this becomes a test about the navigation shell and the setup flow gets its own.
  *
- * Uses the **v2** rule: the v1 `createAndroidComposeRule` is deprecated in Compose BOM 2026.08.00.
- * v2 drives the test clock with a `StandardTestDispatcher` rather than an unconfined one, so work
- * is queued like ordinary coroutines instead of running eagerly. Starting new tests on v1 would
- * mean migrating every one of them later.
+ * What it actually proves is the thing only a device can: that Hilt builds `NotionSetupViewModel`
+ * and everything under it — the repository, the Ktor client, the Keystore token store, the sync
+ * engine — at the moment an `@AndroidEntryPoint` activity composes it. ADR-031 and ADR-049 track
+ * that graph; this closes the **UI** half of it, which the sync worker could not.
+ *
+ * **Nothing here touches the network.** The screen renders its first step without sending anything,
+ * which is exactly why the first step is a text field and not a request.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
@@ -27,9 +31,18 @@ class MainActivityTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun bootstrapPlaceholderIsDisplayed() {
-        val placeholder = composeTestRule.activity.getString(R.string.bootstrap_placeholder)
+    fun theConnectionWizardIsTheFirstThingShown() {
+        val title = composeTestRule.activity.getString(R.string.setup_token_title)
 
-        composeTestRule.onNodeWithText(placeholder).assertIsDisplayed()
+        composeTestRule.onNodeWithText(title).assertIsDisplayed()
+    }
+
+    @Test
+    fun continueIsDisabledUntilATokenIsTyped() {
+        // The one rule the first step has, and the prototype's own (`docs/design-spec.md` §6.5:
+        // disabled until the fields are non-empty). Nothing should be sent on an empty field.
+        val continueLabel = composeTestRule.activity.getString(R.string.setup_token_continue)
+
+        composeTestRule.onNodeWithText(continueLabel).assertIsNotEnabled()
     }
 }

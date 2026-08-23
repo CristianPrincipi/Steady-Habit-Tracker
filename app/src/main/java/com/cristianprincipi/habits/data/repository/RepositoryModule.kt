@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
 import com.cristianprincipi.habits.domain.repository.HabitRepository
+import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import dagger.Binds
@@ -30,4 +31,8 @@ interface RepositoryModule {
     @Binds
     @Singleton
     fun bindSyncStatusRepository(impl: SyncStatusRepositoryImpl): SyncStatusRepository
+
+    @Binds
+    @Singleton
+    fun bindNotionSetupRepository(impl: NotionSetupRepositoryImpl): NotionSetupRepository
 }
