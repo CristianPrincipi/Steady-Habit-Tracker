@@ -1,0 +1,237 @@
+package com.cristianprincipi.habits.core.testing
+
+import com.cristianprincipi.habits.data.local.TestTransactionRunner
+import com.cristianprincipi.habits.data.local.dao.FakeCompletionDao
+import com.cristianprincipi.habits.data.local.dao.FakeDayDao
+import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
+import com.cristianprincipi.habits.data.local.entity.DayEntity
+import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
+import com.cristianprincipi.habits.data.local.entity.SyncState
+import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
+import com.cristianprincipi.habits.data.preferences.NotionMappingStore
+import com.cristianprincipi.habits.data.preferences.NotionPropertyId
+import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
+import com.cristianprincipi.habits.data.preferences.SettingsDataStore
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
+import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
+import com.cristianprincipi.habits.data.sync.DiscardedEditStore
+import com.cristianprincipi.habits.data.sync.HabitImporter
+import com.cristianprincipi.habits.data.sync.SyncEngine
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+
+/**
+ * The property ids from `docs/notion-schema.md` §6.1, percent-encoded exactly as Notion sends them.
+ *
+ * Tidy ids would let a bug through: anything that decoded, trimmed or split on a delimiter would
+ * pass every test written with `read-1` and then fail against the user's real database.
+ */
+object PropertyIds {
+    const val DATA_SOURCE = "ds-1"
+    const val READ = "ZI%40W"
+    const val JOURNAL = "Ye%3Aq"
+    const val DATE = "M%3BBw"
+
+    /** `Weight` — the user's own daily data, deliberately never in the mapping. */
+    const val WEIGHT = "Nw%7Cb"
+}
+
+/**
+ * The user's schema, near enough: two habits, the day key, and one column that is not a habit.
+ *
+ * Names are the verified ones from `docs/notion-schema.md` §2.3, including the `U+FE0F` that only
+ * `Journal` carries, because these fixtures double as the record of what the API returns.
+ */
+val defaultSchema: NotionDataSourceDto =
+    dataSourceOf(
+        NotionPropertySchemaDto(PropertyIds.READ, "📖 Read", "checkbox"),
+        NotionPropertySchemaDto(PropertyIds.JOURNAL, "✒️ Journal", "checkbox"),
+        NotionPropertySchemaDto(PropertyIds.DATE, "Date", "date"),
+        NotionPropertySchemaDto(PropertyIds.WEIGHT, "Weight", "number"),
+    )
+
+val defaultMapping: NotionPropertyMapping =
+    NotionPropertyMapping(
+        dataSourceId = NotionDataSourceId(PropertyIds.DATA_SOURCE),
+        dayKeyPropertyId = NotionPropertyId(PropertyIds.DATE),
+        habitPropertyIds = setOf(NotionPropertyId(PropertyIds.READ), NotionPropertyId(PropertyIds.JOURNAL)),
+    )
+
+/** Fixed, so a sync is as reproducible next year as today (`CLAUDE.md` §6 — no clock is ever read). */
+val syncTestClock: Clock = Clock.fixed(Instant.parse("2026-08-23T12:00:00Z"), ZoneOffset.UTC)
+
+val august19: LocalDate = LocalDate.of(2026, 8, 19)
+val august20: LocalDate = LocalDate.of(2026, 8, 20)
+
+/** A data source keyed the way Notion keys one: by property **name**. */
+fun dataSourceOf(
+    vararg properties: NotionPropertySchemaDto,
+    id: String = PropertyIds.DATA_SOURCE,
+): NotionDataSourceDto =
+    NotionDataSourceDto(id = id, properties = properties.associateBy(NotionPropertySchemaDto::name))
+
+/**
+ * A page, keyed by property **name**, with the id inside the value.
+ *
+ * Nothing in the engine may read that key — the mapping is on ids (ADR-038) — and building the
+ * fixtures faithfully is what would catch it if something did.
+ */
+fun page(
+    id: String,
+    date: LocalDate,
+    checks: Map<String, Boolean> = emptyMap(),
+    editedAtMillis: Long = 1_000,
+    gone: Boolean = false,
+): NotionPageDto =
+    NotionPageDto(
+        id = id,
+        lastEditedTime = Instant.ofEpochMilli(editedAtMillis).toString(),
+        properties =
+            buildMap {
+                put("Date", dateProperty(date))
+                checks.forEach { (propertyId, checked) ->
+                    put(nameOf(propertyId), checkboxProperty(propertyId, checked))
+                }
+            },
+        inTrash = gone,
+    )
+
+/** The user's `Weight` column: real data on the same page, which no sync may touch (§7). */
+fun NotionPageDto.withWeight(weight: Double): NotionPageDto =
+    copy(
+        properties =
+            properties +
+                (
+                    "Weight" to
+                        buildJsonObject {
+                            put("id", PropertyIds.WEIGHT)
+                            put("type", "number")
+                            put("number", weight)
+                        }
+                ),
+    )
+
+fun NotionPageDto.weightValue(): Double? =
+    properties.values
+        .firstOrNull { it["id"]?.jsonPrimitive?.content == PropertyIds.WEIGHT }
+        ?.get("number")
+        ?.jsonPrimitive
+        ?.content
+        ?.toDouble()
+
+private fun nameOf(propertyId: String): String =
+    defaultSchema.properties.values
+        .single { it.id == propertyId }
+        .name
+
+private fun checkboxProperty(
+    propertyId: String,
+    checked: Boolean,
+): JsonObject =
+    buildJsonObject {
+        put("id", propertyId)
+        put("type", "checkbox")
+        put("checkbox", checked)
+    }
+
+/** The day key's value, for a test that hand-builds a page around it. */
+fun dateProperty(date: LocalDate): JsonObject =
+    buildJsonObject {
+        put("id", PropertyIds.DATE)
+        put("type", "date")
+        putJsonObject("date") { put("start", date.toString()) }
+    }
+
+/**
+ * One app's worth of local storage, plus the Notion workspace it syncs against.
+ *
+ * Wires itself rather than being handed its parts, so a test reads as a story about the two sides
+ * drifting apart. The one piece of wiring worth noticing is the pair of lambdas between the day and
+ * completion fakes: they reproduce the foreign key and its cascade, which is what the engine leans
+ * on when a page turns out to be gone.
+ */
+class SyncWorld(
+    schema: NotionDataSourceDto = defaultSchema,
+    clock: Clock = syncTestClock,
+) {
+    val api = FakeNotionApi(schema)
+    val habits = FakeHabitDao()
+    val days = FakeDayDao()
+    val completions = FakeCompletionDao { epochDay -> epochDay in days.current }
+
+    private val preferences = InMemoryDataStore()
+    val mappingStore = NotionMappingStore(preferences)
+    val settings = SettingsDataStore(preferences)
+    val discardedEdits = DiscardedEditStore(preferences)
+
+    val engine =
+        SyncEngine(
+            api = api,
+            mappingStore = mappingStore,
+            habitImporter =
+                HabitImporter(
+                    habitDao = habits,
+                    dayDao = days,
+                    completionDao = completions,
+                    transactionRunner = TestTransactionRunner(),
+                    clock = clock,
+                ),
+            dayDao = days,
+            completionDao = completions,
+            transactionRunner = TestTransactionRunner(),
+            discardedEdits = discardedEdits,
+            settings = SettingsRepositoryImpl(settings),
+            clock = clock,
+        )
+
+    init {
+        days.onDelete = { epochDay -> completions.dropDay(epochDay) }
+    }
+
+    suspend fun connect(mapping: NotionPropertyMapping = defaultMapping) {
+        mappingStore.save(mapping)
+    }
+
+    /**
+     * A local check-off, written exactly as `HabitRepositoryImpl.setCompleted` writes one: the day
+     * first, then the completion, and `PENDING_PUSH` stamped whatever changed.
+     */
+    suspend fun checkOffLocally(
+        date: LocalDate,
+        propertyId: String,
+        at: Long = 5_000,
+    ) {
+        val habitId = habits.current.single { it.notionPropertyId == propertyId }.id
+        val epochDay = date.toEpochDay()
+        val existing = days.find(epochDay)
+        days.upsert(
+            existing?.copy(localUpdatedAtEpochMillis = at, syncState = SyncState.PENDING_PUSH)
+                ?: DayEntity(
+                    epochDay = epochDay,
+                    notionPageId = null,
+                    localUpdatedAtEpochMillis = at,
+                    remoteLastEditedAtEpochMillis = null,
+                    syncState = SyncState.PENDING_PUSH,
+                ),
+        )
+        completions.insert(HabitCompletionEntity(habitId = habitId, epochDay = epochDay))
+    }
+
+    /** The local id of the habit backing a Notion property. */
+    fun habitId(propertyId: String): String = habits.current.single { it.notionPropertyId == propertyId }.id
+
+    fun dayAt(date: LocalDate): DayEntity = days.current.getValue(date.toEpochDay())
+}
+
+/** A connected world, ready to sync. The state every test but the first-run ones starts from. */
+suspend fun connectedWorld(schema: NotionDataSourceDto = defaultSchema): SyncWorld =
+    SyncWorld(schema).apply { connect() }

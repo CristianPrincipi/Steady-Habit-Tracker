@@ -56,11 +56,21 @@ import javax.inject.Singleton
  * Notion returns by default — a kill halfway through pagination would advance the watermark past
  * pages it never applied, and they would never be asked for again.
  *
- * ### What it does not do
+ * ### A conflict is resolved where it is found
  *
- * **It does not resolve conflicts.** It detects them and marks them; `ConflictResolver` (M4.9) is
- * the next step. Until that lands, a day marked [SyncState.CONFLICT] stops being pushed and stays
- * that way — visible, but stuck.
+ * A day both sides changed is decided by [ConflictResolver] during the pull, in the transaction
+ * that discovered it — **nothing is left marked and stuck**. The page is in hand at that moment,
+ * which is the whole reason: resolving later would mean fetching it again to find out what the
+ * remote copy said. Remote wins and the page's check-offs are applied; local wins and the day goes
+ * back to owing a push, which the phase below already knows how to do.
+ *
+ * Whatever the losing copy held is recorded as a [DiscardedEdit] before the run ends, because
+ * `CLAUDE.md` §3.5 allows resolution to destroy an edit but not to do it quietly. Two cases never
+ * reach the resolver at all, and both matter: if the two copies **agree**, there is nothing to
+ * resolve; if **Notion has not moved** since we last looked, only this device changed and the day
+ * simply still owes its push.
+ *
+ * ### What it does not do
  *
  * **It does not notice a day deleted in Notion.** `docs/notion-api.md` §14: a trashed page is never
  * returned by a query and an archived one is excluded by default, so a remote delete is discovered
@@ -73,8 +83,9 @@ class SyncEngine
     @Inject
     // The collaborators this file needs to do what `CLAUDE.md` §5 gives it ("pull, push, reconcile"):
     // one remote, one mapping, the habit set, the two day-shaped tables, the transaction that spans
-    // them, and a clock. Hiding them behind a facade would add an indirection whose only job is a
-    // lint count.
+    // them, somewhere to put what resolution destroyed, and a clock. Hiding them behind a facade
+    // would add an indirection whose only job is a lint count. `ConflictResolver` is absent from
+    // this list on purpose — it is pure, so it is called rather than injected.
     @Suppress("LongParameterList")
     constructor(
         private val api: NotionApi,
@@ -83,6 +94,7 @@ class SyncEngine
         private val dayDao: DayDao,
         private val completionDao: CompletionDao,
         private val transactionRunner: TransactionRunner,
+        private val discardedEdits: DiscardedEditStore,
         private val settings: SettingsRepository,
         private val clock: Clock,
     ) {
@@ -111,10 +123,17 @@ class SyncEngine
 
             val habits = habitImporter.import(valid.habits)
 
+            // Recorded before the outcome is known, and deliberately so: a discard that happened
+            // is a fact whether or not the rest of the run succeeded, and a failed push must not
+            // be the reason the user never hears about it.
+            val discarded = mutableListOf<DiscardedEdit>()
+            val pullResult = pull(mapping, habits, discarded)
+            discardedEdits.record(discarded)
+
             val pulled =
-                when (val result = pull(mapping, habits)) {
-                    is NotionResult.Failure -> return SyncOutcome.Failed(result.error)
-                    is NotionResult.Success -> result.value
+                when (pullResult) {
+                    is NotionResult.Failure -> return SyncOutcome.Failed(pullResult.error)
+                    is NotionResult.Success -> pullResult.value
                 }
 
             habitImporter.refreshStartDates(habits)
@@ -142,6 +161,7 @@ class SyncEngine
         private suspend fun pull(
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            discarded: MutableList<DiscardedEdit>,
         ): NotionResult<PullReport> {
             // Read once, before the first request. The filter has to stay identical across a
             // paginated run, and it would otherwise move as this loop's own writes land.
@@ -164,7 +184,7 @@ class SyncEngine
                     }
 
                 page.results.forEach { dto ->
-                    if (applyPage(dto, mapping, habits)) applied++ else skipped++
+                    if (applyPage(dto, mapping, habits, discarded)) applied++ else skipped++
                 }
                 // `isTruncated` needs no branch of its own, and that is a consequence of the sort
                 // rather than an oversight: at the 10,000 ceiling an ascending run has applied the
@@ -189,6 +209,7 @@ class SyncEngine
             dto: NotionPageDto,
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            discarded: MutableList<DiscardedEdit>,
         ): Boolean {
             val day = dto.property(mapping.dayKeyPropertyId.value) as? NotionPropertyValue.DateValue
             val remoteEditedAt = parseInstant(dto.lastEditedTime)
@@ -201,83 +222,123 @@ class SyncEngine
             }
 
             val remoteMillis = remoteEditedAt.toEpochMilli()
-            transactionRunner.withTransaction {
-                val local = dayDao.find(epochDay)
-                val state = nextState(local, remoteMillis, dto, epochDay, habits)
+            val plan =
+                transactionRunner.withTransaction {
+                    val local = dayDao.find(epochDay)
+                    val plan = planFor(local, remoteMillis, dto, epochDay, habits)
 
-                dayDao.upsert(
-                    DayEntity(
-                        epochDay = epochDay,
-                        // Adopted unconditionally, even for a conflicted day. This is the line that
-                        // makes a killed `createPage` recoverable: whatever the content turns out
-                        // to be, the page for this date is now known.
-                        notionPageId = dto.id,
-                        localUpdatedAtEpochMillis = local?.localUpdatedAtEpochMillis,
-                        // Always advanced, in every state. It is the pull's watermark, so a day
-                        // left in CONFLICT that kept its old value would be re-fetched forever.
-                        remoteLastEditedAtEpochMillis = remoteMillis,
-                        syncState = state,
-                    ),
-                )
-                if (state == SyncState.SYNCED) applyCompletions(dto, epochDay, habits)
-            }
+                    dayDao.upsert(
+                        DayEntity(
+                            epochDay = epochDay,
+                            // Adopted unconditionally. This is the line that makes a killed
+                            // `createPage` recoverable: whatever the content turns out to be, the
+                            // page for this date is now known.
+                            notionPageId = dto.id,
+                            localUpdatedAtEpochMillis = local?.localUpdatedAtEpochMillis,
+                            // Always advanced, in either state. It is the pull's watermark, so a
+                            // day that kept its old value would be re-fetched forever.
+                            remoteLastEditedAtEpochMillis = remoteMillis,
+                            syncState = plan.state,
+                        ),
+                    )
+                    if (plan.state == SyncState.SYNCED) applyCompletions(dto, epochDay, habits)
+                    plan
+                }
+            // Outside the transaction on purpose: a notice for a write that rolled back would be
+            // an apology for something that never happened.
+            plan.discarded?.let(discarded::add)
             return true
         }
 
         /**
-         * Which of the three states this day is in once the remote copy is known.
+         * What to do with one day, once both copies are known.
          *
-         * The interesting case is a day already marked `PENDING_PUSH`, where both sides may have
-         * moved. It resolves in three steps, and the first one matters most:
-         *
-         * 1. **If the two sides already agree, it is not a conflict** — whatever the timestamps say.
-         *    This is what stops a killed push from leaving a conflict behind: the page it created
-         *    holds exactly what we were trying to send, so there is nothing left to disagree about
-         *    and the day is simply `SYNCED`.
-         * 2. **If Notion has not changed since we last looked**, only this device has, so the day
-         *    still owes its push and keeps `PENDING_PUSH`. The remote value we would otherwise
-         *    apply is the one we already have.
-         * 3. **Otherwise both sides changed** — `CONFLICT`, local completions untouched, and M4.9
-         *    decides. Never resolved here, and never resolved silently (`CLAUDE.md` §3.5).
-         *
-         * A day already in `CONFLICT` stays there: this pull is not the thing that resolves it.
+         * @param discarded what resolution destroyed, or null when nothing was.
          */
-        private suspend fun nextState(
+        private data class DayPlan(
+            val state: SyncState,
+            val discarded: DiscardedEdit? = null,
+        )
+
+        /**
+         * Decides one day, in four steps that get progressively less common.
+         *
+         * 1. **A day with nothing unpushed just takes the remote copy.** New, or already `SYNCED`:
+         *    Notion is the only side that has moved.
+         * 2. **If the two copies agree, there is nothing to resolve** — whatever the timestamps
+         *    say. This is what stops a killed push from leaving a conflict behind: the page it
+         *    created holds exactly what this device was trying to send.
+         * 3. **If Notion has not moved since we last looked**, only this device has, so the day
+         *    still owes its push. The remote value we would otherwise apply is the one we already
+         *    have.
+         * 4. **Otherwise both copies changed** and [ConflictResolver] decides by last-write-wins,
+         *    naming what it destroys.
+         *
+         * A day found in `CONFLICT` is treated as unpushed and resolved here. Nothing writes that
+         * state any more — it is the one M4.8 used before this step existed, and this is the door
+         * out of it, so no day can be left stuck in it.
+         */
+        private suspend fun planFor(
             local: DayEntity?,
             remoteMillis: Long,
             dto: NotionPageDto,
             epochDay: Long,
             habits: MappedHabits,
-        ): SyncState =
-            when {
-                local == null -> SyncState.SYNCED
-                local.syncState == SyncState.CONFLICT -> SyncState.CONFLICT
-                local.syncState != SyncState.PENDING_PUSH -> SyncState.SYNCED
-                sidesAgree(dto, epochDay, habits) -> SyncState.SYNCED
-                remoteMillis == local.remoteLastEditedAtEpochMillis -> SyncState.PENDING_PUSH
-                else -> SyncState.CONFLICT
+        ): DayPlan {
+            val unpushed = local?.syncState == SyncState.PENDING_PUSH || local?.syncState == SyncState.CONFLICT
+            if (local == null || !unpushed) return DayPlan(SyncState.SYNCED)
+
+            val remoteChecked = habits.checkedOn(dto)
+            val localChecked = localCheckedOn(epochDay, habits)
+            return when {
+                localChecked == remoteChecked -> {
+                    DayPlan(SyncState.SYNCED)
+                }
+
+                remoteMillis == local.remoteLastEditedAtEpochMillis -> {
+                    DayPlan(SyncState.PENDING_PUSH)
+                }
+
+                else -> {
+                    val resolution =
+                        ConflictResolver.resolve(
+                            localUpdatedAtEpochMillis = local.localUpdatedAtEpochMillis,
+                            remoteEditedAtEpochMillis = remoteMillis,
+                            localHabitIds = localChecked,
+                            remoteHabitIds = remoteChecked,
+                        )
+                    DayPlan(
+                        // Remote wins and the page is applied; local wins and the day goes back to
+                        // owing a push, which the push phase sends in this same run.
+                        state = if (resolution is Resolution.RemoteWins) SyncState.SYNCED else SyncState.PENDING_PUSH,
+                        discarded =
+                            DiscardedEdit(
+                                epochDay = epochDay,
+                                habitIds = resolution.discarded,
+                                discardedSide = resolution.discardedSide,
+                                resolvedAtEpochMillis = clock.millis(),
+                            ),
+                    )
+                }
             }
+        }
 
         /**
-         * Whether the page and the local day record the same check-offs.
+         * The habits this device records as done on a day, **over the mapped habits only**.
          *
-         * **Compared over the mapped habits only.** A habit that has gone inactive still has its
-         * completions locally and has no property in the mapping, so counting them would make every
-         * day disagree forever.
+         * A habit that has gone inactive still has its completions locally and has no property in
+         * the mapping, so counting them would make every day disagree with Notion forever.
          */
-        private suspend fun sidesAgree(
-            dto: NotionPageDto,
+        private suspend fun localCheckedOn(
             epochDay: Long,
             habits: MappedHabits,
-        ): Boolean {
+        ): Set<String> {
             val mapped = habits.localIds.toSet()
-            val locally =
-                completionDao
-                    .forDay(epochDay)
-                    .map(HabitCompletionEntity::habitId)
-                    .filter { it in mapped }
-                    .toSet()
-            return locally == habits.checkedOn(dto)
+            return completionDao
+                .forDay(epochDay)
+                .map(HabitCompletionEntity::habitId)
+                .filter { it in mapped }
+                .toSet()
         }
 
         /**
@@ -323,18 +384,23 @@ class SyncEngine
          * A page Notion reports as trashed or archived.
          *
          * Rare to the point of theoretical — §14 says such a page is not returned by a query at all
-         * — but the branch is one line and the alternative is storing a day that upstream has
-         * deleted. A day with an unpushed local edit becomes a conflict instead of vanishing: the
-         * user checked something off, and dropping it to match a delete they may not have intended
-         * is exactly the silent destruction §3.5 rules out.
+         * — but the branch is short and the alternative is storing a day that upstream has deleted.
+         *
+         * **A day with an unpushed edit survives, and its page id is dropped so the push recreates
+         * it.** This is the one conflict [ConflictResolver] does not decide, because it cannot: a
+         * deletion carries no timestamp to compare, so last-write-wins has nothing to weigh. Local
+         * wins by construction instead, and the reasoning is asymmetric on purpose — this app has
+         * no way to delete in Notion (ADR-036), so honouring the deletion would destroy the local
+         * check-off with no way for the user to get it back, while ignoring it costs them one page
+         * they can delete again.
          */
         private suspend fun reconcileGonePage(epochDay: Long) {
             transactionRunner.withTransaction {
                 val local = dayDao.find(epochDay) ?: return@withTransaction
-                if (local.syncState == SyncState.PENDING_PUSH) {
-                    dayDao.upsert(local.copy(syncState = SyncState.CONFLICT))
-                } else {
+                if (local.syncState == SyncState.SYNCED) {
                     dayDao.delete(epochDay)
+                } else {
+                    dayDao.upsert(local.copy(notionPageId = null, syncState = SyncState.PENDING_PUSH))
                 }
             }
         }

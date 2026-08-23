@@ -33,9 +33,20 @@ enum class SyncState {
     /**
      * Both sides changed since the last sync.
      *
-     * Resolution is last-write-wins per record, comparing the local edit time against Notion's
-     * `last_edited_time` (`CLAUDE.md` §3.5). Where resolution discards a user's edit, the UI has to
-     * say so — never resolve destructively and silently.
+     * **Nothing writes this any more, as of M4.9.** Resolution is last-write-wins and needs no
+     * input from the user, so `SyncEngine` decides a conflict in the transaction that finds it —
+     * the page is in hand at that moment — and the day comes out either [SYNCED] or
+     * [PENDING_PUSH]. A persisted "both changed" state would only ever mean *not yet resolved*,
+     * and a day sitting in it is a day the push skips: stuck, for no benefit.
+     *
+     * It is kept for two reasons. `CLAUDE.md` §3.5 lists it among the three states, and removing it
+     * is a §3 change to ask about rather than to make. And `SyncEngine.planFor` still *reads* it, as
+     * the way out for a row an earlier build could have written — treating it as unpushed and
+     * resolving it like any other disagreement.
+     *
+     * What the resolution destroyed is recorded as a
+     * [com.cristianprincipi.habits.data.sync.DiscardedEdit], because §3.5 permits resolution to
+     * discard an edit but never to do it silently.
      */
     CONFLICT,
 }
