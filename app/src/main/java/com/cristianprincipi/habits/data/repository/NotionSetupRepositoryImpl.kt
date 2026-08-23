@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.data.repository
 
+import com.cristianprincipi.habits.data.local.LocalHabitData
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
@@ -14,6 +15,7 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
 import com.cristianprincipi.habits.data.remote.notion.mapper.NotionPropertyType
 import com.cristianprincipi.habits.data.remote.notion.mapper.propertyType
+import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncEngine
 import com.cristianprincipi.habits.data.sync.SyncOutcome
@@ -26,6 +28,7 @@ import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,14 +42,25 @@ import javax.inject.Singleton
 @Singleton
 class NotionSetupRepositoryImpl
     @Inject
+    // The collaborators the connection's whole life needs: one remote, the two things setup saves,
+    // the engine that runs the first import, and the three things disconnect wipes. `CLAUDE.md`
+    // §3.6 is what makes the tail of that list long, and it is a list worth being explicit about —
+    // a facade over "everything disconnect clears" would hide the enumeration this class's KDoc
+    // exists to keep honest. `LocalHabitData` is already one such extraction, made because the
+    // database wipe was a genuinely different job; the rest are not.
+    @Suppress("LongParameterList")
     constructor(
         private val api: NotionApi,
         private val tokenStore: NotionTokenStore,
         private val mappingStore: NotionMappingStore,
         private val syncEngine: SyncEngine,
         private val lastFailure: LastSyncFailureStore,
+        private val discardedEdits: DiscardedEditStore,
+        private val localData: LocalHabitData,
     ) : NotionSetupRepository {
         override val isConnected: Flow<Boolean> = tokenStore.isConnected
+
+        override val isConfigured: Flow<Boolean> = mappingStore.mapping.map { mapping -> mapping != null }
 
         override suspend fun saveToken(token: String) {
             tokenStore.save(NotionToken(token.trim()))
@@ -164,6 +178,26 @@ class NotionSetupRepositoryImpl
                 // finished setup.
                 else -> NotionSetupResult.Failure(outcome.failure ?: SyncFailure.NotConnected)
             }
+        }
+
+        /**
+         * Disconnect, in the order that survives being killed halfway.
+         *
+         * **The token goes first.** Everything else here is recoverable — a mapping is a few taps,
+         * notices are notices — but a process killed after wiping the mapping and before wiping the
+         * token would leave the one thing `CLAUDE.md` §3.6 calls a password sitting on the device
+         * with nothing pointing at it, and no screen offering to remove it. Wiping the secret first
+         * means a half-finished disconnect fails safe.
+         *
+         * **The local data goes last, and as one transaction** — see [LocalHabitData].
+         */
+        override suspend fun disconnect(alsoDeleteLocalData: Boolean) {
+            tokenStore.clear()
+            mappingStore.clear()
+            lastFailure.clear()
+            discardedEdits.clear()
+
+            if (alsoDeleteLocalData) localData.deleteEverything()
         }
 
         /**

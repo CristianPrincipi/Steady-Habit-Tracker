@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.domain.repository
 
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
@@ -31,4 +32,22 @@ interface SyncStatusRepository {
      * a check-off**: §3.5 asks for writes to be batched rather than fired one per checkbox tap.
      */
     fun requestSync()
+
+    /**
+     * Edits that conflict resolution destroyed and has not been forgiven for, newest first.
+     *
+     * ⭐ **The screen that collects these is what makes `CLAUDE.md` §3.5 true.** That rule permits
+     * last-write-wins to discard a user's edit and forbids doing it silently; M4.9 built the
+     * persistence so a background discard survives to be told about, and rendering it is the other
+     * half of the same sentence. An empty list is the normal case and shows nothing.
+     */
+    fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>>
+
+    /**
+     * The user has read them. Clears every notice.
+     *
+     * Deliberately all of them rather than one at a time: these are an apology, not a task list, and
+     * a per-notice dismiss would imply the app is waiting for something to be done about each.
+     */
+    suspend fun dismissDiscardedEdits()
 }

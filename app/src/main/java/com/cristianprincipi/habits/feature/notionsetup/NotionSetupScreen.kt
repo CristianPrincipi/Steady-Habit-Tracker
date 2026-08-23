@@ -22,6 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.model.SyncFailure
@@ -78,7 +79,7 @@ fun NotionSetupContent(
     ) {
         SetupTopRow(state = state, onEvent = onEvent, canGoBack = canGoBack)
 
-        state.failure?.let { failure -> SetupFailureBanner(failure = failure) }
+        state.failure?.let { failure -> NotionFailureBanner(failure = failure) }
 
         when (state.step) {
             NotionSetupStep.Token -> TokenStep(state = state, onEvent = onEvent)

@@ -51,6 +51,11 @@ style:
       - '**/core/designsystem/theme/**'
       - '**/core/ui/preview/**'
       - '**/*.kts'
+    # A @Preview's body IS sample data — dates, counts, percentages — and naming each literal
+    # produces a wall of single-use constants that says less than the call site it replaced. Same
+    # reasoning as the core/ui/preview exclusion above, applied to previews that live beside their
+    # screen rather than in the shared fixtures package.
+    ignoreAnnotated: ['Preview', 'PreviewLightDark']
   MaxLineLength:
     # ktlint owns line length (see .editorconfig). Two tools reporting the same violation is noise,
     # and only one of them can fix it with `ktlintFormat`.

@@ -1,7 +1,6 @@
 package com.cristianprincipi.habits.feature.notionsetup
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,11 +12,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -37,8 +33,6 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
-import com.cristianprincipi.habits.domain.model.MappingIssue
-import com.cristianprincipi.habits.domain.model.SyncFailure
 
 /*
  * The pieces every step of the wizard is built from.
@@ -152,122 +146,6 @@ fun SetupTextField(
         )
     }
 }
-
-/**
- * The step's one primary action: full width, 14dp radius, and a spinner in place of its label while
- * a request is in flight.
- *
- * The spinner sits **inside the button** rather than over the screen, which is the difference
- * between "this is working" and a modal that blocks everything. `CLAUDE.md` §3.5 asks for the
- * latter never to happen to the sync loop; the same instinct applies here.
- */
-@Composable
-fun SetupPrimaryButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    isBusy: Boolean = false,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        enabled = enabled,
-        shape = MaterialTheme.shapes.large,
-        contentPadding = ButtonDefaults.ContentPadding,
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = HabitsTheme.colors.text.primary,
-                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = DISABLED_ALPHA),
-                disabledContentColor =
-                    HabitsTheme.colors.text.primary
-                        .copy(alpha = DISABLED_ALPHA),
-            ),
-    ) {
-        if (isBusy) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(Sizing.iconMedium),
-                color = HabitsTheme.colors.text.primary,
-                strokeWidth = Sizing.todayRing,
-            )
-        } else {
-            Text(text = text, style = MaterialTheme.typography.labelLarge)
-        }
-    }
-}
-
-/**
- * A failure, said as the thing to do about it.
- *
- * ⭐ The `when` below is the reason [SyncFailure] is a closed set: adding a way to fail stops this
- * compiling, so no failure can ship without a sentence. The warning palette rather than the error
- * one — the prototype's own banner treatment (`docs/design-spec.md` §6.2), and right for this
- * screen, where almost every case is something the user can go and fix.
- */
-@Composable
-fun SetupFailureBanner(
-    failure: SyncFailure,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(
-                    color = HabitsTheme.colors.warning.copy(alpha = BANNER_FILL_ALPHA),
-                    shape = MaterialTheme.shapes.large,
-                ).border(
-                    width = Sizing.hairlineBorder,
-                    color = HabitsTheme.colors.warning.copy(alpha = BANNER_BORDER_ALPHA),
-                    shape = MaterialTheme.shapes.large,
-                ).padding(Spacing.cardPadding),
-        verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
-    ) {
-        Text(
-            text = stringResource(failure.messageRes()),
-            style = MaterialTheme.typography.bodyMedium,
-            color = HabitsTheme.colors.warning,
-        )
-        if (failure is SyncFailure.MappingBroken) {
-            failure.issues.forEach { issue ->
-                Text(
-                    text = issue.describe(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HabitsTheme.colors.text.secondary,
-                )
-            }
-        }
-    }
-}
-
-private fun SyncFailure.messageRes(): Int =
-    when (this) {
-        SyncFailure.NotConnected -> R.string.setup_failure_not_connected
-        SyncFailure.TokenRejected -> R.string.setup_failure_token_rejected
-        SyncFailure.MissingCapability -> R.string.setup_failure_missing_capability
-        SyncFailure.DatabaseNotShared -> R.string.setup_failure_database_not_shared
-        is SyncFailure.MappingBroken -> R.string.setup_failure_mapping_broken
-        SyncFailure.Offline -> R.string.setup_failure_offline
-        SyncFailure.NotionUnavailable -> R.string.setup_failure_notion_unavailable
-        SyncFailure.AppOutOfDate -> R.string.setup_failure_app_out_of_date
-    }
-
-/**
- * One mapping problem as a line of text.
- *
- * A deleted property has no name to show — it is gone from the schema — so those lines are
- * deliberately vaguer than the retyped ones, which can still name the column.
- */
-@Composable
-private fun MappingIssue.describe(): String =
-    when (this) {
-        is MappingIssue.DayKeyMissing -> stringResource(R.string.setup_issue_day_key_missing)
-        is MappingIssue.DayKeyRetyped -> stringResource(R.string.setup_issue_day_key_retyped, actualType)
-        is MappingIssue.HabitMissing -> stringResource(R.string.setup_issue_habit_missing)
-        is MappingIssue.HabitRetyped -> stringResource(R.string.setup_issue_habit_retyped, name, actualType)
-        MappingIssue.WrongDataSource -> stringResource(R.string.setup_issue_wrong_data_source)
-    }
 
 /**
  * A row the user picks exactly one of.
@@ -420,25 +298,6 @@ fun SetupProgressDots(
                             shape = CircleShape,
                         ),
             )
-        }
-    }
-}
-
-private const val DISABLED_ALPHA = 0.35f
-private const val BANNER_FILL_ALPHA = 0.08f
-private const val BANNER_BORDER_ALPHA = 0.20f
-
-@Preview(backgroundColor = 0xFF111113, showBackground = true, widthDp = 400)
-@Composable
-private fun SetupFailureBannerPreview() {
-    HabitsTheme {
-        Column(
-            modifier = Modifier.padding(Spacing.screenPadding),
-            verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
-        ) {
-            SetupFailureBanner(failure = SyncFailure.DatabaseNotShared)
-            SetupPrimaryButton(text = "Continue", onClick = {})
-            SetupPrimaryButton(text = "Continue", onClick = {}, isBusy = true)
         }
     }
 }

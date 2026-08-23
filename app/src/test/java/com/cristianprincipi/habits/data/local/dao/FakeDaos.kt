@@ -58,6 +58,10 @@ class FakeHabitDao(
             }
     }
 
+    override suspend fun deleteAll() {
+        rows.value = emptyMap()
+    }
+
     override suspend fun setColor(
         habitId: String,
         color: String,
@@ -101,6 +105,10 @@ class FakeDayDao(
             }.maxOrNull()
 
     override suspend fun earliestDay(): Long? = rows.keys.minOrNull()
+
+    override suspend fun deleteAll() {
+        rows.clear()
+    }
 
     override suspend fun delete(epochDay: Long) {
         rows.remove(epochDay)
@@ -150,6 +158,10 @@ class FakeCompletionDao(
         }
         // The real DAO inserts with OnConflictStrategy.IGNORE; a Set gives the same outcome.
         rows.value = rows.value + completion
+    }
+
+    override suspend fun deleteAll() {
+        rows.value = emptySet()
     }
 
     override suspend fun delete(

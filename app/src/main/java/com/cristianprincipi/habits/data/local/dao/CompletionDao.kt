@@ -54,9 +54,20 @@ interface CompletionDao {
     suspend fun insert(completion: HabitCompletionEntity)
 
     /** Take a completion back. Deleting one that is not there is not an error. */
+
     @Query("DELETE FROM habit_completions WHERE habitId = :habitId AND epochDay = :epochDay")
     suspend fun delete(
         habitId: String,
         epochDay: Long,
     )
+
+    /**
+     * Every check-off, gone. **Only for the disconnect action** (M4.13).
+     *
+     * Redundant with the two cascades in theory — deleting the habits or the days takes these with
+     * them — and kept anyway, because "the user asked to remove their data" should not depend on a
+     * pragma being enabled to be true.
+     */
+    @Query("DELETE FROM habit_completions")
+    suspend fun deleteAll()
 }

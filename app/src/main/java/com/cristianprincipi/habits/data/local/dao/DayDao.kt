@@ -55,4 +55,14 @@ interface DayDao {
      */
     @Query("DELETE FROM days WHERE epochDay = :epochDay")
     suspend fun delete(epochDay: Long)
+
+    /**
+     * Every day, gone. **Only for the disconnect action** (M4.13).
+     *
+     * This also drops the pull watermark, which is the point: a later reconnect should import from
+     * scratch rather than resume from a `MAX(remoteLastEditedAt)` describing data that is no longer
+     * here (ADR-047).
+     */
+    @Query("DELETE FROM days")
+    suspend fun deleteAll()
 }

@@ -81,6 +81,19 @@ interface HabitDao {
         epochDay: Long,
     )
 
+    /**
+     * Every habit, gone. **Only for the disconnect action** (`CLAUDE.md` §3.6, M4.13).
+     *
+     * Nothing else in this app deletes a habit — ADR-010 removed habit deletion entirely, and
+     * `deactivateAllExcept` is what a sync uses when a column leaves the mapping, precisely so the
+     * history survives. This exists because a user who disconnects and asks to remove the synced
+     * data has said to remove it.
+     *
+     * Completions go with these by cascade, and `DayDao.deleteAll` clears the other parent.
+     */
+    @Query("DELETE FROM habits")
+    suspend fun deleteAll()
+
     @Query("UPDATE habits SET color = :color WHERE id = :habitId")
     suspend fun setColor(
         habitId: String,

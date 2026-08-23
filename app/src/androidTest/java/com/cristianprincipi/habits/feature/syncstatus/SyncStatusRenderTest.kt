@@ -1,0 +1,140 @@
+package com.cristianprincipi.habits.feature.syncstatus
+
+import android.content.Context
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.Elapsed
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.EditSide
+import com.cristianprincipi.habits.domain.model.SyncFailure
+import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.time.Instant
+import java.time.LocalDate
+
+/**
+ * The sync-status screen on a device, driven through its stateless half.
+ *
+ * `createComposeRule` rather than the Android one: [SyncStatusContent] takes its state as a
+ * parameter, so every case below can be set up exactly — including the two that are hard to reach
+ * on a real device, a rejected token and a day whose edit was thrown away.
+ *
+ * **Every string is read from the same resources the screen uses**, so a test cannot pass against
+ * wording that no longer exists.
+ */
+@RunWith(AndroidJUnit4::class)
+class SyncStatusRenderTest {
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    private val notice =
+        DiscardedEditNotice(
+            date = LocalDate.of(2026, 8, 21),
+            habitNames = listOf("📖 Read"),
+            habitCount = 1,
+            discardedSide = EditSide.Local,
+            resolvedAt = Instant.parse("2026-08-23T09:00:00Z"),
+        )
+
+    private fun show(
+        state: SyncStatusUiState,
+        onEvent: (SyncStatusEvent) -> Unit = {},
+    ) {
+        composeTestRule.setContent {
+            HabitsTheme { SyncStatusContent(state = state, onEvent = onEvent) }
+        }
+    }
+
+    /** `createComposeRule` has no activity, so the strings come from the app context. */
+    private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
+
+    @Test
+    fun aHealthyConnectionSaysWhenItLastSynced() {
+        show(SyncStatusUiState(isConnected = true, lastSynced = Elapsed.Minutes(3)))
+
+        composeTestRule.onNodeWithText(string(R.string.sync_connected)).assertIsDisplayed()
+    }
+
+    @Test
+    fun anAppThatHasNeverSyncedSaysThatRatherThanNothing() {
+        show(SyncStatusUiState(isConnected = true, lastSynced = null))
+
+        composeTestRule.onNodeWithText(string(R.string.sync_never)).assertIsDisplayed()
+    }
+
+    @Test
+    fun aFailureRendersAsTheFixRatherThanTheFault() {
+        // ⭐ CLAUDE.md §3.3's case. The sentence must send the user to Notion's sharing menu — the
+        // whole reason NotionFailureBanner is shared with the setup wizard rather than duplicated.
+        show(SyncStatusUiState(isConnected = true, failure = SyncFailure.DatabaseNotShared))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.notion_failure_database_not_shared))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun aDiscardedEditIsAdmittedTo() {
+        // ⭐ The other half of CLAUDE.md §3.5: resolution may destroy an edit, but not silently.
+        show(SyncStatusUiState(isConnected = true, discardedEdits = listOf(notice)))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_discarded_eyebrow))
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText("📖 Read").assertIsDisplayed()
+    }
+
+    @Test
+    fun theDisconnectConfirmationStartsWithTheDataCheckboxOff() {
+        // The safe direction, and CLAUDE.md §3.6's separate choice. A tick here deletes history that
+        // may be the only copy left.
+        show(SyncStatusUiState(isConnected = true, isConfirmingDisconnect = true))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_disconnect_delete_local))
+            .assertIsOff()
+    }
+
+    @Test
+    fun tickingTheDataCheckboxReportsItAndShowsTheWarning() {
+        var toggled: Boolean? = null
+        show(
+            state = SyncStatusUiState(isConnected = true, isConfirmingDisconnect = true, willDeleteLocalData = true),
+            onEvent = { event ->
+                if (event is SyncStatusEvent.DeleteLocalDataToggled) toggled = event.delete
+            },
+        )
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_disconnect_delete_local))
+            .assertIsOn()
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_disconnect_delete_local_warning))
+            .assertIsDisplayed()
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_disconnect_delete_local))
+            .performClick()
+
+        assertEquals(false, toggled)
+    }
+
+    @Test
+    fun anUnconnectedAppOffersNoDisconnect() {
+        show(SyncStatusUiState(isConnected = false))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_not_connected))
+            .assertIsDisplayed()
+    }
+}

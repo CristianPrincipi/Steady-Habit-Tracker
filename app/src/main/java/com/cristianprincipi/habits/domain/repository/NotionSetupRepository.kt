@@ -28,6 +28,16 @@ interface NotionSetupRepository {
     val isConnected: Flow<Boolean>
 
     /**
+     * Whether setup has **finished** — a database is picked and its columns are mapped.
+     *
+     * ⚠ **Not the same question as [isConnected], and the difference is load-bearing.** A token is
+     * stored at the *first* step of the wizard, two steps before the user has chosen anything; a
+     * caller that treats "has a token" as "is set up" will decide the flow is over while the user
+     * is still in the middle of it. This is the one to route on.
+     */
+    val isConfigured: Flow<Boolean>
+
+    /**
      * Stores the pasted token, encrypted under the Android Keystore.
      *
      * Does **not** validate it: that is [findSources]'s job, because the only way to know a token
@@ -100,4 +110,26 @@ interface NotionSetupRepository {
      * @return the value of the run — a success carries how many days arrived.
      */
     suspend fun importNow(): NotionSetupResult<Int>
+
+    /**
+     * Forgets the connection. The **disconnect** action `CLAUDE.md` §3.6 requires.
+     *
+     * Four things go unconditionally, and the list is longer than it first looks:
+     *
+     * 1. the token, ciphertext and Keystore key together;
+     * 2. the property mapping — without a token it names columns in a database the app cannot
+     *    reach, and a stale one is how the next connection silently maps onto the wrong schema;
+     * 3. the last sync failure — an error about a database this app is no longer connected to is
+     *    not something to keep showing;
+     * 4. the discarded-edit notices, for the same reason.
+     *
+     * **`lastSyncedAt` is deliberately left alone**, the way `NotionMappingStore.clear` leaves it:
+     * disconnecting is not a claim about when the data was last correct.
+     *
+     * @param alsoDeleteLocalData the user's separate, explicit choice — **never implied by
+     *   disconnecting**. Losing the history is not what "stop syncing" means, and for a habit whose
+     *   Notion column has since been deleted the local copy may be the only one left in existence
+     *   (`docs/notion-schema.md` §4.1). Default `false` is the safe direction, and the screen asks.
+     */
+    suspend fun disconnect(alsoDeleteLocalData: Boolean = false)
 }

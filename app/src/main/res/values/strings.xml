@@ -11,7 +11,6 @@
     -->
     <string name="setup_step_counter">Step %1$d of %2$d</string>
     <string name="setup_back">Back</string>
-    <string name="setup_working">Working…</string>
 
     <!-- Step 1 — the token -->
     <string name="setup_token_title">Connect to Notion</string>
@@ -65,30 +64,83 @@
     <string name="setup_done_body_empty">No days to import yet. Check a habit off and it will appear in Notion.</string>
 
     <!--
-      Failure sentences — one per SyncFailure case. The `when` that picks between them is
-      exhaustive, so adding a way to fail makes the compiler point at this list.
+      The sync-status screen (M4.13). CLAUDE.md §3.5: failure is "a clear, non-blocking,
+      human-readable message with a retry affordance" — never a modal over the check-off loop.
     -->
-    <string name="setup_failure_not_connected">No token is stored. Paste one to continue.</string>
-    <string name="setup_failure_token_rejected">Notion wouldn\'t accept that token. Check you copied all of it, or create a new one.</string>
-    <string name="setup_failure_missing_capability">That token isn\'t allowed to do this. In Notion, give the connection permission to read and update content.</string>
+    <string name="sync_title">Notion sync</string>
+    <string name="sync_connected">Connected to Notion</string>
+    <string name="sync_not_connected">Not connected</string>
+    <string name="sync_not_connected_body">Connect a Notion database to start syncing your habits.</string>
+    <string name="sync_in_progress">Syncing…</string>
+    <string name="sync_never">Never synced</string>
+    <string name="sync_just_now">Last synced just now</string>
+    <plurals name="sync_minutes_ago">
+        <item quantity="one">Last synced %1$d minute ago</item>
+        <item quantity="other">Last synced %1$d minutes ago</item>
+    </plurals>
+    <plurals name="sync_hours_ago">
+        <item quantity="one">Last synced %1$d hour ago</item>
+        <item quantity="other">Last synced %1$d hours ago</item>
+    </plurals>
+    <plurals name="sync_days_ago">
+        <item quantity="one">Last synced %1$d day ago</item>
+        <item quantity="other">Last synced %1$d days ago</item>
+    </plurals>
+    <string name="sync_retry">Sync now</string>
+
+    <!--
+      ⭐ The notices CLAUDE.md §3.5 requires: "Where resolution discards a user's edit, say so in
+      the UI. Never resolve destructively and silently." Both sides are the same person in this
+      app, which is why the two sentences differ — the user is entitled to know which happened.
+    -->
+    <string name="sync_discarded_eyebrow">CHANGES THAT WERE REPLACED</string>
+    <string name="sync_discarded_body">Two copies of a day disagreed, so the newer one won. Here is what the older one said.</string>
+    <string name="sync_discarded_local">%1$s — your change on this phone was replaced by your later change in Notion.</string>
+    <string name="sync_discarded_remote">%1$s — your change in Notion was replaced by your later change on this phone.</string>
+    <plurals name="sync_discarded_habits">
+        <item quantity="one">%1$d habit affected</item>
+        <item quantity="other">%1$d habits affected</item>
+    </plurals>
+    <string name="sync_discarded_dismiss">Got it</string>
+
+    <!--
+      Disconnect. CLAUDE.md §3.6 requires it, and requires wiping the local data to be the user's
+      SEPARATE choice — for a habit whose Notion column was since deleted, the local copy may be
+      the only one left (docs/notion-schema.md §4.1).
+    -->
+    <string name="sync_disconnect">Disconnect from Notion</string>
+    <string name="sync_disconnect_title">Disconnect from Notion?</string>
+    <string name="sync_disconnect_body">Your token and database setup will be removed from this phone. Nothing in Notion is changed or deleted.</string>
+    <string name="sync_disconnect_delete_local">Also delete the habits and history stored on this phone</string>
+    <string name="sync_disconnect_delete_local_warning">This cannot be undone. If a habit\'s column was deleted in Notion, this phone may hold the only copy of its history.</string>
+    <string name="sync_disconnect_confirm">Disconnect</string>
+    <string name="sync_disconnect_cancel">Cancel</string>
+
+    <!--
+      Failure sentences — one per SyncFailure case, rendered by NotionFailureBanner.
+      ⭐ NOT prefixed `setup_`, and that matters: BOTH the connection wizard and the sync-status
+      screen show these, and two screens calling the same 401 different things is exactly what one
+      shared list prevents. The `when` that picks between them is exhaustive, so adding a way to
+      fail makes the compiler point here.
+    -->
+    <string name="notion_failure_not_connected">No token is stored. Paste one to continue.</string>
+    <string name="notion_failure_token_rejected">Notion wouldn\'t accept that token. Check you copied all of it, or create a new one.</string>
+    <string name="notion_failure_missing_capability">That token isn\'t allowed to do this. In Notion, give the connection permission to read and update content.</string>
     <!--
       ⭐ CLAUDE.md §3.3 and docs/notion-api.md §3.1. Notion returns the same 404 for "doesn't exist"
       and "not shared with the connection", and gives no way to tell them apart. Sharing is the fix
       far more often, so that is the instruction — never "not found".
     -->
-    <string name="setup_failure_database_not_shared">No database is shared with this connection yet. In Notion, open your habit database → ••• (top right) → Connections → add your connection, then try again.</string>
-    <string name="setup_failure_mapping_broken">Your database has changed since it was set up.</string>
-    <string name="setup_failure_offline">Couldn\'t reach Notion. Check your connection and try again.</string>
-    <string name="setup_failure_notion_unavailable">Notion is busy or having trouble. Try again in a moment.</string>
-    <string name="setup_failure_app_out_of_date">This app and Notion disagree about something. There\'s nothing to fix here — the app needs updating.</string>
+    <string name="notion_failure_database_not_shared">No database is shared with this connection yet. In Notion, open your habit database → ••• (top right) → Connections → add your connection, then try again.</string>
+    <string name="notion_failure_mapping_broken">Your database has changed since it was set up.</string>
+    <string name="notion_failure_offline">Couldn\'t reach Notion. Check your connection and try again.</string>
+    <string name="notion_failure_notion_unavailable">Notion is busy or having trouble. Try again in a moment.</string>
+    <string name="notion_failure_app_out_of_date">This app and Notion disagree about something. There\'s nothing to fix here — the app needs updating.</string>
 
     <!-- Mapping problems, listed under setup_failure_mapping_broken. -->
-    <string name="setup_issue_day_key_missing">The day column was deleted.</string>
-    <string name="setup_issue_day_key_retyped">The day column is now a %1$s.</string>
-    <string name="setup_issue_habit_missing">A habit column was deleted.</string>
-    <string name="setup_issue_habit_retyped">“%1$s” is now a %2$s.</string>
-    <string name="setup_issue_wrong_data_source">The saved setup points at a different database.</string>
-
-    <!-- Content descriptions -->
-    <string name="setup_selected">Selected</string>
+    <string name="notion_issue_day_key_missing">The day column was deleted.</string>
+    <string name="notion_issue_day_key_retyped">The day column is now a %1$s.</string>
+    <string name="notion_issue_habit_missing">A habit column was deleted.</string>
+    <string name="notion_issue_habit_retyped">“%1$s” is now a %2$s.</string>
+    <string name="notion_issue_wrong_data_source">The saved setup points at a different database.</string>
 </resources>

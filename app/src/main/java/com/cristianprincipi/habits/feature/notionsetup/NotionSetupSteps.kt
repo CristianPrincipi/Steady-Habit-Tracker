@@ -14,6 +14,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -53,7 +54,7 @@ fun TokenStep(
             // ⚠ CLAUDE.md §3.6 — the token is a password and is never put on screen in the clear.
             isSecret = true,
         )
-        SetupPrimaryButton(
+        PrimaryButton(
             text = stringResource(R.string.setup_token_continue),
             onClick = { onEvent(NotionSetupEvent.TokenSubmitted) },
             enabled = state.canContinueFromToken,
@@ -103,7 +104,7 @@ fun ChooseDatabaseStep(
                 helper = stringResource(R.string.setup_link_helper),
                 errorText = stringResource(R.string.setup_link_unreadable).takeIf { state.isLinkUnreadable },
             )
-            SetupPrimaryButton(
+            PrimaryButton(
                 text = stringResource(R.string.setup_link_submit),
                 onClick = { onEvent(NotionSetupEvent.DatabaseLinkSubmitted) },
                 enabled = state.canLookUpLink,
@@ -117,7 +118,7 @@ fun ChooseDatabaseStep(
                     color = MaterialTheme.colorScheme.primary,
                 )
             }
-            SetupPrimaryButton(
+            PrimaryButton(
                 text = stringResource(R.string.setup_database_continue),
                 onClick = { onEvent(NotionSetupEvent.DatabaseConfirmed) },
                 enabled = state.canContinueFromDatabase,
@@ -197,7 +198,7 @@ fun MapPropertiesStep(
                 if (state.habitPropertyIds.isEmpty() && state.habitCandidates.isNotEmpty()) {
                     StepNote(text = stringResource(R.string.setup_mapping_needs_habit))
                 }
-                SetupPrimaryButton(
+                PrimaryButton(
                     text = stringResource(R.string.setup_mapping_submit),
                     onClick = { onEvent(NotionSetupEvent.MappingSubmitted) },
                     enabled = state.canSaveMapping,

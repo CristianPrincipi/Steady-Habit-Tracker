@@ -1,13 +1,21 @@
 package com.cristianprincipi.habits.data.repository
 
+import com.cristianprincipi.habits.data.local.dao.HabitDao
+import com.cristianprincipi.habits.data.sync.DiscardedEdit
+import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncScheduler
+import com.cristianprincipi.habits.data.sync.SyncSide
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.time.Instant
+import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +51,8 @@ class SyncStatusRepositoryImpl
         private val settings: SettingsRepository,
         private val lastFailure: LastSyncFailureStore,
         private val scheduler: SyncScheduler,
+        private val discardedEdits: DiscardedEditStore,
+        private val habitDao: HabitDao,
     ) : SyncStatusRepository {
         override fun observeStatus(): Flow<SyncStatus> =
             combine(
@@ -63,4 +73,40 @@ class SyncStatusRepositoryImpl
         override fun requestSync() {
             scheduler.syncNow()
         }
+
+        /**
+         * The stored notices, with their habit ids turned into the names those habits have **now**.
+         *
+         * The join is here rather than at write time on purpose (ADR-038): names change upstream,
+         * and a notice written last week should read with today's name. `combine` rather than a
+         * one-shot read, so a rename arriving on the next sync updates a notice already on screen.
+         *
+         * A habit whose column has since been deleted has no name left to find and drops out of the
+         * list — which is why the count travels separately, so the sentence can still say how many
+         * habits were affected.
+         */
+        override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> =
+            combine(discardedEdits.edits, habitDao.observeAll()) { edits, habits ->
+                // The Notion column name, which is what the habit is called everywhere in this app
+                // — habits have no name of their own (ADR-010: they are columns, not rows).
+                val namesById = habits.associate { habit -> habit.id to habit.notionPropertyName }
+                edits.map { edit -> edit.toNotice(namesById) }
+            }.distinctUntilChanged()
+
+        override suspend fun dismissDiscardedEdits() {
+            discardedEdits.clear()
+        }
     }
+
+private fun DiscardedEdit.toNotice(namesById: Map<String, String>): DiscardedEditNotice =
+    DiscardedEditNotice(
+        date = LocalDate.ofEpochDay(epochDay),
+        habitNames = habitIds.mapNotNull(namesById::get).sorted(),
+        habitCount = habitIds.size,
+        discardedSide =
+            when (discardedSide) {
+                SyncSide.LOCAL -> EditSide.Local
+                SyncSide.REMOTE -> EditSide.Remote
+            },
+        resolvedAt = Instant.ofEpochMilli(resolvedAtEpochMillis),
+    )

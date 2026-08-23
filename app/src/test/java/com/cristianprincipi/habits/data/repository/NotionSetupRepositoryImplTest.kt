@@ -8,6 +8,8 @@ import com.cristianprincipi.habits.core.testing.SyncWorld
 import com.cristianprincipi.habits.core.testing.august19
 import com.cristianprincipi.habits.core.testing.dataSourceOf
 import com.cristianprincipi.habits.core.testing.page
+import com.cristianprincipi.habits.data.local.LocalHabitData
+import com.cristianprincipi.habits.data.local.TestTransactionRunner
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.remote.notion.NotionError
@@ -15,7 +17,9 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceRefDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionRichTextDto
+import com.cristianprincipi.habits.data.sync.DiscardedEdit
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
+import com.cristianprincipi.habits.data.sync.SyncSide
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
@@ -24,6 +28,8 @@ import com.cristianprincipi.habits.domain.model.SyncFailure
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -50,6 +56,8 @@ class NotionSetupRepositoryImplTest {
             mappingStore = world.mappingStore,
             syncEngine = world.engine,
             lastFailure = LastSyncFailureStore(dataStore),
+            discardedEdits = world.discardedEdits,
+            localData = LocalHabitData(world.habits, world.days, world.completions, TestTransactionRunner()),
         )
 
     private fun <T> NotionSetupResult<T>.value(): T = (this as NotionSetupResult.Success).value
@@ -293,6 +301,118 @@ class NotionSetupRepositoryImplTest {
 
             assertEquals(SyncFailure.TokenRejected, result.reason())
             assertEquals(SyncFailure.TokenRejected, LastSyncFailureStore(dataStore).read())
+        }
+
+    // --- what "set up" means -------------------------------------------------------------------
+
+    @Test
+    fun storingATokenDoesNotMeanSetupIsFinished() =
+        runTest {
+            // ⭐ Found by looking at the running app. The wizard saves the token at its FIRST step,
+            // two steps before the user has chosen anything — so anything routing on "has a token"
+            // decides the flow is over while the user is still in the middle of it, and they never
+            // see the database picker or the mapping.
+            val repository = repository()
+
+            repository.saveToken("ntn_pretend")
+
+            assertTrue("a token is stored", repository.isConnected.first())
+            assertFalse("but setup is not finished", repository.isConfigured.first())
+        }
+
+    @Test
+    fun savingTheMappingIsWhatFinishesSetup() =
+        runTest {
+            val repository = repository()
+
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+
+            assertTrue(repository.isConfigured.first())
+        }
+
+    @Test
+    fun disconnectingUnfinishesIt() =
+        runTest {
+            val repository = repository()
+            repository.saveToken("ntn_pretend")
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+
+            repository.disconnect()
+
+            assertFalse(repository.isConfigured.first())
+            assertFalse(repository.isConnected.first())
+        }
+
+    // --- disconnect --------------------------------------------------------------------------
+
+    @Test
+    fun disconnectingWipesEverythingThatPointsAtNotion() =
+        runTest {
+            // CLAUDE.md §3.6's disconnect. Four things, not two — a mapping without a token names
+            // columns in a database the app cannot reach, and an error about a database it is no
+            // longer connected to is not something to keep showing.
+            val repository = repository()
+            repository.saveToken("ntn_pretend")
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            world.api.failEverythingWith = NotionError.Unauthorized
+            repository.importNow()
+            world.discardedEdits.record(
+                listOf(DiscardedEdit(20_000, setOf("h"), SyncSide.LOCAL, 1L)),
+            )
+
+            repository.disconnect()
+
+            assertNull("the token", tokenStore.read())
+            assertNull("the mapping", world.mappingStore.read())
+            assertNull("the last failure", LastSyncFailureStore(dataStore).read())
+            assertEquals("the notices", emptyList<DiscardedEdit>(), world.discardedEdits.read())
+        }
+
+    @Test
+    fun disconnectingKeepsTheHistoryUnlessAskedOtherwise() =
+        runTest {
+            // ⭐ The default, and the important one. Losing the history is not what "stop syncing"
+            // means, and for a habit whose Notion column was since deleted this may be the only
+            // copy left in existence (docs/notion-schema.md §4.1).
+            val repository = repository()
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            world.api.givePage(page("p1", august19))
+            repository.importNow()
+            assertTrue("precondition: something was imported", world.habits.current.isNotEmpty())
+
+            repository.disconnect(alsoDeleteLocalData = false)
+
+            assertTrue("habits survive", world.habits.current.isNotEmpty())
+            assertTrue("days survive", world.days.current.isNotEmpty())
+        }
+
+    @Test
+    fun deletingTheLocalDataIsAnExplicitChoiceAndTakesEverything() =
+        runTest {
+            val repository = repository()
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            world.api.givePage(page("p1", august19, checks = mapOf(PropertyIds.READ to true)))
+            repository.importNow()
+            assertTrue("precondition: a completion exists", world.completions.current.isNotEmpty())
+
+            repository.disconnect(alsoDeleteLocalData = true)
+
+            assertTrue("habits gone", world.habits.current.isEmpty())
+            assertTrue("days gone", world.days.current.isEmpty())
+            assertTrue("completions gone", world.completions.current.isEmpty())
+        }
+
+    @Test
+    fun theTokenGoesFirstSoAHalfFinishedDisconnectFailsSafe() =
+        runTest {
+            // Everything else here is recoverable; the token is the one thing §3.6 calls a
+            // password. A process killed mid-disconnect must not leave it behind.
+            val repository = repository()
+            repository.saveToken("ntn_pretend")
+
+            repository.disconnect()
+
+            assertNull(tokenStore.read())
         }
 
     private fun sourceNamed(

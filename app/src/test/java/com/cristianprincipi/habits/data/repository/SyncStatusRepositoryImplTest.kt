@@ -3,10 +3,17 @@ package com.cristianprincipi.habits.data.repository
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeSyncScheduler
 import com.cristianprincipi.habits.core.testing.InMemoryDataStore
+import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
+import com.cristianprincipi.habits.data.local.entity.HabitEntity
 import com.cristianprincipi.habits.data.preferences.SettingsDataStore
 import com.cristianprincipi.habits.data.remote.notion.NotionError
+import com.cristianprincipi.habits.data.sync.DiscardedEdit
+import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncOutcome
+import com.cristianprincipi.habits.data.sync.SyncSide
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import kotlinx.coroutines.test.runTest
@@ -14,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.IOException
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * The one shape the UI sees, assembled from three sources that each know a third of the answer.
@@ -29,7 +37,11 @@ class SyncStatusRepositoryImplTest {
     private val lastFailure = LastSyncFailureStore(dataStore)
     private val scheduler = FakeSyncScheduler()
 
-    private val repository = SyncStatusRepositoryImpl(settings, lastFailure, scheduler)
+    private val discardedEdits = DiscardedEditStore(dataStore)
+    private val habits = FakeHabitDao()
+
+    private val repository =
+        SyncStatusRepositoryImpl(settings, lastFailure, scheduler, discardedEdits, habits)
 
     @Test
     fun aFreshInstallIsIdleAndHasNeverSynced() =
@@ -137,6 +149,96 @@ class SyncStatusRepositoryImplTest {
                 expectNoEvents()
             }
         }
+
+    // --- the notices that make CLAUDE.md §3.5 true ------------------------------------------
+
+    @Test
+    fun aRunThatDestroyedNothingHasNothingToConfess() =
+        runTest {
+            repository.observeDiscardedEdits().test {
+                assertEquals(emptyList<DiscardedEditNotice>(), awaitItem())
+            }
+        }
+
+    @Test
+    fun aNoticeArrivesWithTheNamesThoseHabitsHaveNow() =
+        runTest {
+            // ⭐ The join is done on READ, not on write (ADR-038): the store keeps ids because names
+            // change upstream, and a notice written last week should read with today's name.
+            habits.upsert(listOf(habit("h-read", "📖 Reading"), habit("h-journal", "✒️ Journal")))
+            discardedEdits.record(
+                listOf(
+                    DiscardedEdit(
+                        epochDay = LocalDate.of(2026, 8, 21).toEpochDay(),
+                        habitIds = setOf("h-read", "h-journal"),
+                        discardedSide = SyncSide.LOCAL,
+                        resolvedAtEpochMillis = 1_755_000_000_000L,
+                    ),
+                ),
+            )
+
+            repository.observeDiscardedEdits().test {
+                val notice = awaitItem().single()
+                assertEquals(LocalDate.of(2026, 8, 21), notice.date)
+                assertEquals(listOf("✒️ Journal", "📖 Reading"), notice.habitNames)
+                assertEquals(EditSide.Local, notice.discardedSide)
+            }
+        }
+
+    @Test
+    fun aHabitWhoseColumnWasDeletedLeavesTheCountBehind() =
+        runTest {
+            // It has no name left to find, so it drops out of the list — but "1 habit affected" is
+            // still true and still worth saying, which is why the count travels separately.
+            discardedEdits.record(
+                listOf(
+                    DiscardedEdit(
+                        epochDay = 20_000,
+                        habitIds = setOf("gone"),
+                        discardedSide = SyncSide.REMOTE,
+                        resolvedAtEpochMillis = 1_755_000_000_000L,
+                    ),
+                ),
+            )
+
+            repository.observeDiscardedEdits().test {
+                val notice = awaitItem().single()
+                assertEquals(emptyList<String>(), notice.habitNames)
+                assertEquals(1, notice.habitCount)
+                assertEquals(EditSide.Remote, notice.discardedSide)
+            }
+        }
+
+    @Test
+    fun dismissingClearsThemAll() =
+        runTest {
+            // An apology, not a task list — so there is no per-notice dismiss.
+            discardedEdits.record(
+                listOf(
+                    DiscardedEdit(20_000, setOf("a"), SyncSide.LOCAL, 1L),
+                    DiscardedEdit(20_001, setOf("b"), SyncSide.LOCAL, 2L),
+                ),
+            )
+
+            repository.dismissDiscardedEdits()
+
+            repository.observeDiscardedEdits().test {
+                assertEquals(emptyList<DiscardedEditNotice>(), awaitItem())
+            }
+        }
+
+    private fun habit(
+        id: String,
+        name: String,
+    ) = HabitEntity(
+        id = id,
+        notionPropertyId = id,
+        notionPropertyName = name,
+        color = "#4A9EFF",
+        startDateEpochDay = 20_000,
+        isActive = true,
+        sortOrder = 0,
+    )
 
     @Test
     fun askingForASyncGoesToTheScheduler() =

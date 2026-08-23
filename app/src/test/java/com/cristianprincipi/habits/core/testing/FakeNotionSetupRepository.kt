@@ -23,6 +23,10 @@ class FakeNotionSetupRepository : NotionSetupRepository {
 
     override val isConnected: Flow<Boolean> = connected
 
+    private val configured = MutableStateFlow(false)
+
+    override val isConfigured: Flow<Boolean> = configured
+
     val savedTokens = mutableListOf<String>()
     val savedMappings = mutableListOf<SavedNotionMapping>()
 
@@ -53,7 +57,17 @@ class FakeNotionSetupRepository : NotionSetupRepository {
         habitPropertyIds: List<String>,
     ) {
         savedMappings += SavedNotionMapping(sourceId, dayKeyPropertyId, habitPropertyIds)
+        configured.value = true
     }
 
     override suspend fun importNow(): NotionSetupResult<Int> = importResult
+
+    /** What each disconnect asked for: `true` when the local data was to go too. */
+    val disconnects = mutableListOf<Boolean>()
+
+    override suspend fun disconnect(alsoDeleteLocalData: Boolean) {
+        disconnects += alsoDeleteLocalData
+        connected.value = false
+        configured.value = false
+    }
 }

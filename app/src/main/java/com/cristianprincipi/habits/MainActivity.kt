@@ -11,20 +11,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
-import com.cristianprincipi.habits.feature.notionsetup.NotionSetupScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Bootstrap entry point.
  *
- * ⚠ **The body is scaffolding, and M5 replaces it.** `HabitsNavHost` belongs here; until it exists
- * there is nowhere else to put a screen, and a setup flow nobody can reach is a setup flow nobody
- * has looked at. So M4.12's wizard is hosted directly, which also makes it verifiable on the
- * emulator (`CLAUDE.md` §7).
- *
- * **This is not where the connection flow lives in the finished app.** M12.9 is the real rule: on
- * first launch with no token, route to setup; otherwise go to Week. Wiring that needs navigation,
- * so it waits for M5.
+ * ⚠ **The body is scaffolding, and M5 replaces it** — see [HabitsAppRoot], which stands in for
+ * `HabitsNavHost` until it exists. A screen nobody can reach is a screen nobody has looked at, and
+ * there are now two of them (M4.12, M4.13).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -46,7 +40,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    NotionSetupScreen()
+                    HabitsAppRoot()
                 }
             }
         }
