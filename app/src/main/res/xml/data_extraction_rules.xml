@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nothing leaves this app through backup or transfer. Android 12+ (API 31); older versions are
+    covered by android:allowBackup="false" in the manifest, which this does not replace.
+
+    Why the app opts out entirely, rather than excluding one file:
+
+    The Notion personal access token is stored in its own DataStore file, encrypted with a key held
+    in the Android Keystore (CLAUDE.md §3.6). A Keystore key is bound to the device and is NOT
+    transferred, so a copy of the file that arrived on a new device would be undecryptable — but
+    "the ciphertext is useless over there" is a weaker promise than "it was never copied", and §3.6
+    asks for the second one. Everything else here is a mirror of the user's Notion database, which
+    re-imports from Notion in one sync, so there is nothing worth the risk of carrying.
+
+    ⭐ THIS FILE EXISTS BECAUSE allowBackup="false" IS NOT ENOUGH ON ANDROID 12+. Confirmed against
+    the manifest reference in M4.15: setting it false disables cloud backup, but "on devices from
+    some device manufacturers, you can't disable device-to-device migration of your app's files".
+    <device-transfer> below is the only thing that covers that case.
+
+    Every domain is listed explicitly rather than left to an empty section. A section with no rules
+    at all means "back up everything" — the opposite of what is wanted — and the whitelist reading
+    of an empty section is not stated plainly enough anywhere to bet a token on.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+        <exclude domain="device_root" />
+        <exclude domain="device_file" />
+        <exclude domain="device_database" />
+        <exclude domain="device_sharedpref" />
+    </device-transfer>
+</data-extraction-rules>
