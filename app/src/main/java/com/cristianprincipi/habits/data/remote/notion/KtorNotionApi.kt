@@ -83,7 +83,7 @@ class KtorNotionApi
 
         override suspend fun queryPages(
             dataSourceId: String,
-            editedAfter: Instant?,
+            editedAtOrAfter: Instant?,
             startCursor: String?,
         ): NotionResult<NotionListDto<NotionPageDto>> {
             val request =
@@ -92,7 +92,12 @@ class KtorNotionApi
                     // always explicit. docs/notion-api.md §7 warns that a missing one silently
                     // defaults to UTC — right today, and exactly the kind of default that moves a
                     // pull window by hours if it ever changes.
-                    filter = editedAfter?.let { LastEditedTimeFilter(TimestampCondition(after = it.toString())) },
+                    filter =
+                        editedAtOrAfter?.let {
+                            LastEditedTimeFilter(
+                                TimestampCondition(onOrAfter = it.toString()),
+                            )
+                        },
                     startCursor = startCursor,
                 )
             return exchange(

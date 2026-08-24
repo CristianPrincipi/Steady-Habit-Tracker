@@ -185,12 +185,12 @@ class KtorNotionApiTest {
             // successful sync. Never re-fetch the entire database on every run."
             api(Canned(emptyListBody)).queryPages(
                 dataSourceId = "ds-1",
-                editedAfter = Instant.parse("2026-08-22T09:00:00Z"),
+                editedAtOrAfter = Instant.parse("2026-08-22T09:00:00Z"),
             )
 
             val filter = NotionJson.parseToJsonElement(sent.single().bodyText()).jsonObject["filter"]!!.jsonObject
             assertEquals("last_edited_time", filter["timestamp"]!!.jsonPrimitive.content)
-            val after = filter["last_edited_time"]!!.jsonObject["after"]!!.jsonPrimitive.content
+            val after = filter["last_edited_time"]!!.jsonObject["on_or_after"]!!.jsonPrimitive.content
             // docs/notion-api.md §7: "if no timezone is provided, then the timezone defaults to UTC".
             // Relying on that default is how a pull window silently moves by hours.
             assertTrue("Expected an explicit offset in $after", after.endsWith("Z"))

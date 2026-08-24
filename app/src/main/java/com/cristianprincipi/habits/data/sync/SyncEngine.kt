@@ -56,6 +56,13 @@ import javax.inject.Singleton
  * Notion returns by default — a kill halfway through pagination would advance the watermark past
  * pages it never applied, and they would never be asked for again.
  *
+ * ⭐ **The watermark is asked for inclusively (`on_or_after`), and it has to be.** Notion rounds
+ * `last_edited_time` down to the minute (`notion-api.md` §7a, observed in M4.15). An exclusive
+ * bound therefore skips not just the page the watermark came from but every *other* page edited in
+ * that same minute — permanently, since the watermark never moves past them. Inclusive re-reads the
+ * boundary minute on each run, which is cheap and harmless because applying a pulled day is
+ * idempotent.
+ *
  * ### A conflict is resolved where it is found
  *
  * A day both sides changed is decided by [ConflictResolver] during the pull, in the transaction
@@ -165,7 +172,7 @@ class SyncEngine
         ): NotionResult<PullReport> {
             // Read once, before the first request. The filter has to stay identical across a
             // paginated run, and it would otherwise move as this loop's own writes land.
-            val editedAfter = dayDao.latestRemoteEditMillis()?.let(Instant::ofEpochMilli)
+            val editedAtOrAfter = dayDao.latestRemoteEditMillis()?.let(Instant::ofEpochMilli)
             var cursor: String? = null
             var applied = 0
             var skipped = 0
@@ -174,7 +181,7 @@ class SyncEngine
                 val query =
                     api.queryPages(
                         dataSourceId = mapping.dataSourceId.value,
-                        editedAfter = editedAfter,
+                        editedAtOrAfter = editedAtOrAfter,
                         startCursor = cursor,
                     )
                 val page =

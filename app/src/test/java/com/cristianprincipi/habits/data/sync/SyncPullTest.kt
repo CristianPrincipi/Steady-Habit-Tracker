@@ -87,7 +87,36 @@ class SyncPullTest {
 
             world.engine.sync()
 
-            assertEquals(listOf(null, Instant.ofEpochMilli(2_000)), world.api.queriedEditedAfter)
+            assertEquals(listOf(null, Instant.ofEpochMilli(2_000)), world.api.queriedEditedAtOrAfter)
+        }
+
+    @Test
+    fun anEditSharingTheWatermarksMinuteIsStillPulled() =
+        runTest {
+            // ⭐ M4.15, found against the real API — and not findable here before it, because
+            // `FakeNotionApi.stamp()` advances a second per write, so no two fake edits ever
+            // collided the way real ones do.
+            //
+            // Notion rounds `last_edited_time` DOWN TO THE MINUTE (`notion-api.md` §7a: 511 of 511
+            // of the user's real pages came back minute-aligned), so two edits made 45 seconds
+            // apart carry the same stamp. The resume point is `MAX(remoteLastEditedAt)`. Asked for
+            // *exclusively*, every page sharing that minute is filtered out of this run and of
+            // every run after it — the watermark can never move past them. An edit dropped in
+            // silence, which `CLAUDE.md` §3.4 forbids outright.
+            val theSameMinute = 60_000L
+            val world = connectedWorld()
+            world.api.givePage(page("p1", august19, editedAtMillis = theSameMinute))
+            world.engine.sync()
+
+            // Edited later on the wall clock; stamped by Notion with the very same minute.
+            world.api.givePage(page("p2", august20, editedAtMillis = theSameMinute))
+            val outcome = world.engine.sync()
+
+            assertTrue("the second run failed: $outcome", outcome is SyncOutcome.Success)
+            assertEquals(
+                setOf(august19.toEpochDay(), august20.toEpochDay()),
+                world.days.current.keys,
+            )
         }
 
     @Test

@@ -66,7 +66,9 @@ interface NotionApi {
      * One page of days, newest-edited first is **not** guaranteed — no sort is sent, so treat the
      * order as arbitrary.
      *
-     * @param editedAfter when set, only pages edited strictly after this instant. This is the
+     * @param editedAtOrAfter when set, only pages edited at **or after** this instant — inclusive,
+     *   because Notion rounds `last_edited_time` down to the minute (`notion-api.md` §7a) and an
+     *   exclusive bound would drop for ever any edit sharing the resume point's minute. This is the
      *   incremental pull `CLAUDE.md` §3.5 requires; the value comes from `DayDao.latestRemoteEditMillis`.
      *   When null, the whole data source — the first-run import, and nothing else.
      * @param startCursor [NotionListDto.cursorForNextPage] from the previous page, or null to start.
@@ -77,7 +79,7 @@ interface NotionApi {
      */
     suspend fun queryPages(
         dataSourceId: String,
-        editedAfter: Instant? = null,
+        editedAtOrAfter: Instant? = null,
         startCursor: String? = null,
     ): NotionResult<NotionListDto<NotionPageDto>>
 

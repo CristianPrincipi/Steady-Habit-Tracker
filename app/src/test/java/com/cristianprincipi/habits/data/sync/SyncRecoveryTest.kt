@@ -182,7 +182,7 @@ class SyncRecoveryTest {
 
             assertEquals(
                 applied,
-                world.api.queriedEditedAfter
+                world.api.queriedEditedAtOrAfter
                     .last()
                     ?.toEpochMilli(),
             )

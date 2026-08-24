@@ -21,7 +21,8 @@ import java.time.Instant
  *
  * Three behaviours are modelled on purpose, because the engine's correctness rests on them:
  *
- * - **Query results are filtered by `editedAfter` and sorted ascending by edit time**, exactly as
+ * - **Query results are filtered by `editedAtOrAfter` — inclusively, as the real endpoint's
+ *   `on_or_after` is — and sorted ascending by edit time**, exactly as
  *   `QueryDataSourceRequest` asks the real endpoint to. That is what makes a killed run resumable,
  *   so a fake that returned everything in insertion order would hide the bug it prevents.
  * - **Pagination is real.** [pageSize] is small by default so the walk over `cursorForNextPage` is
@@ -83,8 +84,8 @@ class FakeNotionApi(
     /** Fails only `updatePage`. The `404` case is how a deleted page is discovered (§14). */
     var failUpdateWith: NotionError? = null
 
-    /** Every `editedAfter` the engine has asked with, in order. The incremental-pull assertion. */
-    val queriedEditedAfter = mutableListOf<Instant?>()
+    /** Every `editedAtOrAfter` the engine has asked with, in order. The incremental-pull assertion. */
+    val queriedEditedAtOrAfter = mutableListOf<Instant?>()
 
     /**
      * What the search finds. `null` means the one [schema], which is what every sync test wants.
@@ -183,14 +184,14 @@ class FakeNotionApi(
     @Suppress("ReturnCount")
     override suspend fun queryPages(
         dataSourceId: String,
-        editedAfter: Instant?,
+        editedAtOrAfter: Instant?,
         startCursor: String?,
     ): NotionResult<NotionListDto<NotionPageDto>> {
         failEverythingWith?.let { return NotionResult.Failure(it) }
         // Recorded once per paginated run rather than once per page: the cursor pages of one walk
         // all carry the same filter, and a test asserting the pull window wants the window.
         if (startCursor == null) {
-            queriedEditedAfter += editedAfter
+            queriedEditedAtOrAfter += editedAtOrAfter
             pagesServedThisRun = 0
         }
         val pageLimit = failQueryAfterPages
@@ -206,7 +207,7 @@ class FakeNotionApi(
         val visible =
             pages.values
                 .filterNot { it.isGone && !includeTrashedInQuery }
-                .filter { editedAfter == null || Instant.parse(it.lastEditedTime).isAfter(editedAfter) }
+                .filter { editedAtOrAfter == null || !Instant.parse(it.lastEditedTime).isBefore(editedAtOrAfter) }
                 .sortedBy { it.lastEditedTime }
 
         val from = startCursor?.toInt() ?: 0

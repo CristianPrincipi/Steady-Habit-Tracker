@@ -196,7 +196,7 @@ matching property:
 {
   "filter": {
     "timestamp": "last_edited_time",
-    "last_edited_time": { "after": "2026-08-22T09:00:00.000Z" }
+    "last_edited_time": { "on_or_after": "2026-08-22T09:00:00.000Z" }
   }
 }
 ```
@@ -208,6 +208,38 @@ matching property:
   offset; do not rely on that default.
 
 This is what `DayDao.latestRemoteEditMillis()` (built in M3.3, tested in M3.11) exists to feed.
+
+## 7a. ⭐ `last_edited_time` is rounded to the minute — observed in M4.15, and it decides the condition
+
+**This is the single most consequential thing the live run found**, and no amount of reading the
+docs would have produced it.
+
+`last_edited_time` comes back **truncated to the minute**. Every one of the **511 real pages** the
+first import brought down had a timestamp exactly divisible by 60,000 ms — 511 of 511, checked with
+`SELECT COUNT(*) ... WHERE remoteLastEditedAtEpochMillis % 60000 <> 0` against the device database.
+The client does not do this: `SyncEngine.parseInstant` is a bare `Instant.parse`.
+
+**The trap is that the docs above look like they rule this out.** "The comparison is done with
+millisecond precision" is true — and irrelevant. The *comparison* is millisecond-precise; the
+*values* being compared are minute-rounded. Read quickly, that line makes an exclusive `after` look
+safe.
+
+**Why an exclusive `after` loses data.** The resume point is `MAX(remoteLastEditedAt)` (ADR-047 —
+there is no stored cursor). Say a run ends having seen a page stamped `19:38:00`. Any *other* page
+edited at any point in that same minute — `19:38:45`, say — is also stamped `19:38:00`. Asked for
+`after: 19:38:00`, it is excluded. And it is excluded **for ever**, because the watermark can never
+advance past a page it never receives. That is an edit dropped in silence, which `CLAUDE.md` §3.4
+forbids outright.
+
+**So the pull asks `on_or_after`, inclusively** (ADR-054). The cost is re-reading the pages that
+share the watermark's minute, once per run — bounded, and harmless because applying a pulled day is
+idempotent: `SyncEngine.planFor` step 3 sees a remote timestamp it already holds, leaves the day
+owed, and records nothing as discarded.
+
+**No test could have caught this before the live run.** `FakeNotionApi.stamp()` advances 1,000 ms
+per write, so every fake edit carried a unique timestamp and the collision was unreachable. The fake
+now filters inclusively too, and `SyncPullTest.anEditSharingTheWatermarksMinuteIsStillPulled` seeds
+two pages sharing a stamp; mutating the filter back to exclusive fails that test and only that test.
 
 ---
 
@@ -318,15 +350,25 @@ explicitly: "`id` may be used in place of name when creating or updating pages."
 object, it states the rule as a positive capability with its rationale (the id is stable across
 renames), and a second source confirmed the keys "are the names or IDs of the property".
 
-**Still to be verified with one real request — and M4.5 could not do it.** Verifying it needs the
-user's own token against their own workspace, and `CLAUDE.md` §6 and §8 forbid pointing any
-automated test at the live API. So M4.5 built the write path keyed on `id`, as §9 decided, and the
-confirmation moved to **M4.15**, the manual round trip on a *duplicate* of the user's database. It
-is the first thing that run should check.
+### ⭐ ANSWERED IN M4.15, 2026-08-24 — a property `id` **is** accepted as a write key
 
-If it turns out to be name-only, the mapping stays keyed on `id` regardless — only the push path
-changes, resolving id → current name from the schema it already fetches. `NotionApi.updatePage`
-takes the property keys from its caller precisely so that change would land in one place.
+Carried since M4.5, and now settled by one real request. A `PATCH /v1/pages/{id}` was sent against a
+**duplicate** of the user's database with **property ids** as the body keys. It was accepted, and the
+user confirmed in Notion that the checkbox had actually flipped — which is the part a `200` alone
+does not prove, since a silently-ignored key would look identical from the client's side.
+
+**The write keys in that body included percent-encoded ids.** The real schema returns ids such as
+`%40kT%3E` (`@kT>`) and `%5DbnV` (`]bnV`) alongside plain ones like `bmIb` and `ZmNS`, and the push
+sends every mapped habit for the day in one request (ADR-036: un-checking is a `false`, not an
+omission). So both forms went up in the same accepted PATCH.
+
+**ADR-038 stands, and §9 with it.** The update-page reference's "identified by name only" line is
+simply wrong; the page-property-values reference is right. The contingency below is now dead code as
+far as v1 is concerned — kept only because a future API version could revive it.
+
+*If it had turned out to be name-only:* the mapping stays keyed on `id` regardless, and only the push
+path changes, resolving id → current name from the schema it already fetches. `NotionApi.updatePage`
+takes its property keys from the caller precisely so that change would land in one place.
 
 ---
 
@@ -392,20 +434,52 @@ so the first one was a response.
 
 ### What this does and does not establish
 
-| Verified against the live API | Still unverified |
+| Verified against the live API | Still unverified *(as of M4.13 — **all of this was closed by M4.15**, §12c)* |
 | --- | --- |
-| The base URL and TLS reach `api.notion.com` | **Any `2xx` at all** — no successful response has ever been parsed |
-| The pinned `Notion-Version` header is accepted (a bad version is `400 missing_version`, not `401`) | Every object shape in §12 — still read from docs, never observed |
-| `Authorization: Bearer …` is the right shape | Whether a property `id` works as a write key (§11) |
-| A `401` decodes and reaches the UI as the right sentence | Pagination, the day-key filter, and every write path |
-| The offline path produces a *different*, correct failure | The whole of a successful sync |
+| The base URL and TLS reach `api.notion.com` | ~~**Any `2xx` at all** — no successful response has ever been parsed~~ |
+| The pinned `Notion-Version` header is accepted (a bad version is `400 missing_version`, not `401`) | ~~Every object shape in §12 — still read from docs, never observed~~ |
+| `Authorization: Bearer …` is the right shape | ~~Whether a property `id` works as a write key (§11)~~ |
+| A `401` decodes and reaches the UI as the right sentence | ~~Pagination, the day-key filter, and every write path~~ |
+| The offline path produces a *different*, correct failure | ~~The whole of a successful sync~~ |
 
 **No secret was involved and nothing was written.** The token was nonsense by construction, the call
 was a read, and it failed at authentication.
 
-M4.15 still owns the real round trip — against a **duplicate** of the user's database, never the live
-one. This entry exists so a later session neither repeats "nothing has ever talked to Notion" (it
-has) nor overstates it (one `401` is not a working integration).
+~~M4.15 still owns the real round trip.~~ **It ran on 2026-08-24 — see §12c.** This entry is kept as
+written so the progression stays legible: a later session should neither repeat "nothing has ever
+talked to Notion" nor mistake one `401` for a working integration.
+
+---
+
+## 12c. ⭐⭐ THE ROUND TRIP — 2026-08-24, in M4.15
+
+Run on the emulator against a **duplicate** of the user's real Habits database, with a real personal
+access token typed on the device and never written anywhere.
+
+**A first import of real data, parsed end to end:** **5 habits, 511 days, 871 completions**. The
+habits came from the data source's checkbox properties as `CLAUDE.md` §3.4 requires — names, emoji
+and all (`✒️ Journal`, `🎯 Focus`, `📖 Read`, `📜 Quote`, `🥕 Diet`) — with no property name hardcoded
+anywhere.
+
+| Now verified against the live API | Where |
+| --- | --- |
+| `2xx` responses parse — search, `retrieveDataSource`, `queryPages`, `updatePage` | the whole run |
+| Every object shape in §12 and §13, against real bodies | the import |
+| Pagination over a real workspace | the database picker, 15+ databases |
+| **A property `id` works as a write key**, percent-encoded ones included | §11 |
+| A push reaches Notion and flips the real checkbox | the user confirmed it in Notion |
+| **Unmapped columns survive a write untouched** — `Weight`, `Sleep`, `Area`, `Progress` | `notion-schema.md` §7 |
+| The token appears in no log | 43 app log lines, zero matches |
+
+**Two things the run found that no test could have.** `last_edited_time` is minute-rounded, which
+made the exclusive pull window a silent data-drop — §7a and ADR-054. And the database picker rendered
+15 databases in a non-scrolling `Column`, putting **Continue** below the fold with no way to reach it:
+setup could not be completed on a real workspace at all. Both were fixed in this step.
+
+**On the token, for the record.** A `grep` of the full logcat for `ntn_` returns 24 hits — **all of
+them from Android's `SatelliteController`**, where NTN means *Non-Terrestrial Network*. The app's own
+process logged 43 lines and none of them match `ntn_`, `Bearer`, `Authorization` or `token`. A future
+session running this check should expect that false positive rather than panic at it.
 
 ---
 

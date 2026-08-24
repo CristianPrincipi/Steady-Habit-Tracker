@@ -48,7 +48,12 @@ class SyncPushTest {
 
             val outcome = world.engine.sync()
 
-            assertEquals(SyncOutcome.Success(daysPulled = 0, daysPushed = 1), outcome)
+            // `daysPulled = 1` is the boundary page being re-read, not a second day arriving:
+            // M4.15 made the pull window inclusive (`on_or_after`), so each run re-reads the pages
+            // sharing its watermark's minute. Harmless by construction — `planFor` step 3 sees a
+            // remote timestamp it already has, keeps the day owed and records nothing discarded,
+            // which is why the push below still carries the local check-off.
+            assertEquals(SyncOutcome.Success(daysPulled = 1, daysPushed = 1), outcome)
             val (pageId, properties) = world.api.updated.single()
             assertEquals("p1", pageId)
             assertEquals(setOf(PropertyIds.READ, PropertyIds.JOURNAL), properties.keys)

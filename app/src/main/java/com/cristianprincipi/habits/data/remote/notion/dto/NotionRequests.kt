@@ -92,7 +92,16 @@ internal data class LastEditedTimeFilter(
 )
 
 /**
- * `after`, exclusive, compared at **millisecond precision** when the string carries a time.
+ * `on_or_after`, **inclusive** — and the inclusiveness is the whole point.
+ *
+ * The reference says the comparison is made at *millisecond* precision, which is true and
+ * misleading: the values being compared are not. **Notion stores `last_edited_time` rounded down to
+ * the minute** — observed in M4.15, where 511 of 511 real pages came back exactly minute-aligned
+ * (`notion-api.md` §7a). Two edits 45 seconds apart therefore carry the *same* timestamp.
+ *
+ * With an exclusive `after`, an edit sharing the resume point's minute is filtered out of every
+ * subsequent pull and never arrives — a silently dropped edit, which `CLAUDE.md` §3.4 forbids.
+ * Inclusive costs one re-fetch of the boundary minute per run, and the pull is idempotent.
  *
  * The string must always carry an explicit offset. §7: "if no timezone is provided, then the
  * timezone defaults to UTC" — true today, and exactly the kind of default that silently shifts a
@@ -101,7 +110,7 @@ internal data class LastEditedTimeFilter(
  */
 @Serializable
 internal data class TimestampCondition(
-    val after: String,
+    @SerialName("on_or_after") val onOrAfter: String,
 )
 
 /**
