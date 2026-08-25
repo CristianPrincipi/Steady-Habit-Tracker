@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.data.repository
 
+import com.cristianprincipi.habits.core.network.ConnectivityObserver
 import com.cristianprincipi.habits.data.local.dao.HabitDao
 import com.cristianprincipi.habits.data.sync.DiscardedEdit
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
@@ -8,6 +9,7 @@ import com.cristianprincipi.habits.data.sync.SyncScheduler
 import com.cristianprincipi.habits.data.sync.SyncSide
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.EditSide
+import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
@@ -20,7 +22,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * [SyncStatusRepository] over the three things that between them know the answer.
+ * [SyncStatusRepository] over the four things that between them know the answer.
  *
  * None of them is a sync status on its own, and no single one could be:
  *
@@ -29,7 +31,10 @@ import javax.inject.Singleton
  * - **whether a run is happening now** — WorkManager, reached through [SyncScheduler] so that
  *   nothing above this class needs a `Context`;
  * - **how the last run got on** — [LastSyncFailureStore], because the run itself happened in a
- *   background process that is long gone by the time anyone looks.
+ *   background process that is long gone by the time anyone looks;
+ * - **whether a run that was asked for can even start** — [SyncScheduler.observeQueued] beside
+ *   [ConnectivityObserver.isOnline], which is M4.16's addition and the one combination neither
+ *   source could make alone.
  *
  * ### Running beats failed
  *
@@ -38,11 +43,25 @@ import javax.inject.Singleton
  * when the new run finishes. Showing the stale error over the top of a live attempt would tell the
  * user something is broken at the exact moment it is being fixed.
  *
+ * ### ⭐ Waiting beats one failure, and only one
+ *
+ * A queued run outranks [SyncFailure.Offline] and nothing else, because it supersedes **exactly the
+ * failure it would itself resolve**. The case is real, and it is the one a user hits hardest: a run
+ * dies on a flaky connection, they tap "Sync now", and the request is held — so the banner goes on
+ * reading *"check your connection and try again"* over a job that is already waiting, and every
+ * further tap does nothing at all. "Will sync when you're back online" is both truer and calmer.
+ *
+ * Every other failure still wins. A rejected token, a broken mapping, an unshared database: none of
+ * them is fixed by the network returning, the queued run will hit the same wall, and burying an
+ * actionable error under a reassuring one would be the worse lie.
+ *
  * ### Nothing here waits for anything
  *
- * `CLAUDE.md` §1: Room is the source of truth for the UI. All three sources emit their current value
- * immediately — a DataStore flow its stored value or its absence, WorkManager its current work info
- * — so a collector gets a status without a round trip, and a check-off never touches this at all.
+ * `CLAUDE.md` §1: Room is the source of truth for the UI. All four sources emit their current value
+ * immediately — a DataStore flow its stored value or its absence, WorkManager its current work info,
+ * and `ConnectivityObserver` the current network *including when there is none* (ADR-041, which is
+ * the whole reason that interface documents its first emission) — so a collector gets a status
+ * without a round trip, and a check-off never touches this at all.
  */
 @Singleton
 class SyncStatusRepositoryImpl
@@ -51,21 +70,48 @@ class SyncStatusRepositoryImpl
         private val settings: SettingsRepository,
         private val lastFailure: LastSyncFailureStore,
         private val scheduler: SyncScheduler,
+        private val connectivity: ConnectivityObserver,
         private val discardedEdits: DiscardedEditStore,
         private val habitDao: HabitDao,
     ) : SyncStatusRepository {
+        /**
+         * A run has been asked for and provably cannot start.
+         *
+         * Folded here rather than inside [observeStatus]'s `combine` because neither half means
+         * anything alone: enqueued-and-online is a sync about to happen, and offline-with-nothing-
+         * owed is this app's normal condition (`CLAUDE.md` §1). Only the conjunction is a state
+         * worth putting on a screen.
+         */
+        private val waitingForNetwork: Flow<Boolean> =
+            combine(scheduler.observeQueued(), connectivity.isOnline) { queued, online ->
+                queued && !online
+            }.distinctUntilChanged()
+
         override fun observeStatus(): Flow<SyncStatus> =
             combine(
                 settings.observeLastSyncedAt(),
                 lastFailure.failure,
                 scheduler.observeRunning(),
-            ) { lastSyncedAt, failure, running ->
+                waitingForNetwork,
+            ) { lastSyncedAt, failure, running, waiting ->
                 when {
-                    running -> SyncStatus.Syncing(lastSyncedAt)
-                    failure != null -> SyncStatus.Failed(failure, lastSyncedAt)
-                    else -> SyncStatus.Idle(lastSyncedAt)
+                    running -> {
+                        SyncStatus.Syncing(lastSyncedAt)
+                    }
+
+                    waiting && failure.isResolvedByReconnecting() -> {
+                        SyncStatus.WaitingForNetwork(lastSyncedAt)
+                    }
+
+                    failure != null -> {
+                        SyncStatus.Failed(failure, lastSyncedAt)
+                    }
+
+                    else -> {
+                        SyncStatus.Idle(lastSyncedAt)
+                    }
                 }
-                // Three sources, and any of them can emit without changing the answer: WorkManager
+                // Four sources, and any of them can emit without changing the answer: WorkManager
                 // re-emits a work info on every state transition, most of which are between two kinds
                 // of not-running. Without this a status bar would recompose on each one.
             }.distinctUntilChanged()
@@ -96,6 +142,30 @@ class SyncStatusRepositoryImpl
         override suspend fun dismissDiscardedEdits() {
             discardedEdits.clear()
         }
+    }
+
+/**
+ * Whether a waiting run would make this failure go away by itself.
+ *
+ * `null` — no failure at all — counts, and is the ordinary case: the user was simply offline when
+ * they tapped. [SyncFailure.Offline] counts because it is the same problem stated one run earlier.
+ * Nothing else does; the class KDoc says why.
+ *
+ * A `when` over the sealed type rather than `== Offline`, so that adding a way to fail stops this
+ * compiling and forces a decision, instead of silently defaulting to "the error wins".
+ */
+private fun SyncFailure?.isResolvedByReconnecting(): Boolean =
+    when (this) {
+        null, SyncFailure.Offline -> true
+
+        SyncFailure.NotConnected,
+        SyncFailure.TokenRejected,
+        SyncFailure.MissingCapability,
+        SyncFailure.DatabaseNotShared,
+        SyncFailure.NotionUnavailable,
+        SyncFailure.AppOutOfDate,
+        is SyncFailure.MappingBroken,
+        -> false
     }
 
 private fun DiscardedEdit.toNotice(namesById: Map<String, String>): DiscardedEditNotice =

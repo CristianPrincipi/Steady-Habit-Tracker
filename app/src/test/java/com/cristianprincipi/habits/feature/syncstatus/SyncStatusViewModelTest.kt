@@ -89,6 +89,26 @@ class SyncStatusViewModelTest {
         }
 
     @Test
+    fun aHeldSyncSaysSoAndTakesTheButtonAwayWithIt() =
+        runTest {
+            // ⭐ M4.16. The button is hidden on purpose: syncNow() de-duplicates on a unique name,
+            // so a second tap while the request is held provably does nothing, and leaving it up
+            // would re-create the silent no-op one tap further along. The card answers instead.
+            connection.saveToken("ntn_pretend")
+            status.value = SyncStatus.WaitingForNetwork(lastSyncedAt = now.minusSeconds(7200))
+
+            viewModel().uiState.test {
+                val state = awaitItem()
+                assertTrue(state.isWaitingForNetwork)
+                assertFalse(state.isSyncing)
+                assertFalse(state.canRetry)
+                // Still true, and still worth saying: waiting is not a failure.
+                assertEquals(null, state.failure)
+                assertEquals(Elapsed.Hours(2), state.lastSynced)
+            }
+        }
+
+    @Test
     fun retryAsksTheRepositoryForASync() =
         runTest {
             // The "offer a retry" half of CLAUDE.md §3.5.

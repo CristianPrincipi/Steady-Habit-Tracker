@@ -18,6 +18,13 @@ import com.cristianprincipi.habits.domain.model.SyncFailure
 data class SyncStatusUiState(
     val isConnected: Boolean = false,
     val isSyncing: Boolean = false,
+    /**
+     * ⭐ A sync was asked for and is being held until the device has a network (M4.16).
+     *
+     * Distinct from [isSyncing] on purpose: nothing is happening, and nothing will until the
+     * network returns. The card says so; see `SyncStatusScreen.secondLine`.
+     */
+    val isWaitingForNetwork: Boolean = false,
     /** How long since the last **successful** sync, or `null` if none ever finished. */
     val lastSynced: Elapsed? = null,
     /** Why the last run did not sync. `null` while it is running — see `SyncStatusRepositoryImpl`. */
@@ -36,8 +43,16 @@ data class SyncStatusUiState(
      */
     val willDeleteLocalData: Boolean = false,
 ) {
-    /** Nothing to retry while a run is already in flight. */
-    val canRetry: Boolean get() = isConnected && !isSyncing
+    /**
+     * Nothing to retry while a run is already in flight — **or already owed**.
+     *
+     * The waiting case is M4.16's, and hiding the button there is the point rather than a side
+     * effect. `SyncScheduler.syncNow()` de-duplicates on a unique name, so a second tap while a
+     * request is held provably does nothing; leaving the button up would re-create the exact
+     * silent no-op `CLAUDE.md` §3.5 forbids, one tap further along. The card has taken over
+     * saying what happens next.
+     */
+    val canRetry: Boolean get() = isConnected && !isSyncing && !isWaitingForNetwork
 
     val hasDiscardedEdits: Boolean get() = discardedEdits.isNotEmpty()
 }

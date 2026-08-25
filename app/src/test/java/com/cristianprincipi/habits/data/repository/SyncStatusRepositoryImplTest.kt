@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
 import app.cash.turbine.test
+import com.cristianprincipi.habits.core.testing.FakeConnectivityObserver
 import com.cristianprincipi.habits.core.testing.FakeSyncScheduler
 import com.cristianprincipi.habits.core.testing.InMemoryDataStore
 import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
@@ -36,12 +37,20 @@ class SyncStatusRepositoryImplTest {
     private val settings = SettingsRepositoryImpl(SettingsDataStore(dataStore))
     private val lastFailure = LastSyncFailureStore(dataStore)
     private val scheduler = FakeSyncScheduler()
+    private val connectivity = FakeConnectivityObserver()
 
     private val discardedEdits = DiscardedEditStore(dataStore)
     private val habits = FakeHabitDao()
 
     private val repository =
-        SyncStatusRepositoryImpl(settings, lastFailure, scheduler, discardedEdits, habits)
+        SyncStatusRepositoryImpl(
+            settings,
+            lastFailure,
+            scheduler,
+            connectivity,
+            discardedEdits,
+            habits,
+        )
 
     @Test
     fun aFreshInstallIsIdleAndHasNeverSynced() =
@@ -132,6 +141,132 @@ class SyncStatusRepositoryImplTest {
                 assertEquals(SyncStatus.Idle(syncedAt), awaitItem())
 
                 cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    // ------------------------------------------------------------------ M4.16
+
+    @Test
+    fun aSyncAskedForWhileOfflineSaysItIsWaitingRatherThanNothing() =
+        runTest {
+            // ⭐ The defect M4.16 exists for. syncNow() enqueues under a CONNECTED constraint, so
+            // offline the run is held and never happens — which means no failure is ever recorded
+            // and, before this, the card went on reading "Last synced …" at a user who had just
+            // tapped a button. CLAUDE.md §3.5: never a silent no-op.
+            settings.setLastSyncedAt(syncedAt)
+
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.Idle(syncedAt), awaitItem())
+
+                connectivity.online.value = false
+                scheduler.queued.value = true
+                assertEquals(SyncStatus.WaitingForNetwork(syncedAt), awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun beingOfflineWithNothingOwedIsStillIdle() =
+        runTest {
+            // CLAUDE.md §1 treats offline as the normal case, not the error case. A user who turns
+            // off their wifi has not broken anything, and the screen must not start nagging.
+            settings.setLastSyncedAt(syncedAt)
+
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.Idle(syncedAt), awaitItem())
+
+                connectivity.online.value = false
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun aQueuedRunOnAWorkingNetworkIsAlsoStillIdle() =
+        runTest {
+            // The other half of the conjunction. Enqueued-and-online is a sync about to happen in a
+            // moment, which is not something to put on a screen.
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.Idle(lastSyncedAt = null), awaitItem())
+
+                scheduler.queued.value = true
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun theNetworkComingBackTakesTheWaitingLineAwayByItself() =
+        runTest {
+            connectivity.online.value = false
+            scheduler.queued.value = true
+
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.WaitingForNetwork(lastSyncedAt = null), awaitItem())
+
+                // The network comes back first, and the card is calm again the instant it does —
+                // nothing here waits for the sync to prove anything.
+                connectivity.online.value = true
+                assertEquals(SyncStatus.Idle(lastSyncedAt = null), awaitItem())
+
+                // Then WorkManager releases the held request and the worker starts. The brief Idle
+                // in between is not a glitch: for that moment the app really is online with nothing
+                // running, and saying "will sync when you're back online" would then be false.
+                scheduler.queued.value = false
+                scheduler.running.value = true
+                assertEquals(SyncStatus.Syncing(lastSyncedAt = null), awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun waitingReplacesAnOfflineFailure() =
+        runTest {
+            // ⭐ The ordering exception, and the case a user hits hardest: a run dies on a flaky
+            // connection, they tap "Sync now", and the request is held. Leaving the old banner up
+            // would advise them to "check your connection and try again" over a job that is already
+            // waiting — and every further tap would do nothing.
+            lastFailure.record(SyncOutcome.Failed(NotionError.Network(IOException())))
+
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.Failed(SyncFailure.Offline, lastSyncedAt = null), awaitItem())
+
+                connectivity.online.value = false
+                scheduler.queued.value = true
+                assertEquals(SyncStatus.WaitingForNetwork(lastSyncedAt = null), awaitItem())
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun waitingDoesNotBuryAFailureTheNetworkWillNotFix() =
+        runTest {
+            // A revoked token is not fixed by the wifi coming back — the queued run will hit the
+            // same wall. Hiding it under a reassuring sentence would be the worse lie.
+            lastFailure.record(SyncOutcome.Failed(NotionError.Unauthorized))
+            connectivity.online.value = false
+            scheduler.queued.value = true
+
+            repository.observeStatus().test {
+                assertEquals(
+                    SyncStatus.Failed(SyncFailure.TokenRejected, lastSyncedAt = null),
+                    awaitItem(),
+                )
+            }
+        }
+
+    @Test
+    fun aRunInProgressStillBeatsWaiting() =
+        runTest {
+            // Both can be true for an instant: WorkManager can start the worker before the
+            // connectivity callback has caught up. Something actually happening is the better fact.
+            connectivity.online.value = false
+            scheduler.queued.value = true
+            scheduler.running.value = true
+
+            repository.observeStatus().test {
+                assertEquals(SyncStatus.Syncing(lastSyncedAt = null), awaitItem())
             }
         }
 

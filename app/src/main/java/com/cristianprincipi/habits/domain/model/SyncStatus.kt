@@ -42,6 +42,29 @@ sealed interface SyncStatus {
     ) : SyncStatus
 
     /**
+     * ⭐ A sync has been asked for and **cannot start**, because the device is offline.
+     *
+     * The state M4.16 exists to name. `SyncScheduler.syncNow()` enqueues under a `CONNECTED`
+     * constraint, so offline the run is held rather than attempted — correctly, and invisibly. No
+     * run means no [Failed], so without this case the card went on reading "Last synced 2 hours ago"
+     * while the user tapped a button that answered with nothing. `CLAUDE.md` §3.5 forbids exactly
+     * that: *"never a silent no-op"*.
+     *
+     * **Not the same as [Failed] with [SyncFailure.Offline].** That one is a run that *started* and
+     * could not reach Notion — a dropped socket, a captive portal, a network that claims to work.
+     * This one never started, and there is nothing to retry: WorkManager already holds it and will
+     * release it the moment the network returns. Which is why the sentence differs too — "check your
+     * connection and try again" is bad advice for a job that is already waiting.
+     *
+     * **It says nothing about being offline on its own.** `CLAUDE.md` §1 treats offline as the
+     * normal case rather than the error case, so an offline device with nothing owed is still
+     * [Idle] and still reads as calm. This appears only once a run is genuinely waiting to happen.
+     */
+    data class WaitingForNetwork(
+        override val lastSyncedAt: Instant?,
+    ) : SyncStatus
+
+    /**
      * The last run did not sync, and [reason] is what to say about it.
      *
      * Not necessarily *now* — a run worth retrying is already queued behind WorkManager's backoff

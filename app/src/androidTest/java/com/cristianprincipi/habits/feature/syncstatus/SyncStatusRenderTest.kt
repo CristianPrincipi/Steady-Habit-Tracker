@@ -73,6 +73,16 @@ class SyncStatusRenderTest {
     }
 
     @Test
+    fun aHeldSyncSaysWhatHappensNextAndHidesTheButtonItAnswersFor() {
+        show(SyncStatusUiState(isConnected = true, isWaitingForNetwork = true, lastSynced = Elapsed.Hours(2)))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_waiting_for_network))
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.sync_retry)).assertDoesNotExist()
+    }
+
+    @Test
     fun aFailureRendersAsTheFixRatherThanTheFault() {
         // ⭐ CLAUDE.md §3.3's case. The sentence must send the user to Notion's sharing menu — the
         // whole reason NotionFailureBanner is shared with the setup wizard rather than duplicated.

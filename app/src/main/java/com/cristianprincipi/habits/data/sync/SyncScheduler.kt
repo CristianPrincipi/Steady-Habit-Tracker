@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.minutes
@@ -62,6 +63,24 @@ interface SyncScheduler {
      * for fifteen minutes at a time.
      */
     fun observeRunning(): Flow<Boolean>
+
+    /**
+     * ⭐ Whether an **on-demand** sync has been asked for and has not run yet.
+     *
+     * Not a status on its own — a request that is about to be picked up looks identical to one the
+     * `CONNECTED` constraint is holding, and WorkManager exposes no "this constraint is currently
+     * unmet" flag to tell them apart. It becomes
+     * [com.cristianprincipi.habits.domain.model.SyncStatus.WaitingForNetwork] only when
+     * `SyncStatusRepositoryImpl` puts it beside
+     * [com.cristianprincipi.habits.core.network.ConnectivityObserver.isOnline]: enqueued **and**
+     * offline is a run that provably cannot start.
+     *
+     * **The periodic schedule is deliberately not counted.** It sits `ENQUEUED` for the whole
+     * fifteen minutes between runs, online or off, so including it would light the waiting state up
+     * permanently the moment a user turned off their wifi — which is the nagging M4.16 was told not
+     * to do. Only [syncNow] means somebody is actually waiting for an answer.
+     */
+    fun observeQueued(): Flow<Boolean>
 }
 
 @Singleton
@@ -131,6 +150,29 @@ class WorkManagerSyncScheduler
                         workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK),
                     ) { periodic, onDemand ->
                         (periodic + onDemand).any { it.state == WorkInfo.State.RUNNING }
+                    },
+                )
+            }.distinctUntilChanged()
+
+        /**
+         * One unique name, and only the not-yet-run states.
+         *
+         * `ENQUEUED` covers both things worth calling queued: a request waiting for its constraint,
+         * and one waiting out a backoff after `Result.retry()`. `BLOCKED` cannot happen — nothing in
+         * this app chains work — but it is the other unfinished state, and leaving it out would be a
+         * silent hole if one is ever added.
+         *
+         * `getInstance` on collection, for the initialisation-order reason [observeRunning]
+         * documents.
+         */
+        override fun observeQueued(): Flow<Boolean> =
+            flow {
+                val workManager = WorkManager.getInstance(context)
+                emitAll(
+                    workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK).map { infos ->
+                        infos.any {
+                            it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED
+                        }
                     },
                 )
             }.distinctUntilChanged()

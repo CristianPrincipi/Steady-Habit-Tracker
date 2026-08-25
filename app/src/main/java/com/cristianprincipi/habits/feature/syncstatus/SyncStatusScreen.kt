@@ -176,13 +176,16 @@ private fun ConnectionCard(
  * "Last synced 3 minutes ago", or what stands in for it.
  *
  * **A sync in progress wins over the timestamp**, because it is the more current fact and the one
- * that explains why the retry button has gone.
+ * that explains why the retry button has gone. ⭐ A sync that is *waiting* wins for the same reason
+ * (M4.16) and sits directly below it: it is likewise the current fact, it likewise explains the
+ * missing button, and it is the only line here that answers a tap the user has already made.
  */
 @Composable
 private fun SyncStatusUiState.secondLine(): String =
     when {
         !isConnected -> stringResource(R.string.sync_not_connected_body)
         isSyncing -> stringResource(R.string.sync_in_progress)
+        isWaitingForNetwork -> stringResource(R.string.sync_waiting_for_network)
         lastSynced == null -> stringResource(R.string.sync_never)
         else -> lastSynced.describe()
     }
@@ -382,6 +385,27 @@ private fun SyncStatusFailedPreview() {
                     lastSynced = Elapsed.Days(2),
                     failure = SyncFailure.TokenRejected,
                     discardedEdits = previewNotices,
+                ),
+            onEvent = {},
+        )
+    }
+}
+
+/**
+ * ⭐ M4.16: tapped "Sync now" with no network.
+ *
+ * The whole defect in one frame — the card answers, and the button it answers for is gone.
+ */
+@Preview(backgroundColor = 0xFF111113, showBackground = true, widthDp = 400, heightDp = 800)
+@Composable
+private fun SyncStatusWaitingForNetworkPreview() {
+    HabitsTheme {
+        SyncStatusContent(
+            state =
+                SyncStatusUiState(
+                    isConnected = true,
+                    isWaitingForNetwork = true,
+                    lastSynced = Elapsed.Hours(2),
                 ),
             onEvent = {},
         )

@@ -70,6 +70,7 @@ class SyncStatusViewModel
                 SyncStatusUiState(
                     isConnected = isConnected,
                     isSyncing = status is SyncStatus.Syncing,
+                    isWaitingForNetwork = status is SyncStatus.WaitingForNetwork,
                     lastSynced = status.lastSyncedAt?.let { at -> elapsedBetween(at, clock.instant()) },
                     failure = (status as? SyncStatus.Failed)?.reason,
                     discardedEdits = notices,
