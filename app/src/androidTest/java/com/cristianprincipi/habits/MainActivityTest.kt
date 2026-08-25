@@ -5,8 +5,10 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cristianprincipi.habits.core.testing.FreshInstallRule
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 
 /**
@@ -24,11 +26,34 @@ import org.junit.runner.RunWith
  *
  * **Nothing here touches the network.** The screen renders its first step without sending anything,
  * which is exactly why the first step is a text field and not a request.
+ *
+ * ### ⭐ M4.17 — the precondition is stated, not inherited
+ *
+ * Both assertions are about the **wizard**, and `HabitsAppRoot` only shows the wizard while setup is
+ * unfinished; a configured app gets `SyncStatusScreen` instead, where neither node exists. So this
+ * class passed for eleven steps on the strength of an accident — no device it had ever run on had
+ * been connected to Notion by hand. The first one that was would have failed it, and the failure
+ * would have read as a broken wizard rather than as a dirty device.
+ *
+ * ⚠ **And the routing key is the mapping, not the token.** M4.17 was written as "clear the auth
+ * DataStore", which would not have fixed it: `HabitsAppRoot` routes on `isConfigured`, which
+ * `NotionMappingStore` answers out of the **settings** file, while the token lives in its own
+ * (`AuthDataStoreModule` — kept apart on purpose). [FreshInstallRule] clears both, which is what
+ * "fresh install" means and what these assertions actually depend on.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
+    private val composeTestRule = createAndroidComposeRule<MainActivity>()
+
+    /**
+     * The clear has to happen **outside** the compose rule, not in an `@Before`.
+     *
+     * `createAndroidComposeRule` launches the activity from its own `before()`, and JUnit runs rules
+     * outside `@Before` methods — so an `@Before` would land after the activity had already composed
+     * against whatever was on disk. [FreshInstallRule] documents the rest.
+     */
     @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
+    val rules: RuleChain = RuleChain.outerRule(FreshInstallRule()).around(composeTestRule)
 
     @Test
     fun theConnectionWizardIsTheFirstThingShown() {
