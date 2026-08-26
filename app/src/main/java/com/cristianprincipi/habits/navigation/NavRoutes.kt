@@ -1,0 +1,75 @@
+package com.cristianprincipi.habits.navigation
+
+import kotlinx.serialization.Serializable
+
+/**
+ * Every destination in the app, as a type-safe Navigation Compose route (`CLAUDE.md` §4).
+ *
+ * Routes are `@Serializable` objects rather than string constants, so `navigate(Week)` and
+ * `composable<Week> { }` are checked by the compiler and a typo cannot become a runtime crash on a
+ * screen nobody opened during testing.
+ *
+ * **None of them carry arguments, and that is a decision rather than an omission.** ADR-010 removed
+ * habit create, rename and delete — a habit is a *column* in the user's Notion schema, and this app
+ * does not edit their schema. So there is no per-habit destination to address, and
+ * [ManageHabits] is a list rather than something reached with an id (M1.10, confirmed by the user;
+ * the route was called `HabitEdit(habitId: String?)` before that). Add a parameterised route when a
+ * screen genuinely needs one; do not add one in anticipation.
+ *
+ * ⚠ **The two Notion screens are deliberately absent** — the connection wizard and sync status. They
+ * are currently shown by `HabitsAppRoot`, which picks between them with an `if` and which M5.2
+ * replaces. Setup is a **gate around** the graph rather than a tab (M12.9's rule: first launch with
+ * no configuration goes straight to the wizard), and sync status belongs under Settings, which is
+ * M7's screen. **M5.2 owns that decision and must not lose sync status in the move** — after the
+ * nav bar exists, the `if` no longer has anywhere to put it.
+ */
+sealed interface NavRoute
+
+/**
+ * The five destinations with a bottom-nav tab, in the order the design shows them
+ * (`docs/design-spec.md` §1).
+ *
+ * Being a separate type is what keeps [ManageHabits] out of the navigation bar: the bar is built
+ * from this type, so adding a sixth tab has to be a deliberate act rather than a side effect of
+ * declaring a route. Each tab also owns a colour and an icon, but those live with the bar in M5.2 —
+ * a route is a destination, not a piece of styling.
+ */
+sealed interface TopLevelRoute : NavRoute
+
+/** Monthly completion density for every habit at once — `docs/design-spec.md` §2. */
+@Serializable
+data object Month : TopLevelRoute
+
+/**
+ * The landing tab, and the home of the check-off loop (M6).
+ *
+ * **The start destination is this one, not [Month]** — the user's decision. Opening the app lands on
+ * the current week with today already ringed, which is how v1 gets a "today" experience without a
+ * sixth tab. System back therefore exits from here and returns here from any other tab
+ * (`docs/design-spec.md` §1, `CLAUDE.md` §1).
+ */
+@Serializable
+data object Week : TopLevelRoute
+
+/** A year of completions as a dot grid — `docs/design-spec.md` §4. */
+@Serializable
+data object Year : TopLevelRoute
+
+/** Completion rates, streaks and the year heatmap — `docs/design-spec.md` §5. */
+@Serializable
+data object Stats : TopLevelRoute
+
+/** Notion connection, sync state and everything about the app — `docs/design-spec.md` §6. */
+@Serializable
+data object Settings : TopLevelRoute
+
+/**
+ * The habit list — **read-only**, by design.
+ *
+ * Not a tab, and not named `HabitEdit`. ADR-010 makes habits a projection of the user's Notion
+ * schema, so this screen links out to Notion and offers app-local colour controls rather than
+ * editing anything (M7.5). The old name would invite a future session to build the editing that
+ * must not exist.
+ */
+@Serializable
+data object ManageHabits : NavRoute
