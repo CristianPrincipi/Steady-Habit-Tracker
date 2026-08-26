@@ -5,13 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -82,7 +79,11 @@ fun SyncStatusContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing)
+                // ⭐ No `windowInsetsPadding` here. M5.2 put this screen inside `HabitsShell`'s
+                // Scaffold, whose content padding already covers the status bar and the bottom bar,
+                // and applying `safeDrawing` as well pushed the title a status bar's height down the
+                // page — visible the moment the shell was screenshotted. **The shell owns insets; a
+                // screen inside the graph takes the padding it is handed** (see `StubScreen`).
                 .verticalScroll(rememberScrollState())
                 .padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),

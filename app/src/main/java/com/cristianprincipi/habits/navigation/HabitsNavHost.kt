@@ -1,14 +1,11 @@
 package com.cristianprincipi.habits.navigation
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -20,12 +17,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.cristianprincipi.habits.R
-import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
-import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
+import com.cristianprincipi.habits.feature.history.MonthScreen
+import com.cristianprincipi.habits.feature.history.YearScreen
+import com.cristianprincipi.habits.feature.managehabits.ManageHabitsScreen
 import com.cristianprincipi.habits.feature.notionsetup.NotionSetupScreen
+import com.cristianprincipi.habits.feature.settings.SettingsScreen
+import com.cristianprincipi.habits.feature.stats.StatsScreen
 import com.cristianprincipi.habits.feature.syncstatus.SyncStatusScreen
+import com.cristianprincipi.habits.feature.week.WeekScreen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -98,42 +98,20 @@ fun HabitsShell(
             startDestination = Week,
             modifier = Modifier.padding(contentPadding),
         ) {
-            // ⚠ The five tabs are empty on purpose: **M5.3 stubs every screen**, and doing it here
-            // would be that step's work under this step's name. What M5.2 is answerable for is that
-            // each destination exists, the bar switches between them, and the right tab lights up.
-            composable<Month> { }
-            composable<Week> { }
-            composable<Year> { }
-            composable<Stats> { }
+            // ⚠ Every screen below except sync status is an M5.3 stub — a title and a line saying
+            // so. The milestone that builds each one replaces it in place; see each screen's KDoc.
+            composable<Month> { MonthScreen() }
+            composable<Week> { WeekScreen() }
+            composable<Year> { YearScreen() }
+            composable<Stats> { StatsScreen() }
             composable<Settings> {
-                SettingsScaffolding(onOpenSyncStatus = { navController.navigate(SyncStatus) })
+                SettingsScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
             composable<SyncStatus> { SyncStatusScreen() }
             // ⚠ Declared but unreachable until the header's `+` exists (M6/M7.5). That is a stated
-            // gap, unlike sync status, which the user asked to keep reachable from this step on.
-            composable<ManageHabits> { }
+            // gap, unlike sync status, which the user asked to keep reachable from M5.2 on.
+            composable<ManageHabits> { ManageHabitsScreen() }
         }
-    }
-}
-
-/**
- * Settings, until M7 builds it: one row, into sync status.
- *
- * ⭐ **This exists because the user asked for it in M5.2.** Deleting `HabitsAppRoot` took away the
- * only thing pointing at `SyncStatusScreen` — it used to be what every configured user saw — and a
- * destination nothing navigates to is unreachable however carefully it is declared. Rather than
- * leave the Notion connection unreachable for a whole milestone, Settings carries a single row into
- * it. M7 absorbs this when it builds the real screen; there is nothing here worth keeping.
- */
-@Composable
-private fun SettingsScaffolding(onOpenSyncStatus: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.screenPadding),
-    ) {
-        SecondaryButton(
-            text = stringResource(R.string.settings_notion_sync),
-            onClick = onOpenSyncStatus,
-        )
     }
 }
 

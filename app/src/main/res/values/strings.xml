@@ -167,4 +167,23 @@
       screen keep a way in rather than going dark until M7.
     -->
     <string name="settings_notion_sync">Notion sync</string>
+
+    <!--
+      Header titles — docs/design-spec.md §1. Deliberately NOT the same strings as the tab labels:
+      the design's header reads "Statistics" where the tab reads "Stats", and the Month header will
+      eventually read the month's name rather than "Month" at all (M8).
+    -->
+    <string name="screen_title_month">Month</string>
+    <string name="screen_title_week">Week</string>
+    <string name="screen_title_year">Year</string>
+    <string name="screen_title_stats">Statistics</string>
+    <string name="screen_title_settings">Settings</string>
+    <string name="screen_title_habits">Habits</string>
+
+    <!--
+      Scaffolding (M5.3). Every screen showing this is replaced by the milestone that builds it, and
+      this string goes with the last of them. It exists because a destination that renders nothing
+      is indistinguishable from one that is broken — M5.6 asks the user to click through the shell.
+    -->
+    <string name="stub_placeholder">Nothing here yet — this screen is built in a later milestone.</string>
 </resources>

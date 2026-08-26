@@ -4,7 +4,11 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasNoClickAction
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -34,12 +38,25 @@ class HabitsShellNavigationTest {
 
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
+    /**
+     * A bottom-nav item.
+     *
+     * ⚠ Matching on text alone stopped being enough when M5.3 gave the screens headers: "Week" is
+     * now both a tab and a heading, and `onNodeWithText` fails outright on two matches. The tab is
+     * the selectable one — that is what `NavigationBarItem` puts in semantics — and the heading is
+     * the one with no click action.
+     */
+    private fun tab(id: Int) = composeTestRule.onAllNodesWithText(string(id)).filterToOne(isSelectable())
+
+    /** A screen's own header title, as opposed to the tab of the same name. */
+    private fun heading(id: Int) = composeTestRule.onAllNodesWithText(string(id)).filterToOne(hasNoClickAction())
+
     @Test
     fun theShellOpensOnWeekWithEveryTabPresent() {
         // Week, not Month — the user's decision (`docs/design-spec.md` §1). Getting the start
         // destination wrong is invisible to every other assertion here, because all five
         // destinations exist either way.
-        composeTestRule.onNodeWithText(string(R.string.tab_week)).assertIsSelected()
+        tab(R.string.tab_week).assertIsSelected()
 
         listOf(
             R.string.tab_month,
@@ -47,15 +64,15 @@ class HabitsShellNavigationTest {
             R.string.tab_year,
             R.string.tab_stats,
             R.string.tab_settings,
-        ).forEach { label -> composeTestRule.onNodeWithText(string(label)).assertIsDisplayed() }
+        ).forEach { label -> tab(label).assertIsDisplayed() }
     }
 
     @Test
     fun tappingATabSelectsItAndDeselectsTheLast() {
-        composeTestRule.onNodeWithText(string(R.string.tab_month)).performClick()
+        tab(R.string.tab_month).performClick()
 
-        composeTestRule.onNodeWithText(string(R.string.tab_month)).assertIsSelected()
-        composeTestRule.onNodeWithText(string(R.string.tab_week)).assertIsNotSelected()
+        tab(R.string.tab_month).assertIsSelected()
+        tab(R.string.tab_week).assertIsNotSelected()
     }
 
     @Test
@@ -63,7 +80,7 @@ class HabitsShellNavigationTest {
         // ⭐ The reason this test exists. Deleting `HabitsAppRoot` in M5.2 removed the only thing
         // pointing at sync status, and a destination nothing navigates to is unreachable however
         // carefully it is declared. The user asked that it keep a way in (ADR-062).
-        composeTestRule.onNodeWithText(string(R.string.tab_settings)).performClick()
+        tab(R.string.tab_settings).performClick()
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
 
         // No token is stored, so the screen correctly reports the connection as absent. That it
@@ -73,15 +90,36 @@ class HabitsShellNavigationTest {
         Espresso.pressBack()
 
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(string(R.string.tab_settings)).assertIsSelected()
+        tab(R.string.tab_settings).assertIsSelected()
     }
 
     @Test
     fun theBarIsHiddenOnADestinationThatIsNotATab() {
         // A bar with nothing selected would be a bar lying about where the user is.
-        composeTestRule.onNodeWithText(string(R.string.tab_settings)).performClick()
+        tab(R.string.tab_settings).performClick()
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
 
         composeTestRule.onNodeWithText(string(R.string.tab_week)).assertDoesNotExist()
+    }
+
+    @Test
+    fun everyTabLandsOnItsOwnScreen() {
+        // ⭐ M5.3. Until the stubs existed, all five destinations rendered nothing, so a bar that
+        // lit the right tab while showing the wrong screen would have looked identical. This is the
+        // assertion that would have caught a copy-paste in the graph.
+        heading(R.string.screen_title_week).assertIsDisplayed()
+
+        tab(R.string.tab_month).performClick()
+        heading(R.string.screen_title_month).assertIsDisplayed()
+
+        tab(R.string.tab_year).performClick()
+        heading(R.string.screen_title_year).assertIsDisplayed()
+
+        tab(R.string.tab_stats).performClick()
+        // "Statistics" in the header, "Stats" on the tab — the design's own asymmetry (§1).
+        heading(R.string.screen_title_stats).assertIsDisplayed()
+
+        tab(R.string.tab_settings).performClick()
+        heading(R.string.screen_title_settings).assertIsDisplayed()
     }
 }
