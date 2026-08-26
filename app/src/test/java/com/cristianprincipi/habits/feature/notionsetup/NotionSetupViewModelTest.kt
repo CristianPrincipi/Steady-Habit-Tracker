@@ -27,7 +27,11 @@ class NotionSetupViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private val repository = FakeNotionSetupRepository()
-    private val viewModel = NotionSetupViewModel(repository)
+
+    // Constructed lazily, so that it is built from inside the test body rather than while the class
+    // is being instantiated: the ViewModel now collects in `init`, and a rule has not yet swapped
+    // `Dispatchers.Main` at field-initialisation time.
+    private val viewModel by lazy { NotionSetupViewModel(repository) }
 
     private val state get() = viewModel.uiState.value
 
@@ -315,5 +319,38 @@ class NotionSetupViewModelTest {
 
             assertEquals(null, state.failure)
             assertEquals(NotionSetupStep.ChooseDatabase, state.step)
+        }
+
+    // --- coming back after a disconnect ---------------------------------------------------------
+
+    @Test
+    fun disconnectingStartsTheWizardOver() =
+        runTest {
+            // ⭐ M4.18, found on the device rather than here. This ViewModel is activity-scoped, so
+            // it survives being swapped away and came back after a disconnect still on Done: a dead
+            // end reading "Connected, 513 days imported" at someone who had just disconnected.
+            reachMappingStep()
+            repository.importResult = NotionSetupResult.Success(513)
+            viewModel.onEvent(NotionSetupEvent.MappingSubmitted)
+            assertEquals(NotionSetupStep.Done, state.step)
+
+            repository.disconnect(alsoDeleteLocalData = false)
+
+            assertEquals(NotionSetupStep.Token, state.step)
+            assertEquals(0, state.importedDays)
+            assertTrue(state.properties.isEmpty())
+            assertTrue(state.databases.isEmpty())
+        }
+
+    @Test
+    fun aRunInProgressIsNotResetByBeingUnconfigured() =
+        runTest {
+            // The reset watches the *transition*, not the value. `isConfigured` is false for the
+            // whole of a normal first run, so resetting on the value would wipe the wizard between
+            // steps — which is every run, rather than the one case this exists for.
+            reachMappingStep()
+
+            assertEquals(NotionSetupStep.MapProperties, state.step)
+            assertTrue(state.properties.isNotEmpty())
         }
 }

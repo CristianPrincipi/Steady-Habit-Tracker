@@ -12,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,6 +36,39 @@ class NotionSetupViewModel
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(NotionSetupUiState())
         val uiState: StateFlow<NotionSetupUiState> = _uiState.asStateFlow()
+
+        init {
+            resetWhenDisconnected()
+        }
+
+        /**
+         * ⭐ **Starts the wizard over when the app stops being configured** — a disconnect.
+         *
+         * Found by watching a real disconnect in M4.18, not by a test. This ViewModel outlives the
+         * screen: `HabitsAppRoot` chooses between the wizard and sync status with an `if`, so there
+         * is no back stack entry to scope to and `hiltViewModel()` resolves against the *activity*.
+         * The instance therefore survives being swapped away, and a disconnect brought the wizard
+         * back holding [NotionSetupStep.Done] from the previous run — a dead end reading "Connected,
+         * 513 days imported" at someone who had just disconnected, with no control on it and
+         * [goBack] treating `Done` as terminal. The only way out was to leave the app.
+         *
+         * Watching the *transition* rather than the value matters: `isConfigured` is false for the
+         * whole of a normal first run, and resetting on that would wipe the wizard mid-flow.
+         *
+         * **This does not belong in `HabitsAppRoot`**, which M5 deletes. State that claims a
+         * connection the app no longer has is wrong wherever the screen is hosted from.
+         */
+        private fun resetWhenDisconnected() {
+            viewModelScope.launch {
+                var wasConfigured = false
+                repository.isConfigured.distinctUntilChanged().collect { configured ->
+                    if (wasConfigured && !configured) {
+                        _uiState.value = NotionSetupUiState()
+                    }
+                    wasConfigured = configured
+                }
+            }
+        }
 
         fun onEvent(event: NotionSetupEvent) {
             when (event) {

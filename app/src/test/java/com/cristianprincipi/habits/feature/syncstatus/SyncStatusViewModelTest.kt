@@ -89,11 +89,12 @@ class SyncStatusViewModelTest {
         }
 
     @Test
-    fun aHeldSyncSaysSoAndTakesTheButtonAwayWithIt() =
+    fun aHeldSyncSaysSoAndDisablesTheButtonItAnswersFor() =
         runTest {
-            // ⭐ M4.16. The button is hidden on purpose: syncNow() de-duplicates on a unique name,
-            // so a second tap while the request is held provably does nothing, and leaving it up
-            // would re-create the silent no-op one tap further along. The card answers instead.
+            // ⭐ M4.16, amended by ADR-060 in M4.18. syncNow() de-duplicates on a unique name, so a
+            // second tap while the request is held provably does nothing — but the button is now
+            // disabled rather than removed, because removing it let the destructive button reflow
+            // into its place. canRetry is the enabled flag; the card still says what happens next.
             connection.saveToken("ntn_pretend")
             status.value = SyncStatus.WaitingForNetwork(lastSyncedAt = now.minusSeconds(7200))
 

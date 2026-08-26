@@ -481,6 +481,47 @@ them from Android's `SatelliteController`**, where NTN means *Non-Terrestrial Ne
 process logged 43 lines and none of them match `ntn_`, `Bearer`, `Authorization` or `token`. A future
 session running this check should expect that false positive rather than panic at it.
 
+
+---
+
+## 12d. The second live run — 2026-08-26, in M4.18
+
+Two connects and two disconnects against the same **duplicate** database, with a real personal access
+token typed on the device each time and never written anywhere. Purpose was the **disconnect**, which
+had never been watched; no new API behaviour was being probed.
+
+**Nothing here contradicts §12c.** Both imports parsed exactly as they did two days ago —
+**5 habits, 513 days, 884 completions** (511/871 on 2026-08-24; the database has moved on since).
+Search, `retrieveDataSource`, `queryPages` and the day-key filter all behaved as recorded.
+
+**What the disconnect does, measured on disk either side of the tap:**
+
+| | before | after |
+| --- | --- | --- |
+| `files/datastore/notion_auth.preferences_pb` | 136 bytes, holds `notion_token_ciphertext` | **0 bytes** |
+| `files/datastore/settings.preferences_pb` | `notion_property_mapping`, `last_synced_at_epoch_millis` | `last_synced_at_epoch_millis` only |
+| Room, with the checkbox **off** | 5 / 513 / 884 | unchanged |
+| Room, with the checkbox **on** | 5 / 513 / 884 | **0 / 0 / 0** |
+
+`lastSyncedAt` surviving both is deliberate and documented on `NotionSetupRepository.disconnect`.
+The destructive variant showed its irreversibility warning only once the box was ticked, and the box
+started clear on each of the two openings, as ADR-052 requires.
+
+### ⚠ The `ntn_` false positive is much larger than §12c recorded
+
+§12c reported 24 `SatelliteController` hits. This session's log held **935**, and a future session
+should not read a bigger number as a leak. What actually matters is the attribution:
+
+- All 935 came from **pid 1104**, a system process. The app's own pids that session were 4380, 5244,
+  5417 and 5452, and none of them logged an `ntn_` anything.
+- `Bearer` appears **zero** times in 84,196 log lines.
+- `Authorization` appears once — `AdbAuthorizationStore: Ignoring tag 'keyStore'`, from pid 692.
+
+Grep by **pid**, not by package name: filtering on `com.cristianprincipi.habits` matches framework
+lines that merely name the app (`WindowManager`, `ContentCapturePerUserService`, `SdkSandboxManager`,
+`BackupManagerService`), several of which contain the word *token* in an Android sense and none of
+which the app emitted.
+
 ---
 
 ## 13. Property values — every shape, confirmed in M4.6

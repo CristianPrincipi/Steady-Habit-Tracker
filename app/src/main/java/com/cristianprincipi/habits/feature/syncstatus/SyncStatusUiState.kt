@@ -46,11 +46,13 @@ data class SyncStatusUiState(
     /**
      * Nothing to retry while a run is already in flight — **or already owed**.
      *
-     * The waiting case is M4.16's, and hiding the button there is the point rather than a side
-     * effect. `SyncScheduler.syncNow()` de-duplicates on a unique name, so a second tap while a
-     * request is held provably does nothing; leaving the button up would re-create the exact
-     * silent no-op `CLAUDE.md` §3.5 forbids, one tap further along. The card has taken over
-     * saying what happens next.
+     * ⚠ **This disables the button; it does not hide it** (ADR-060, the user's decision in M4.18).
+     * `SyncScheduler.syncNow()` de-duplicates on a unique name, so a second tap while a request is
+     * held provably does nothing — but M4.16 answered that by removing the control, and removing it
+     * let "Disconnect from Notion" reflow up into the exact pixels "Sync now" had occupied. A second
+     * tap then landed on the destructive button. A disabled control is not the silent no-op
+     * `CLAUDE.md` §3.5 forbids: it says "queued, nothing more to do" out loud, and it holds the
+     * layout still. Seen on the device in M4.18 — the two screenshots differ by one button.
      */
     val canRetry: Boolean get() = isConnected && !isSyncing && !isWaitingForNetwork
 

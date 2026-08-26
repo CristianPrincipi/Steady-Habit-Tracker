@@ -97,10 +97,14 @@ fun SyncStatusContent(
 
         state.failure?.let { failure -> NotionFailureBanner(failure = failure) }
 
-        if (state.canRetry) {
+        // Shown for the whole of a connection and only ever disabled, so that neither a held sync
+        // nor a running one can move the destructive button below it. ADR-060.
+        if (state.isConnected) {
             SecondaryButton(
                 text = stringResource(R.string.sync_retry),
                 onClick = { onEvent(SyncStatusEvent.RetryPressed) },
+                enabled = state.canRetry,
+                isBusy = state.isSyncing,
             )
         }
 

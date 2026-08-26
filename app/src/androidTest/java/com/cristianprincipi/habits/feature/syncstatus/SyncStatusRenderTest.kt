@@ -1,7 +1,9 @@
 package com.cristianprincipi.habits.feature.syncstatus
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -58,6 +60,13 @@ class SyncStatusRenderTest {
     /** `createComposeRule` has no activity, so the strings come from the app context. */
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
+    /** Where the destructive button currently sits, so a test can assert it has not moved. */
+    private fun disconnectPosition() =
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_disconnect))
+            .fetchSemanticsNode()
+            .positionInRoot
+
     @Test
     fun aHealthyConnectionSaysWhenItLastSynced() {
         show(SyncStatusUiState(isConnected = true, lastSynced = Elapsed.Minutes(3)))
@@ -73,13 +82,37 @@ class SyncStatusRenderTest {
     }
 
     @Test
-    fun aHeldSyncSaysWhatHappensNextAndHidesTheButtonItAnswersFor() {
+    fun aHeldSyncSaysWhatHappensNextAndDisablesTheButtonItAnswersFor() {
+        // ⭐ ADR-060, from watching this on the device in M4.18. The button must stay *in place*:
+        // hiding it let "Disconnect from Notion" slide up into the pixels a second tap was headed
+        // for. Displayed-but-disabled is the assertion that pins the fix.
         show(SyncStatusUiState(isConnected = true, isWaitingForNetwork = true, lastSynced = Elapsed.Hours(2)))
 
         composeTestRule
             .onNodeWithText(string(R.string.sync_waiting_for_network))
             .assertIsDisplayed()
-        composeTestRule.onNodeWithText(string(R.string.sync_retry)).assertDoesNotExist()
+        composeTestRule
+            .onNodeWithText(string(R.string.sync_retry))
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+    }
+
+    @Test
+    fun theDestructiveButtonDoesNotMoveWhenASyncIsHeld() {
+        // The hazard itself, rather than its cause: whatever the card is saying, Disconnect must
+        // stay where the user last saw it.
+        // Driven through one composition rather than two `show` calls: `setContent` may only be
+        // called once, and the point is what the *same* screen does when its state changes under it.
+        val state = mutableStateOf(SyncStatusUiState(isConnected = true, lastSynced = Elapsed.Hours(2)))
+        composeTestRule.setContent {
+            HabitsTheme { SyncStatusContent(state = state.value, onEvent = {}) }
+        }
+        val settled = disconnectPosition()
+
+        state.value = state.value.copy(isWaitingForNetwork = true)
+        composeTestRule.waitForIdle()
+
+        assertEquals(settled, disconnectPosition())
     }
 
     @Test
