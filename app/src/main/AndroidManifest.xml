@@ -40,10 +40,24 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!--
+      PREDICTIVE BACK IS OPTED INTO EXPLICITLY (M5.4).
+
+      `android:enableOnBackInvokedCallback` is the documented opt-in from API 33. Newer platforms
+      turn it on by default above some targetSdk, but the exact threshold is an API detail, and this
+      project does not write those from memory (CLAUDE.md §3.2's rule, applied outside Notion).
+      Stating it costs one attribute and removes the question.
+
+      ⚠ It was NOT verifiable from the app: `ApplicationInfo.isOnBackInvokedCallbackEnabled` is not
+      public API — checked with javap against the compileSdk 37 android.jar, where no such method
+      exists. What IS asserted, in HabitsShellNavigationTest, is the mechanism a predictive gesture
+      needs: the app claims back exactly when it has somewhere to go.
+    -->
     <application
         android:name=".HabitsApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

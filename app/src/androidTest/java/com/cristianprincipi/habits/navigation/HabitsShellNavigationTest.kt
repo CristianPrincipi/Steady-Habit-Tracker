@@ -16,6 +16,8 @@ import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.gallery.ShellHarnessActivity
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -100,6 +102,77 @@ class HabitsShellNavigationTest {
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
 
         composeTestRule.onNodeWithText(string(R.string.tab_week)).assertDoesNotExist()
+    }
+
+    // --- back (M5.4) -----------------------------------------------------------------------
+
+    @Test
+    fun backFromAnyTabReturnsToWeekRatherThanTheTabBefore() {
+        // ⭐ The behaviour `docs/design-spec.md` §1 asks for: "system back exits from Week and
+        // returns to Week from any other tab". `switchTab` pops to the start destination on every
+        // switch, so three tab taps must still leave a stack one deep — the failure mode this pins
+        // is a back stack that grows with every tab the user has ever visited, which is what
+        // `navigate(route)` on its own would do.
+        tab(R.string.tab_month).performClick()
+        tab(R.string.tab_year).performClick()
+        tab(R.string.tab_stats).performClick()
+
+        Espresso.pressBack()
+
+        heading(R.string.screen_title_week).assertIsDisplayed()
+        tab(R.string.tab_week).assertIsSelected()
+    }
+
+    @Test
+    fun backFromWeekLeavesTheApp() {
+        // Week is the start destination, so there is nothing behind it. `pressBackUnconditionally`
+        // rather than `pressBack`: the latter throws when back would leave the app, which is
+        // precisely the case under test.
+        // Held before the press: once the activity is gone, `composeTestRule.activity` throws
+        // "Cannot run onActivity since Activity has been destroyed already" — which is itself the
+        // answer, but not an assertion.
+        val activity = composeTestRule.activity
+
+        Espresso.pressBackUnconditionally()
+
+        composeTestRule.waitUntil { activity.isFinishing || activity.isDestroyed }
+        assertTrue(activity.isFinishing || activity.isDestroyed)
+    }
+
+    @Test
+    fun backOutOfSyncStatusDoesNotDisturbTheTabBehindIt() {
+        // A destination without a tab sits *on top of* the tab that opened it. Coming back should
+        // land on Settings with Settings still selected — not on the start destination.
+        tab(R.string.tab_month).performClick()
+        tab(R.string.tab_settings).performClick()
+        composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
+
+        Espresso.pressBack()
+
+        heading(R.string.screen_title_settings).assertIsDisplayed()
+        tab(R.string.tab_settings).assertIsSelected()
+    }
+
+    @Test
+    fun theShellClaimsBackOnlyWhenItHasSomewhereToGo() {
+        // ⭐ This is the mechanism predictive back rides on, which is why it is worth pinning. The
+        // platform can only animate a predictive gesture when the app has an *enabled* back callback
+        // registered; `NavHost` enables one exactly while its back stack is more than one deep.
+        //
+        // It is also the pair of claims that keeps back honest at both ends: on the start
+        // destination the app must NOT claim back, or it would swallow the gesture that leaves the
+        // app; anywhere else it must, or the gesture would leave the app from the middle of it.
+        assertFalse(composeTestRule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
+
+        tab(R.string.tab_month).performClick()
+        // ⚠ The `waitForIdle` is load-bearing, and this test failed without it. `performClick`
+        // syncs the composition, but `NavController` enables its callback from an observer that has
+        // not necessarily run by then — so the assertion read a stale `false` and looked exactly
+        // like a real defect. The behavioural test above passed the whole time, which is what said
+        // otherwise.
+        composeTestRule.waitForIdle()
+
+        assertTrue(composeTestRule.activity.onBackPressedDispatcher.hasEnabledCallbacks())
     }
 
     @Test
