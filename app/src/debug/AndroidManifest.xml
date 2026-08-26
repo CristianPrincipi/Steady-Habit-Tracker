@@ -23,6 +23,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          The five-tab shell, as if the app were configured. Reached by an instrumented test
+          (HabitsShellNavigationTest), which can launch a non-exported activity because
+          instrumentation runs against this app.
+
+          `exported="false"` and no launcher entry, unlike the gallery beside it, because this one
+          hosts the real SyncStatusScreen — and that screen can disconnect a live Notion connection.
+          A debug build is still somebody's phone.
+
+          ⚠ The cost is that `adb shell am start` CANNOT open it: the shell uid gets
+          "Permission Denial: ... not exported from uid", and `run-as <pkg> am start` fails too
+          ("package=com.android.shell does not belong to uid"). To look at the shell by hand, flip
+          this to `true`, `installDebug`, screenshot, and flip it back — which is what M5.2 did.
+        -->
+        <activity
+            android:name=".gallery.ShellHarnessActivity"
+            android:exported="false"
+            android:theme="@style/Theme.MyHabitApp" />
     </application>
 
 </manifest>

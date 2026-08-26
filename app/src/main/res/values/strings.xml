@@ -151,4 +151,20 @@
     <string name="notion_issue_habit_missing">A habit column was deleted.</string>
     <string name="notion_issue_habit_retyped">“%1$s” is now a %2$s.</string>
     <string name="notion_issue_wrong_data_source">The saved setup points at a different database.</string>
+    <!--
+      Bottom-nav labels — docs/design-spec.md §1. One word each, because the bar gives them 10sp
+      across a fifth of the screen; anything longer wraps or ellipsises on a narrow device.
+    -->
+    <string name="tab_month">Month</string>
+    <string name="tab_week">Week</string>
+    <string name="tab_year">Year</string>
+    <string name="tab_stats">Stats</string>
+    <string name="tab_settings">Settings</string>
+
+    <!--
+      Scaffolding, and M7 replaces it with the real Settings screen. It exists because deleting
+      HabitsAppRoot in M5.2 took away the only route into sync status, and the user asked that the
+      screen keep a way in rather than going dark until M7.
+    -->
+    <string name="settings_notion_sync">Notion sync</string>
 </resources>

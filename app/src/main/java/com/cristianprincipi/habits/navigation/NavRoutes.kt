@@ -16,12 +16,13 @@ import kotlinx.serialization.Serializable
  * the route was called `HabitEdit(habitId: String?)` before that). Add a parameterised route when a
  * screen genuinely needs one; do not add one in anticipation.
  *
- * ⚠ **The two Notion screens are deliberately absent** — the connection wizard and sync status. They
- * are currently shown by `HabitsAppRoot`, which picks between them with an `if` and which M5.2
- * replaces. Setup is a **gate around** the graph rather than a tab (M12.9's rule: first launch with
- * no configuration goes straight to the wizard), and sync status belongs under Settings, which is
- * M7's screen. **M5.2 owns that decision and must not lose sync status in the move** — after the
- * nav bar exists, the `if` no longer has anywhere to put it.
+ * ⚠ **The connection wizard is deliberately not a route.** Setup is a **gate around** the graph
+ * rather than a tab (M12.9's rule: a first launch with no configuration goes straight to the
+ * wizard), so `HabitsNavHost` shows it with an `if` and the graph below never sees it.
+ *
+ * ⭐ **[SyncStatus] is a route, and that was the user's call in M5.2.** Deleting `HabitsAppRoot`
+ * took away the only thing pointing at that screen, and it would otherwise have been unreachable
+ * until M7 builds Settings. It is a destination without a tab, reached from Settings.
  */
 sealed interface NavRoute
 
@@ -73,3 +74,13 @@ data object Settings : TopLevelRoute
  */
 @Serializable
 data object ManageHabits : NavRoute
+
+/**
+ * Notion connection health, last sync, manual retry and disconnect — `feature/syncstatus`.
+ *
+ * **A destination, not a tab.** The design has five tabs and this is not one of them; it hangs off
+ * Settings, which is where a connection belongs (`docs/design-spec.md` §6). Until M7 builds that
+ * screen, `HabitsNavHost` carries a single row into here — see `SettingsScaffolding`.
+ */
+@Serializable
+data object SyncStatus : NavRoute

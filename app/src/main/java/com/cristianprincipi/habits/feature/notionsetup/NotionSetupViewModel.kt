@@ -45,18 +45,19 @@ class NotionSetupViewModel
          * ⭐ **Starts the wizard over when the app stops being configured** — a disconnect.
          *
          * Found by watching a real disconnect in M4.18, not by a test. This ViewModel outlives the
-         * screen: `HabitsAppRoot` chooses between the wizard and sync status with an `if`, so there
-         * is no back stack entry to scope to and `hiltViewModel()` resolves against the *activity*.
-         * The instance therefore survives being swapped away, and a disconnect brought the wizard
-         * back holding [NotionSetupStep.Done] from the previous run — a dead end reading "Connected,
-         * 513 days imported" at someone who had just disconnected, with no control on it and
-         * [goBack] treating `Done` as terminal. The only way out was to leave the app.
+         * screen: `HabitsNavHost` gates the wizard with an `if` rather than making it a destination,
+         * so there is no back stack entry to scope to and `hiltViewModel()` resolves against the
+         * *activity*. The instance therefore survives being swapped away, and a disconnect brought
+         * the wizard back holding [NotionSetupStep.Done] from the previous run — a dead end reading
+         * "Connected, 513 days imported" at someone who had just disconnected, with no control on it
+         * and [goBack] treating `Done` as terminal. The only way out was to leave the app.
          *
          * Watching the *transition* rather than the value matters: `isConfigured` is false for the
          * whole of a normal first run, and resetting on that would wipe the wizard mid-flow.
          *
-         * **This does not belong in `HabitsAppRoot`**, which M5 deletes. State that claims a
-         * connection the app no longer has is wrong wherever the screen is hosted from.
+         * **This does not belong in the host** — `HabitsAppRoot` was deleted in M5.2 and the gate
+         * moved to `HabitsNavHost`, which is exactly why it is here. State that claims a connection
+         * the app no longer has is wrong wherever the screen is hosted from.
          */
         private fun resetWhenDisconnected() {
             viewModelScope.launch {

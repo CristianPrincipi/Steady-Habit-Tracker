@@ -29,14 +29,14 @@ import org.junit.runner.RunWith
  *
  * ### ⭐ M4.17 — the precondition is stated, not inherited
  *
- * Both assertions are about the **wizard**, and `HabitsAppRoot` only shows the wizard while setup is
+ * Both assertions are about the **wizard**, and `HabitsNavHost` only shows the wizard while setup is
  * unfinished; a configured app gets `SyncStatusScreen` instead, where neither node exists. So this
  * class passed for eleven steps on the strength of an accident — no device it had ever run on had
  * been connected to Notion by hand. The first one that was would have failed it, and the failure
  * would have read as a broken wizard rather than as a dirty device.
  *
  * ⚠ **And the routing key is the mapping, not the token.** M4.17 was written as "clear the auth
- * DataStore", which would not have fixed it: `HabitsAppRoot` routes on `isConfigured`, which
+ * DataStore", which would not have fixed it: the host routes on `isConfigured`, which
  * `NotionMappingStore` answers out of the **settings** file, while the token lives in its own
  * (`AuthDataStoreModule` — kept apart on purpose). [FreshInstallRule] clears both, which is what
  * "fresh install" means and what these assertions actually depend on.

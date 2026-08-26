@@ -61,6 +61,16 @@ object Spacing {
 
     /** `gap-2` — between habit chips in the Stats selector row. */
     val chipGap: Dp = 8.dp
+
+    /**
+     * Between a bottom-nav label and its active dot.
+     *
+     * ⚠ **Inferred, not extracted.** `docs/design-spec.md` §1 records the dot as 4px and says it
+     * sits "beneath the label", but the gap itself was never captured — 4px is the natural reading
+     * of the prototype's Tailwind spacing step. Worth a glance when the user reviews the shell
+     * (M5.6); it is one value and nothing else depends on it.
+     */
+    val tabIndicatorGap: Dp = 4.dp
 }
 
 /*

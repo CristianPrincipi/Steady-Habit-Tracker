@@ -11,14 +11,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.navigation.HabitsNavHost
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * Bootstrap entry point.
  *
- * ⚠ **The body is scaffolding, and M5 replaces it** — see [HabitsAppRoot], which stands in for
- * `HabitsNavHost` until it exists. A screen nobody can reach is a screen nobody has looked at, and
- * there are now two of them (M4.12, M4.13).
+ * Everything above the theme is here: edge-to-edge, the dark system bars, and the one surface the
+ * whole app draws on. The app itself is [HabitsNavHost], which decides between the setup wizard and
+ * the five-tab shell.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -40,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    HabitsAppRoot()
+                    HabitsNavHost()
                 }
             }
         }
