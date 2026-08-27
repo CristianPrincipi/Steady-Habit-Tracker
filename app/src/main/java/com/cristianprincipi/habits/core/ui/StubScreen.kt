@@ -33,8 +33,24 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * puts every destination inside a `Scaffold`, whose content padding already covers the status bar
  * and the bottom bar, so a screen that also applied `safeDrawing` would be padded twice. That is not
  * hypothetical: `SyncStatusScreen` was written standalone in M4.13 and did exactly that once M5.2
- * put it in the graph, which is how the rule got written down. M5.5 is where this is verified on
- * every destination.
+ * put it in the graph, which is how the rule got written down.
+ *
+ * **M5.5 verified this on every destination** — five tabs plus sync status, portrait and landscape,
+ * gesture and three-button navigation — and the shell was right in all of them. `NotionSetupScreen`
+ * is the one screen outside the rule, because setup is a gate around the graph rather than a
+ * destination in it, and its KDoc says so.
+ *
+ * ### ⚠ And the clause M5.5 had to add: insets are not fit
+ *
+ * **The shell hands a screen a correctly padded box. It does not make the content fit inside it.**
+ * Those are different jobs, and only the first one is the shell's. A `Scaffold` shrinks the content
+ * area — for the bars, and for the keyboard where a screen opts into it — and a plain `Column` given
+ * less room than it needs clips the remainder without a word. Every real screen therefore owns its
+ * own scrolling: `LazyColumn` for a list, `verticalScroll` for bounded content.
+ *
+ * These stubs get away without it because they are two lines of text. **The milestone that replaces
+ * each one does not.** M5.5 watched this exact failure in the setup wizard, where landscape plus a
+ * keyboard clipped away the button the user needed.
  */
 @Composable
 fun StubScreen(

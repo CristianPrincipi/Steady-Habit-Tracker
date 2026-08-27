@@ -58,7 +58,18 @@ fun NotionSetupScreen(
  *
  * `safeDrawing` insets rather than a `Scaffold`: there is no app bar and no bottom nav here — this
  * screen predates the navigation shell (M5) — so the content owns its own insets and never sits
- * under the status bar.
+ * under the status bar. It is **outside** the shell's graph (setup is a gate, ADR-061), so the
+ * "shell owns insets" rule in `StubScreen` does not reach here and this is the exception it names.
+ *
+ * ### ⭐ The top row is pinned; each step scrolls itself
+ *
+ * `safeDrawing` includes the IME, so a raised keyboard *shrinks* this Column rather than covering
+ * it — and whatever no longer fits is clipped, silently. The scrolling therefore has to live below
+ * this level: [ChooseDatabaseStep] and [MapPropertiesStep] are `LazyColumn`s, which cannot be
+ * nested inside a scrolling parent, so [TokenStep] and [DoneStep] each carry their own
+ * `verticalScroll` instead. [SetupTopRow] stays put, being a few dp of progress dots.
+ *
+ * M5.5 found this by rotating the emulator with the keyboard up. See [TokenStep].
  */
 @Composable
 fun NotionSetupContent(

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +33,18 @@ import com.cristianprincipi.habits.domain.model.NotionSource
  * hands them over — `CLAUDE.md` §3.4 makes the schema user data, and this is where that shows.
  */
 
-/** Step 1 — the token. Nothing has been sent to Notion when this renders. */
+/**
+ * Step 1 — the token. Nothing has been sent to Notion when this renders.
+ *
+ * ⚠ **It scrolls, and that is not decoration — M5.5 watched it fail without it.** This is the only
+ * screen in the app with a keyboard, `WindowInsets.safeDrawing` includes the IME, and the wizard
+ * pads itself by `safeDrawing`. So raising the keyboard does not cover this step, it *shrinks* it —
+ * and a plain Column given less room than its content simply clips the overflow. In landscape with
+ * the keyboard up, the field, its helper line and **Continue** all vanished: a user could type a
+ * token and had no way to submit it. Setup could not be completed at all.
+ *
+ * Exactly the defect ADR-055 fixed one step later, in the database picker, for the same reason.
+ */
 @Composable
 fun TokenStep(
     state: NotionSetupUiState,
@@ -39,7 +52,10 @@ fun TokenStep(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),
     ) {
         SetupHeading(
@@ -237,7 +253,13 @@ fun DoneStep(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                // The other plain-Column step, so the same clip is available to it — a short screen
+                // today, but nothing stops the body from growing. One modifier against a class of
+                // bug that only shows up on somebody else's device.
+                .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),
     ) {
         SetupHeading(
