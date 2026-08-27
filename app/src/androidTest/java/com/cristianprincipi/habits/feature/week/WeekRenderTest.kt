@@ -2,6 +2,8 @@ package com.cristianprincipi.habits.feature.week
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -182,6 +184,55 @@ class WeekRenderTest {
 
         pill(doneHabit, doneDate).assertIsOn()
         pill(missedHabit, missedDate).assertIsOff()
+    }
+
+    // --- days that cannot be written (M6.7) ---------------------------------------------------
+
+    @Test
+    fun aFutureDayIsNotTappable() {
+        // ⭐ The step's whole point, on real dates. The reference Saturday leaves Sunday still to
+        // come, and the design already draws it dimmed — what it did not do was stop it behaving
+        // like a live checkbox.
+        showWeek()
+        val sunday = monday.plusDays(6)
+
+        pill(subject, sunday).performClick()
+
+        assertEquals(emptyList<WeekEvent>(), events)
+    }
+
+    @Test
+    fun aFutureDayIsMarkedUnavailableRatherThanSilentlyInert() {
+        // ⚠ A pill that ignores a tap without saying so is worse for a screen-reader user than one
+        // that refuses out loud: they get no signal at all. "Disabled in place" is the app's
+        // established preference (ADR-060) and it is what carries the meaning here.
+        showWeek()
+
+        pill(subject, monday.plusDays(6)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun todayIsStillTappable() {
+        // ⚠ The off-by-one that would hurt most. Today is not the future, and a boundary that
+        // included it would disable the single pill this app exists to let you tap.
+        showWeek()
+
+        pill(subject, reference).assertIsEnabled()
+        pill(subject, reference).performClick()
+
+        assertEquals(reference, toggled().date)
+    }
+
+    @Test
+    fun aPastDayStaysFreelyEditable() {
+        // The step's other question, answered yes: Notion allows it, and catching up on a day you
+        // missed is most of what a week view is for. Nothing restricts them.
+        showWeek()
+
+        pill(subject, monday).assertIsEnabled()
+        pill(subject, monday).performClick()
+
+        assertEquals(monday, toggled().date)
     }
 
     @Test

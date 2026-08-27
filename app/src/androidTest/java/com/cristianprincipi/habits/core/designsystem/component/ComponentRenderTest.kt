@@ -6,6 +6,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -113,14 +115,46 @@ class ComponentRenderTest {
         composeTestRule.runOnIdle { assertEquals(listOf(WEDNESDAY_INDEX), toggled) }
     }
 
+    // --- which pills can be written at all (M6.7) ---------------------------------------------
+
+    @Test
+    fun onlyDaysThatCanBeWrittenAreEnabled() {
+        // ⭐ Exhaustive over `DayStatus`, which the feature layer cannot manage: a week never
+        // contains BEFORE_START unless you page back past a habit's start date, and it can never
+        // contain PADDING at all (`weekWindow` produces none). Here every case is one list entry.
+        composeTestRule.setContent { HabitsTheme { TestWeekCard(days = EVERY_STATUS, onToggle = {}) } }
+
+        composeTestRule.onNodeWithContentDescription(MONDAY).assertIsEnabled()
+        composeTestRule.onNodeWithContentDescription(TUESDAY).assertIsEnabled()
+        composeTestRule.onNodeWithContentDescription(WEDNESDAY).assertIsNotEnabled()
+        composeTestRule.onNodeWithContentDescription(THURSDAY).assertIsNotEnabled()
+        composeTestRule.onNodeWithContentDescription(FRIDAY).assertIsNotEnabled()
+    }
+
+    @Test
+    fun aDisabledPillCannotBeActivatedThroughSemanticsEither() {
+        // ⚠ `performClick` goes through the **semantics** action, which is the path an accessibility
+        // service takes — not the pointer path. A pill that ignores a finger but still fires for
+        // TalkBack would be a real bug, and only this direction of the test can see it.
+        val toggled = mutableListOf<Int>()
+        composeTestRule.setContent { HabitsTheme { TestWeekCard(days = EVERY_STATUS, onToggle = toggled::add) } }
+
+        composeTestRule.onNodeWithContentDescription(WEDNESDAY).performClick()
+
+        composeTestRule.runOnIdle { assertEquals(emptyList<Int>(), toggled) }
+    }
+
     @androidx.compose.runtime.Composable
-    private fun TestWeekCard(onToggle: (Int) -> Unit) {
+    private fun TestWeekCard(
+        days: List<DayStatus> = previewWeek(),
+        onToggle: (Int) -> Unit,
+    ) {
         WeekHabitCard(
             name = "Drink water",
             description = "8 glasses a day",
             emoji = "💧",
             habitColor = HabitsTheme.colors.habit.green,
-            days = previewWeek(),
+            days = days,
             dayLabels = PREVIEW_DAY_LABELS,
             dayContentDescriptions = PREVIEW_DAY_LABELS,
             todayIndex = TODAY_INDEX,
@@ -132,8 +166,23 @@ class ComponentRenderTest {
     private companion object {
         val GALLERY_WIDTH = 360.dp
         const val MONDAY = "Mon"
+        const val TUESDAY = "Tue"
         const val WEDNESDAY = "Wed"
+        const val THURSDAY = "Thu"
+        const val FRIDAY = "Fri"
         const val WEDNESDAY_INDEX = 2
         const val TODAY_INDEX = 4
+
+        /** One pill per `DayStatus`, in enum order, then two fillers to make up the seven. */
+        val EVERY_STATUS =
+            listOf(
+                DayStatus.COMPLETED,
+                DayStatus.INCOMPLETE,
+                DayStatus.FUTURE,
+                DayStatus.BEFORE_START,
+                DayStatus.PADDING,
+                DayStatus.COMPLETED,
+                DayStatus.INCOMPLETE,
+            )
     }
 }

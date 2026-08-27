@@ -51,8 +51,9 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  *   checkbox, so these should name the date, not the state.
  * @param todayIndex which pill gets the ring, or `-1` for a week that does not contain today. The
  *   ring is drawn whether or not that day is complete.
- * @param onToggle fired with the index. Future days are still reported — whether tomorrow can be
- *   checked off is a domain rule (M6), not a drawing one.
+ * @param onToggle fired with the index of a day that can be checked off. **Days that cannot are
+ *   disabled rather than silently inert** — see [isCheckable]. A tap on tomorrow does not reach
+ *   here, does not reach the domain, and says nothing (`Plan.md` M6.7).
  */
 @Composable
 fun WeekPills(
@@ -115,6 +116,12 @@ private fun RowScope.DayPill(
                 .heightIn(min = Sizing.minimumTouchTarget)
                 .toggleable(
                     value = completed,
+                    // ⚠ Disabled, not absent. `enabled = false` keeps the node a checkbox and marks
+                    // it unavailable, so a screen reader still finds a day here and says it cannot
+                    // be ticked. Dropping the modifier instead would leave a pill that a sighted
+                    // user can see and a blind one cannot — and "disabled in place" is what this app
+                    // does elsewhere (ADR-060).
+                    enabled = status.isCheckable,
                     interactionSource = interactionSource,
                     indication = null,
                     onValueChange = { onToggle() },
@@ -152,6 +159,34 @@ private fun RowScope.DayPill(
         }
     }
 }
+
+/**
+ * Whether a tap on this day can do anything — `Plan.md` M6.7.
+ *
+ * ⚠ **This is an affordance, not the rule.** The rule lives in `ToggleCompletion`, which refuses a
+ * date that has not happened yet and is unit tested for it; `WeekViewModelTest` separately pins that
+ * the ViewModel does not route around it. This stops the tap **reaching** any of that, so the two
+ * are belt and braces rather than one guard in two places. **If they ever disagree, the domain is
+ * right and this is the bug.**
+ *
+ * The design already says all of this without a word: `pillFill` dims [DayStatus.FUTURE] and
+ * [DayStatus.BEFORE_START] to `DayOpacity.WEEK_FUTURE`, the prototype's 30%. What was missing was
+ * that the *dimmed* pill still behaved like a live checkbox.
+ *
+ * - [DayStatus.FUTURE] — tomorrow has not happened. `ToggleCompletion` would refuse it anyway.
+ * - [DayStatus.BEFORE_START] — the habit did not exist yet, so there is no day to write to.
+ * - [DayStatus.PADDING] — not a day at all. It cannot occur in a week (`weekWindow` produces none),
+ *   and `WeekContent.toggleAt` already returns `null` for one; this makes the pill match.
+ *
+ * **Past days are deliberately absent from that list.** They stay freely editable: Notion allows it,
+ * and catching up on a day you missed is most of what a week view is for (`Plan.md` M6.7).
+ */
+private val DayStatus.isCheckable: Boolean
+    get() =
+        when (this) {
+            DayStatus.COMPLETED, DayStatus.INCOMPLETE -> true
+            DayStatus.FUTURE, DayStatus.BEFORE_START, DayStatus.PADDING -> false
+        }
 
 private fun Color.pillFill(
     status: DayStatus,
