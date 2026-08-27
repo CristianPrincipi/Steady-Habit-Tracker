@@ -75,12 +75,20 @@ object SampleHabits {
      * @param reference the day to treat as "today", so `FUTURE` and `BEFORE_START` both appear
      *   without the caller arranging them. The default sits mid-week on a Saturday, which is where
      *   one screen shows completed, incomplete and future days at once.
+     * @param completions the history to draw against. Passed explicitly by anything that lets a
+     *   preview be *changed* — `WeekPreviewActivity`'s in-memory check-off, for one.
+     * @param weekOf which week to draw. Defaults to the week containing [reference]; a caller that
+     *   pages passes the week it has paged to, while [reference] stays put.
      */
     fun weekPeriods(
         reference: LocalDate = referenceDate,
         completions: Collection<Completion> = completions(reference),
+        weekOf: LocalDate = reference,
     ): List<HabitPeriod> {
-        val window = weekWindow(reference)
+        // Two dates, and they are not the same thing: [weekOf] picks which seven days to draw, while
+        // [reference] stays "today". Paging away from today is exactly the case where conflating
+        // them hides a bug — every day would go on looking present-tense.
+        val window = weekWindow(weekOf)
         val byHabit = completions.toList().byHabit()
         return habits(reference).map { habit ->
             buildPeriod(

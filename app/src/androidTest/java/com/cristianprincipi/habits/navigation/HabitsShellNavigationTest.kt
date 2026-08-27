@@ -56,15 +56,12 @@ class HabitsShellNavigationTest {
     /**
      * What proves the **Week** screen is the one on show.
      *
-     * ⚠ **Not a heading, because Week no longer has one.** M6.3 replaced its `StubScreen` with the
-     * real `WeekContent`, and `docs/design-spec.md` §1 puts the title in the screen *header* — which
-     * **M6.4** builds. Four tests failed on this the moment Week stopped being a stub.
-     *
-     * The harness has no Notion connection, so Room is empty and Week correctly renders its empty
-     * state. That string is the anchor until the header exists. **M6.4 should point this back at
-     * the heading**, at which point Week matches the other four again.
+     * Its own header title, like the other four — **again**. M6.3 briefly took this away: replacing
+     * the `StubScreen` with the real `WeekContent` left Week with no title at all, because
+     * `docs/design-spec.md` §1 puts it in the screen *header*, and four tests failed the moment the
+     * stub went. M6.4 built the header, so the anchor is a heading once more.
      */
-    private fun weekIsShowing() = composeTestRule.onNodeWithText(string(R.string.week_empty_title))
+    private fun weekIsShowing() = heading(R.string.screen_title_week)
 
     @Test
     fun theShellOpensOnWeekWithEveryTabPresent() {

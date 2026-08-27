@@ -116,17 +116,20 @@ class HabitsShellInsetsTest {
     /**
      * The **topmost** piece of text on each destination, whatever kind of screen it is.
      *
-     * Week has no heading, so it is anchored on its empty state — the harness has no Notion
-     * connection, so Room is empty and that is what Week correctly shows.
+     * Week rejoins by its own header title now that M6.4 has built one — but only here, not in
+     * [stubsAllStartAtTheSameHeight]. Its title sits in a `Row` beside the "This week" button, and
+     * a `TextButton` has a 40dp minimum height, so the row centres the title a few dp lower than a
+     * stub's bare `Text`. That is a real cross-tab alignment question — the design puts a control
+     * in this row on three views of five and none on the other two — and it is **the user's to
+     * judge at M6.11**, not something to paper over with a fixed row height the design never gave.
      *
-     * ⚠ **The emoji, not the title, and the difference matters.** `EmptyState` draws a large emoji
-     * above its heading, so anchoring on the heading measured the emoji's line height as if it were
-     * padding — 318px against a 142px inset — and [noDestinationIsPaddedTwice] failed on a screen
-     * that was laid out perfectly correctly. These anchors have to be the first thing drawn, or the
-     * test measures content and calls it padding.
+     * ⚠ Whatever is named here must be the **first thing drawn**. An earlier version anchored Week
+     * on its empty state's *title*, which sits below a large emoji — and
+     * [noDestinationIsPaddedTwice] duly failed on a perfectly correct screen, having measured that
+     * emoji's line height as if it were padding.
      */
     private val everyTabAndItsFirstText =
-        stubTabsAndHeadings + (R.string.tab_week to R.string.week_empty_emoji)
+        stubTabsAndHeadings + (R.string.tab_week to R.string.screen_title_week)
 
     @Test
     fun everyDestinationClearsTheStatusBar() {

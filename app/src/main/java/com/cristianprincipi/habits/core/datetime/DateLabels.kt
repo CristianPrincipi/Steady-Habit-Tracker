@@ -37,6 +37,40 @@ fun weekdayLabels(locale: Locale): List<String> =
     }
 
 /**
+ * The `Aug 17 – Aug 23` label between the sub-nav arrows — `docs/design-spec.md` §3.
+ *
+ * An en dash, not a hyphen: it is a range, and the design draws one.
+ *
+ * ### ⚠ No year, and that is the design's call rather than an oversight
+ *
+ * The prototype shows `Aug 17 – Aug 23` and nothing more. Paging back far enough therefore makes
+ * the label ambiguous — which the prototype never had to care about, because its arrows are inert
+ * like every other control in it (`docs/design-spec.md` §0). The remedy `Plan.md` M6.4 asks for is
+ * a **jump back to this week**, not a year in the label, so that is what the header carries. If a
+ * year turns out to be wanted, this is the one function that changes. Flagged at M6.11.
+ *
+ * ### The pattern is `MMM d`, which is right for English and approximate elsewhere
+ *
+ * `CLAUDE.md` §8 makes v1 English-only. A properly localised range would need a *skeleton* rather
+ * than a pattern — some locales lead with the day, and a few would want the month only once — and
+ * `java.time` has no public skeleton API. `MMM d` is honest about being the design's format; the
+ * month and day names inside it still come from the locale.
+ */
+fun weekRangeLabel(
+    weekStart: LocalDate,
+    weekEndInclusive: LocalDate,
+    locale: Locale,
+): String {
+    val format = DateTimeFormatter.ofPattern(WEEK_RANGE_PATTERN, locale)
+    return "${weekStart.format(format)} $EN_DASH ${weekEndInclusive.format(format)}"
+}
+
+private const val WEEK_RANGE_PATTERN = "MMM d"
+
+/** `–`, written as an escape so it cannot be mistaken for a hyphen in a diff. */
+private const val EN_DASH = "–"
+
+/**
  * A date as a screen reader should hear it — "Monday, 24 August 2026".
  *
  * [FormatStyle.FULL] rather than a hand-written pattern: it is locale-correct for free, and it

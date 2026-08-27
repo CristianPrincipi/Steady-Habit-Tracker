@@ -24,10 +24,27 @@ object Spacing {
     val headerHorizontal: Dp = 20.dp
 
     /**
+     * `pb-1` — between a screen's title row and the `‹ ›` sub-nav beneath it.
+     *
+     * The design's header block is `px-5, pt-10, pb-1` (`docs/design-spec.md` §1). Tight on paper
+     * and right on screen, because the nav-arrow row under it is 48dp tall for its touch targets
+     * and carries its own visual air. `pt-10` is deliberately absent — that one is the status-bar
+     * inset, and the note at the bottom of this file says why there is no token for it.
+     */
+    val headerBottom: Dp = 4.dp
+
+    /**
      * `pb-28` — bottom padding that keeps the last card clear of the floating bottom nav.
      *
-     * This is scroll *content* padding, not a container inset: the nav bar floats above the list,
-     * so the list must scroll past it rather than stop short of it.
+     * ⚠ **Not used by the Week list, and probably not by any of them.** It assumes the prototype's
+     * *floating* blurred bar, which content scrolls underneath. Ours is opaque (ADR-066) and the
+     * shell's `Scaffold` reserves its height as content padding (ADR-063), so the list's viewport
+     * already ends above the bar — adding this on top would leave 112dp of dead space below the
+     * last card.
+     *
+     * It is still ported, and still correct for what it describes: scroll *content* padding rather
+     * than a container inset, for a list that has to scroll past a floating bar instead of stopping
+     * short of it. `GalleryActivity` uses it, having no `Scaffold` of its own.
      */
     val bottomNavClearance: Dp = 112.dp
 

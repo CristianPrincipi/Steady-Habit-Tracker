@@ -18,9 +18,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.feature.week.WeekContent
 import com.cristianprincipi.habits.feature.week.WeekEvent
 import com.cristianprincipi.habits.feature.week.WeekUiState
@@ -83,23 +85,41 @@ class WeekPreviewActivity : ComponentActivity() {
 @Composable
 private fun SampleWeek() {
     val reference = SampleHabits.referenceDate
-    var completed by remember { mutableStateOf(SampleHabits.completions(reference).toSet()) }
+    val thisWeek = startOfWeek(reference)
 
+    var completed by remember { mutableStateOf(SampleHabits.completions(reference).toSet()) }
+    var weekStart by remember { mutableStateOf(thisWeek) }
+
+    // The same shape `WeekViewModel` produces, minus Room: `weekPeriods` is anchored on the shown
+    // week while "today" stays at the reference date, so paging away really does dim the pills and
+    // light up "This week".
     val state =
         WeekUiState.Content(
-            weekStart = startOfWeek(reference),
-            habits = SampleHabits.weekPeriods(reference, completed),
-            isCurrentWeek = true,
+            weekStart = weekStart,
+            habits = SampleHabits.weekPeriods(reference, completed, weekStart),
+            isCurrentWeek = weekStart == thisWeek,
         )
 
     WeekContent(
         state = state,
         onEvent = { event ->
-            if (event is WeekEvent.DayToggled) {
-                val row =
-                    com.cristianprincipi.habits.domain.model
-                        .Completion(event.habitId, event.date)
-                completed = if (event.completed) completed + row else completed - row
+            when (event) {
+                is WeekEvent.DayToggled -> {
+                    val row = Completion(event.habitId, event.date)
+                    completed = if (event.completed) completed + row else completed - row
+                }
+
+                WeekEvent.PreviousWeekPressed -> {
+                    weekStart = weekStart.minusDays(DAYS_PER_WEEK.toLong())
+                }
+
+                WeekEvent.NextWeekPressed -> {
+                    weekStart = weekStart.plusDays(DAYS_PER_WEEK.toLong())
+                }
+
+                WeekEvent.ThisWeekPressed -> {
+                    weekStart = thisWeek
+                }
             }
         },
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),

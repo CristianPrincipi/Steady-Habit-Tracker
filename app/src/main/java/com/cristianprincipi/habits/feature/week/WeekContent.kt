@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.week
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,14 +54,42 @@ fun WeekContent(
     onEvent: (WeekEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (state) {
-        // Room is local and fast, so this is a frame or two. Drawing nothing beats a spinner that
-        // flashes — `CLAUDE.md` §1 is explicit that no screen is ever spinner-gated on data.
-        WeekUiState.Loading -> Unit
+    // The design system does no date maths and no localisation, so both are resolved once here and
+    // handed down — to the header for its `Aug 17 – Aug 23` label, and to the cards for their
+    // weekday initials and spoken dates.
+    //
+    // ⚠ `androidx.compose.ui.text.intl.Locale.current`, not `LocalConfiguration.current.locales[0]`
+    // and not `java.util.Locale.getDefault()`. Lint's `NonObservableLocale` rejects both: the first
+    // reads a Configuration field composition does not observe, the second is read once and then
+    // goes stale for the life of the process. This one is state-backed, so the labels actually
+    // change when the user changes their language.
+    val locale = remember(ComposeLocale.current) { Locale.forLanguageTag(ComposeLocale.current.toLanguageTag()) }
 
-        WeekUiState.Empty -> WeekEmpty(modifier = modifier)
+    Column(modifier = modifier.fillMaxSize()) {
+        // Pinned above the list rather than scrolling with it — `docs/design-spec.md` §1's diagram.
+        // It takes the whole state, not a title: the sub-nav only exists when there is a week.
+        WeekHeader(week = state as? WeekUiState.Content, onEvent = onEvent, locale = locale)
 
-        is WeekUiState.Content -> WeekList(state = state, onEvent = onEvent, modifier = modifier)
+        when (state) {
+            // Room is local and fast, so this is a frame or two. Drawing nothing beats a spinner
+            // that flashes — `CLAUDE.md` §1 is explicit that no screen is spinner-gated on data.
+            WeekUiState.Loading -> {
+                Unit
+            }
+
+            WeekUiState.Empty -> {
+                WeekEmpty(modifier = Modifier.fillMaxSize())
+            }
+
+            is WeekUiState.Content -> {
+                WeekList(
+                    state = state,
+                    locale = locale,
+                    onEvent = onEvent,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }
 
@@ -74,18 +103,10 @@ fun WeekContent(
 @Composable
 private fun WeekList(
     state: WeekUiState.Content,
+    locale: Locale,
     onEvent: (WeekEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The design system does no date maths and no localisation, so both are resolved here and
-    // handed down.
-    //
-    // ⚠ `androidx.compose.ui.text.intl.Locale.current`, not `LocalConfiguration.current.locales[0]`
-    // and not `java.util.Locale.getDefault()`. Lint's `NonObservableLocale` rejects both: the first
-    // reads a Configuration field that composition does not observe, the second is read once and
-    // then goes stale for the life of the process. This one is state-backed, so the labels and the
-    // spoken dates actually change when the user changes their language.
-    val locale = remember(ComposeLocale.current) { Locale.forLanguageTag(ComposeLocale.current.toLanguageTag()) }
     val labels = remember(locale) { weekdayLabels(locale) }
 
     LazyColumn(
