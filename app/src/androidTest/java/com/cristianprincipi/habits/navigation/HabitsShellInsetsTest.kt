@@ -37,9 +37,10 @@ import org.junit.runner.RunWith
  * The second is not hypothetical: `SyncStatusScreen` did exactly that the moment M5.2 put it in the
  * graph, and it was caught by eye rather than by anything that would fail a build.
  *
- * [everyDestinationClearsTheStatusBar] catches the first. [everyDestinationStartsAtTheSameHeight]
- * catches the second, and does it without a magic tolerance: if one screen pads itself and the
- * others do not, their titles no longer line up.
+ * [everyDestinationClearsTheStatusBar] catches the first. [stubsAllStartAtTheSameHeight] catches
+ * the second with no tolerance at all — screens sharing a layout must share a top pixel — and
+ * [noDestinationIsPaddedTwice] keeps catching it once they stop sharing one, because double-padding
+ * has an exact signature: content that begins two status bars down instead of one.
  *
  * ### What this cannot see, and what did the seeing
  *
@@ -90,15 +91,42 @@ class HabitsShellInsetsTest {
         return top
     }
 
-    /** Every tab, paired with the title its screen draws. Stats is "Statistics" — the design's own asymmetry. */
-    private val tabsAndHeadings =
+    /**
+     * The tabs still drawn by `StubScreen`, paired with the title each draws.
+     *
+     * ⚠ **Week is no longer among them.** M6.3 replaced its stub with the real `WeekContent`, which
+     * has no header at all — `docs/design-spec.md` §1 puts the title in the screen header and
+     * **M6.4** builds it. Week is covered by [everyDestinationClearsTheStatusBar] through its empty
+     * state instead, and it is deliberately out of [stubsAllStartAtTheSameHeight], because that
+     * test's zero-tolerance comparison only means anything between screens that share a layout.
+     *
+     * **This list shrinks as M6–M8 replace the stubs, and that is fine.** What it protects is the
+     * exact regression M5.2 produced — one screen padding itself on top of the shell — and it keeps
+     * protecting it for as long as two screens still share `StubScreen`. Stats is "Statistics" in
+     * the header and "Stats" on the tab: the design's own asymmetry.
+     */
+    private val stubTabsAndHeadings =
         listOf(
             R.string.tab_month to R.string.screen_title_month,
-            R.string.tab_week to R.string.screen_title_week,
             R.string.tab_year to R.string.screen_title_year,
             R.string.tab_stats to R.string.screen_title_stats,
             R.string.tab_settings to R.string.screen_title_settings,
         )
+
+    /**
+     * The **topmost** piece of text on each destination, whatever kind of screen it is.
+     *
+     * Week has no heading, so it is anchored on its empty state — the harness has no Notion
+     * connection, so Room is empty and that is what Week correctly shows.
+     *
+     * ⚠ **The emoji, not the title, and the difference matters.** `EmptyState` draws a large emoji
+     * above its heading, so anchoring on the heading measured the emoji's line height as if it were
+     * padding — 318px against a 142px inset — and [noDestinationIsPaddedTwice] failed on a screen
+     * that was laid out perfectly correctly. These anchors have to be the first thing drawn, or the
+     * test measures content and calls it padding.
+     */
+    private val everyTabAndItsFirstText =
+        stubTabsAndHeadings + (R.string.tab_week to R.string.week_empty_emoji)
 
     @Test
     fun everyDestinationClearsTheStatusBar() {
@@ -107,7 +135,7 @@ class HabitsShellInsetsTest {
         // under test actually has a status bar before trusting the rest.
         assertTrue("expected a non-zero top inset to test against, got $barTop", barTop > 0)
 
-        tabsAndHeadings.forEach { (tabLabel, heading) ->
+        everyTabAndItsFirstText.forEach { (tabLabel, heading) ->
             tab(tabLabel).performClick()
             composeTestRule.waitForIdle()
 
@@ -131,12 +159,13 @@ class HabitsShellInsetsTest {
     }
 
     @Test
-    fun everyDestinationStartsAtTheSameHeight() {
-        // ⭐ The assertion that would have caught M5.2's double-padded sync status. Every stub uses
-        // the same modifier chain, so their titles must land on exactly the same pixel; a screen
-        // that adds `windowInsetsPadding` of its own is the only way for one to drift.
+    fun stubsAllStartAtTheSameHeight() {
+        // ⭐ The assertion that would have caught M5.2's double-padded sync status, and it needs no
+        // tolerance to do it: every `StubScreen` uses the same modifier chain, so their titles must
+        // land on exactly the same pixel. A screen that adds `windowInsetsPadding` of its own is
+        // the only way for one to drift, and it drifts by a whole status bar.
         val tops =
-            tabsAndHeadings.map { (tabLabel, heading) ->
+            stubTabsAndHeadings.map { (tabLabel, heading) ->
                 tab(tabLabel).performClick()
                 composeTestRule.waitForIdle()
                 string(heading) to headingTop(heading)
@@ -149,6 +178,32 @@ class HabitsShellInsetsTest {
                 reference.second,
                 top,
                 0f,
+            )
+        }
+    }
+
+    @Test
+    fun noDestinationIsPaddedTwice() {
+        // ⭐ What [stubsAllStartAtTheSameHeight] cannot say once screens stop sharing a layout, and
+        // what will still be true when the last stub is gone.
+        //
+        // Double-padding has an exact signature: the screen applies the same inset the shell already
+        // applied, so its content starts at **two** status bars rather than one. A real screen's own
+        // content padding is far smaller than that — 20dp of `screenPadding` against a 48dp bar — so
+        // one bar's worth of headroom separates "padded once, plus some design padding" from "padded
+        // twice", with no number to tune.
+        val barTop = systemBarTop()
+        assertTrue("expected a non-zero top inset to test against, got $barTop", barTop > 0)
+
+        everyTabAndItsFirstText.forEach { (tabLabel, anchor) ->
+            tab(tabLabel).performClick()
+            composeTestRule.waitForIdle()
+
+            val top = headingTop(anchor)
+            assertTrue(
+                "${string(anchor)} starts at $top — a whole extra status bar below the $barTop " +
+                    "inset, which is what applying the shell's insets a second time looks like",
+                top < barTop * 2,
             )
         }
     }

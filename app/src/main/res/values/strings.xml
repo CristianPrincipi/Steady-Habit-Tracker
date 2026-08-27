@@ -174,6 +174,12 @@
       eventually read the month's name rather than "Month" at all (M8).
     -->
     <string name="screen_title_month">Month</string>
+    <!--
+      ⚠ Lint reports screen_title_week as unused, and right now it is. M6.3 replaced the Week stub
+      with the real WeekContent, which has no header — the header, with this title and the
+      ‹ Aug 17 – Aug 23 › sub-nav beside it, is M6.4's. Kept rather than deleted and re-added one
+      step later: it belongs with the four siblings around it, and the churn would say nothing.
+    -->
     <string name="screen_title_week">Week</string>
     <string name="screen_title_year">Year</string>
     <string name="screen_title_stats">Statistics</string>
@@ -186,4 +192,23 @@
       is indistinguishable from one that is broken — M5.6 asks the user to click through the shell.
     -->
     <string name="stub_placeholder">Nothing here yet — this screen is built in a later milestone.</string>
+
+    <!--
+      Week view (M6.3) — docs/design-spec.md §3.
+
+      week_card_summary fills the card's second line. The design calls that line a "description"
+      and shows "15 min practice", but ADR-027 deleted Habit.description: Notion has nowhere to
+      keep one and ADR-010 makes the habit set read-only, so there is no source for it. The slot is
+      drawn unconditionally, so leaving it blank holds the space and reads like a failed load —
+      this puts the most useful fact a week view has there instead. UNDESIGNED; see Plan.md M6.11.
+
+      week_empty_* is a placeholder for M6.8, which owns the real copy. It deliberately offers no
+      call to action: ADR-010 removed habit creation, because a habit IS a checkbox property in the
+      user's Notion database, so there is no "+" this app could ever honour.
+    -->
+    <string name="week_card_summary">%1$d of %2$d</string>
+    <string name="week_pill_description">%1$s, %2$s</string>
+    <string name="week_empty_emoji">☑️</string>
+    <string name="week_empty_title">No habits yet</string>
+    <string name="week_empty_body">Habits come from the checkbox columns in your Notion database. Pick which ones to track in Settings.</string>
 </resources>

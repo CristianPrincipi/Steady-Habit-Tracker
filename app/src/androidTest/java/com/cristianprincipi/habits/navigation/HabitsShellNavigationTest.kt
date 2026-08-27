@@ -53,6 +53,19 @@ class HabitsShellNavigationTest {
     /** A screen's own header title, as opposed to the tab of the same name. */
     private fun heading(id: Int) = composeTestRule.onAllNodesWithText(string(id)).filterToOne(hasNoClickAction())
 
+    /**
+     * What proves the **Week** screen is the one on show.
+     *
+     * ⚠ **Not a heading, because Week no longer has one.** M6.3 replaced its `StubScreen` with the
+     * real `WeekContent`, and `docs/design-spec.md` §1 puts the title in the screen *header* — which
+     * **M6.4** builds. Four tests failed on this the moment Week stopped being a stub.
+     *
+     * The harness has no Notion connection, so Room is empty and Week correctly renders its empty
+     * state. That string is the anchor until the header exists. **M6.4 should point this back at
+     * the heading**, at which point Week matches the other four again.
+     */
+    private fun weekIsShowing() = composeTestRule.onNodeWithText(string(R.string.week_empty_title))
+
     @Test
     fun theShellOpensOnWeekWithEveryTabPresent() {
         // Week, not Month — the user's decision (`docs/design-spec.md` §1). Getting the start
@@ -119,7 +132,7 @@ class HabitsShellNavigationTest {
 
         Espresso.pressBack()
 
-        heading(R.string.screen_title_week).assertIsDisplayed()
+        weekIsShowing().assertIsDisplayed()
         tab(R.string.tab_week).assertIsSelected()
     }
 
@@ -180,7 +193,7 @@ class HabitsShellNavigationTest {
         // ⭐ M5.3. Until the stubs existed, all five destinations rendered nothing, so a bar that
         // lit the right tab while showing the wrong screen would have looked identical. This is the
         // assertion that would have caught a copy-paste in the graph.
-        heading(R.string.screen_title_week).assertIsDisplayed()
+        weekIsShowing().assertIsDisplayed()
 
         tab(R.string.tab_month).performClick()
         heading(R.string.screen_title_month).assertIsDisplayed()

@@ -1,9 +1,13 @@
 package com.cristianprincipi.habits.core.ui.preview
 
+import com.cristianprincipi.habits.core.datetime.weekWindow
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.usecase.buildPeriod
+import com.cristianprincipi.habits.domain.usecase.byHabit
 import java.time.LocalDate
 
 /**
@@ -58,6 +62,35 @@ object SampleHabits {
             val rate = KEEP_RATES.getValue(habit.id.value)
             generate(habit.id, from = habit.startDate, to = reference, keepRate = rate)
         }
+
+    /**
+     * The five habits as one week of [HabitPeriod]s, ready for a Week preview.
+     *
+     * ⭐ **It runs the real `buildPeriod`**, the same function `GetHabitsForWeek` uses, rather than
+     * assembling cells by hand. A preview that built its own cells would keep rendering happily
+     * after the thing that fills them in production broke — which is the one failure a preview
+     * exists to catch. `buildPeriod` is `internal`, and this is in the same module, so there is
+     * nothing to widen to reuse it.
+     *
+     * @param reference the day to treat as "today", so `FUTURE` and `BEFORE_START` both appear
+     *   without the caller arranging them. The default sits mid-week on a Saturday, which is where
+     *   one screen shows completed, incomplete and future days at once.
+     */
+    fun weekPeriods(
+        reference: LocalDate = referenceDate,
+        completions: Collection<Completion> = completions(reference),
+    ): List<HabitPeriod> {
+        val window = weekWindow(reference)
+        val byHabit = completions.toList().byHabit()
+        return habits(reference).map { habit ->
+            buildPeriod(
+                habit = habit,
+                window = window,
+                completedDates = byHabit[habit.id].orEmpty(),
+                today = reference,
+            )
+        }
+    }
 
     /** One habit and its history — for a preview of a single card. */
     fun habitWithHistory(

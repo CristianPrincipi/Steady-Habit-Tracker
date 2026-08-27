@@ -38,6 +38,22 @@
           ("package=com.android.shell does not belong to uid"). To look at the shell by hand, flip
           this to `true`, `installDebug`, screenshot, and flip it back — which is what M5.2 did.
         -->
+        <!--
+          The Week screen over SampleHabits, with no Room and no Notion behind it (M6.3).
+
+          Exported, unlike ShellHarnessActivity below, and safe to be: it holds sample data in
+          memory and touches no repository, so there is nothing here that could damage a live
+          workspace. It exists because Week only shows habits once a connection has imported some,
+          and connecting costs the USER a token paste — which would have made the app's most
+          important screen one nobody could look at while building it.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.WeekPreviewActivity
+        -->
+        <activity
+            android:name=".gallery.WeekPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"
