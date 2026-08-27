@@ -1,21 +1,50 @@
 package com.cristianprincipi.habits.feature.week
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.shortDateLabel
+import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * The landing tab, and the app's whole value proposition — `docs/design-spec.md` §3.
  *
- * Stateful half only: it collects the state and forwards events, and nothing else. Everything drawn
- * is in [WeekContent], which is the split `CLAUDE.md` §6 asks for and the reason that file's
- * previews can exist at all.
+ * Stateful half only: it collects the state, forwards events, and hosts the undo snackbar.
+ * Everything drawn is in [WeekContent], which is the split `CLAUDE.md` §6 asks for and the reason
+ * that file's previews can exist at all.
  *
- * ⚠ **No header yet.** `docs/design-spec.md` §1 gives every view a header with a title, and this one
- * a `‹ Aug 17 – Aug 23 ›` sub-nav row besides. **M6.4 builds both**, which is also when the three
- * paging events become reachable — [WeekViewModel] already handles them.
+ * ### The snackbar is hosted here, not in the shell — ADR-070
+ *
+ * `HabitsShell` owns a `Scaffold` with a `snackbarHost` slot going spare, so the shell looks like
+ * the obvious home. It is not, for four reasons:
+ *
+ * - **The message belongs to one screen.** `CLAUDE.md` §6 gives every screen its own one-shot
+ *   channel. A shell-level host would need a `SnackbarHostState` threaded through every
+ *   `composable<>` entry, or a `CompositionLocal` reaching down past each screen root — the
+ *   coupling §6 exists to prevent, paid for a message nothing else sends.
+ * - **The pixels are the same either way.** The shell pads its `NavHost` by the bottom bar's
+ *   height (ADR-063), so the bottom of this screen *is* the top of the bar. A snackbar aligned to
+ *   the bottom here lands where `Scaffold` would have put it.
+ * - **The lifetime is right.** Navigate away and the offer goes with the screen. A shell-hosted
+ *   snackbar would outlive the pill its Undo acts on, and stay up over a tab that has nothing to do
+ *   with it.
+ * - **Nothing has to be un-shared later.** When sync errors want a snackbar, that screen gets its
+ *   own, with its own copy and its own channel.
  */
 @Composable
 fun WeekScreen(
@@ -24,5 +53,89 @@ fun WeekScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    WeekContent(state = state, onEvent = viewModel::onEvent, modifier = modifier)
+    WeekWithUndo(
+        state = state,
+        messages = viewModel.messages,
+        onEvent = viewModel::onEvent,
+        modifier = modifier,
+    )
+}
+
+/**
+ * [WeekContent] plus the snackbar over it — [WeekScreen] with the ViewModel taken out.
+ *
+ * ⭐ **This seam exists so the snackbar can be looked at.** `WeekScreen` needs a Hilt graph and a
+ * Notion connection to show anything, and connecting costs the **user** a paste of a token only they
+ * have (`CLAUDE.md` §7). `WeekPreviewActivity` plugs its own `Flow` in here instead, which means
+ * what gets watched on the emulator is the composition that ships rather than a debug re-creation
+ * of it — the difference that makes M6.11's judgement worth anything.
+ *
+ * A `Box` rather than a nested `Scaffold`: the only slot wanted is the snackbar host, and a second
+ * `Scaffold` inside the shell's would take the window insets twice (ADR-063 puts them at the shell).
+ */
+@Composable
+internal fun WeekWithUndo(
+    state: WeekUiState,
+    messages: Flow<WeekMessage>,
+    onEvent: (WeekEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    UndoSnackbars(messages = messages, hostState = snackbarHostState, onEvent = onEvent)
+
+    Box(modifier = modifier.fillMaxSize()) {
+        WeekContent(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+        SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/**
+ * Turns each [WeekMessage] into one snackbar, and its Undo into one event.
+ *
+ * ### ⚠ `collectLatest`, so the newest tap wins immediately
+ *
+ * `showSnackbar` suspends until its snackbar goes away, so a plain `collect` would show them
+ * strictly one after another: check off five habits and the fifth sentence appears twenty seconds
+ * after the fifth tap, describing something the user has long since stopped thinking about.
+ * `collectLatest` cancels the one on screen when a new message arrives, and a cancelled
+ * `showSnackbar` dismisses. Together with the `CONFLATED` channel behind [WeekViewModel.messages],
+ * a fast hand produces one snackbar that keeps being replaced rather than a queue that keeps
+ * growing.
+ *
+ * The strings are resolved out here, in composition, rather than in the ViewModel — `CLAUDE.md` §6
+ * keeps `android.*` out of one and every user-facing string in `strings.xml`.
+ *
+ * It takes the `Flow`, not the ViewModel: §6 allows no `ViewModel` reference below the screen root,
+ * and this is below it even though it sits in the same file.
+ */
+@Composable
+private fun UndoSnackbars(
+    messages: Flow<WeekMessage>,
+    hostState: SnackbarHostState,
+    onEvent: (WeekEvent) -> Unit,
+) {
+    val locale = rememberCurrentLocale()
+    val checked = stringResource(R.string.week_undo_checked)
+    val cleared = stringResource(R.string.week_undo_cleared)
+    val today = stringResource(R.string.week_day_today)
+    val undo = stringResource(R.string.week_undo_action)
+
+    LaunchedEffect(messages, hostState, locale) {
+        messages.collectLatest { message ->
+            val day = if (message.isToday) today else shortDateLabel(message.date, locale)
+            val result =
+                hostState.showSnackbar(
+                    message = (if (message.completed) checked else cleared).format(message.habitName, day),
+                    actionLabel = undo,
+                    // Short, because the pill has already shown the change and this is a second
+                    // chance rather than the news itself. Long would park it over the bottom card
+                    // for most of the time the user spends checking the rest of the week off.
+                    duration = SnackbarDuration.Short,
+                )
+            if (result == SnackbarResult.ActionPerformed) {
+                onEvent(message.undo)
+            }
+        }
+    }
 }

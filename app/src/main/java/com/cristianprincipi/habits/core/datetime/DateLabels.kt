@@ -82,3 +82,23 @@ fun accessibleDate(
     date: LocalDate,
     locale: Locale,
 ): String = date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale))
+
+/**
+ * A date short enough to sit inside a sentence — "Wed, Aug 19".
+ *
+ * For the undo snackbar (M6.6), whose whole job is to name **which** day a tap changed: the pill
+ * flipping already says that something happened, and only the text can say what. That is why the
+ * weekday is in here and not just the date — a mis-tap on this screen lands on the *neighbouring
+ * column*, so "Wed" is the word that catches it.
+ *
+ * `MMM d` is deliberately the same half-pattern [weekRangeLabel] uses, so the snackbar and the
+ * header above it name a day the same way rather than in two dialects. The same caveat applies:
+ * it is the design's format, correct for English and approximate in locales that lead with the day
+ * (`CLAUDE.md` §8 makes v1 English-only). The weekday and month names still come from the locale.
+ */
+fun shortDateLabel(
+    date: LocalDate,
+    locale: Locale,
+): String = date.format(DateTimeFormatter.ofPattern(SHORT_DATE_PATTERN, locale))
+
+private const val SHORT_DATE_PATTERN = "EEE, MMM d"

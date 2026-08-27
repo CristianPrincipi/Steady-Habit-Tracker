@@ -23,9 +23,12 @@ import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Completion
-import com.cristianprincipi.habits.feature.week.WeekContent
 import com.cristianprincipi.habits.feature.week.WeekEvent
+import com.cristianprincipi.habits.feature.week.WeekMessage
 import com.cristianprincipi.habits.feature.week.WeekUiState
+import com.cristianprincipi.habits.feature.week.WeekWithUndo
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 
 /**
  * The Week screen against `SampleHabits`, with no Room and no Notion behind it.
@@ -76,11 +79,16 @@ class WeekPreviewActivity : ComponentActivity() {
 }
 
 /**
- * `WeekContent` over an in-memory week that a tap actually changes.
+ * The real `WeekWithUndo` over an in-memory week that a tap actually changes.
  *
  * The toggle is real — it rebuilds the state the way the ViewModel would — so what this shows is not
  * a static mock but the whole loop minus Room. It takes its own `safeDrawing` insets because there
  * is no shell around it here (ADR-063's rule applies inside the graph; this is outside it).
+ *
+ * ⚠ **The undo snackbar is wired the same way too, and it has to be**: M6.6's copy is undesigned,
+ * and a sentence nobody can look at cannot be judged. The channel below is `CONFLATED` and the
+ * `UndoPressed` branch stays silent, exactly as `WeekViewModel` does — get either wrong here and the
+ * emulator would be showing behaviour the app does not have.
  */
 @Composable
 private fun SampleWeek() {
@@ -89,6 +97,7 @@ private fun SampleWeek() {
 
     var completed by remember { mutableStateOf(SampleHabits.completions(reference).toSet()) }
     var weekStart by remember { mutableStateOf(thisWeek) }
+    val messages = remember { Channel<WeekMessage>(Channel.CONFLATED) }
 
     // The same shape `WeekViewModel` produces, minus Room: `weekPeriods` is anchored on the shown
     // week while "today" stays at the reference date, so paging away really does dim the pills and
@@ -100,11 +109,28 @@ private fun SampleWeek() {
             isCurrentWeek = weekStart == thisWeek,
         )
 
-    WeekContent(
+    WeekWithUndo(
         state = state,
+        messages = remember(messages) { messages.receiveAsFlow() },
         onEvent = { event ->
             when (event) {
                 is WeekEvent.DayToggled -> {
+                    val row = Completion(event.habitId, event.date)
+                    completed = if (event.completed) completed + row else completed - row
+                    val habit = state.habits.first { period -> period.habit.id == event.habitId }.habit
+                    messages.trySend(
+                        WeekMessage(
+                            habitId = event.habitId,
+                            habitName = habit.name,
+                            date = event.date,
+                            completed = event.completed,
+                            isToday = event.date == reference,
+                        ),
+                    )
+                }
+
+                // Silent, like the ViewModel's — announcing an undo offers to undo the undo.
+                is WeekEvent.UndoPressed -> {
                     val row = Completion(event.habitId, event.date)
                     completed = if (event.completed) completed + row else completed - row
                 }

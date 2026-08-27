@@ -303,8 +303,8 @@ class WeekViewModelTest {
     fun aFutureDayIsRefusedByTheDomainAndNothingIsWritten() =
         runTest {
             // The guard lives in `ToggleCompletion`, not here, and this pins that the ViewModel does not
-            // route around it. ⚠ The refusal currently goes nowhere on screen — M6.7 owns making the
-            // pill untappable, M6.6 owns the message.
+            // route around it. ⚠ The refusal still goes nowhere on screen — M6.7 owns making the pill
+            // untappable, and M6.6 deliberately does not invent a sentence for it.
             val (repository, viewModel) = viewModel()
             content(viewModel)
 
@@ -313,5 +313,183 @@ class WeekViewModelTest {
             )
 
             assertEquals(emptyList<FakeHabitRepository.Write>(), repository.writes)
+        }
+
+    // --- what a check-off says (M6.6) ---------------------------------------------------------
+
+    @Test
+    fun aCheckOffNamesTheHabitAndTheDayItChanged() =
+        runTest {
+            // ⭐ The whole point of the message. A filled pill says *something* happened; only this
+            // can say it was Read, on this day — the two things a mis-tap gets wrong.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+                )
+
+                assertEquals(
+                    WeekMessage(
+                        habitId = HabitId("read"),
+                        habitName = "Read",
+                        date = today,
+                        completed = true,
+                        isToday = true,
+                    ),
+                    awaitItem(),
+                )
+            }
+        }
+
+    @Test
+    fun aPastDayIsAnnouncedByItsDateRatherThanAsToday() =
+        runTest {
+            // `isToday` is the only clock-dependent field on the message, and it decides whether the
+            // screen says "today" or "Mon, Aug 24". The Monday of the shown week is genuinely past.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("run"), date = thisMonday, completed = true),
+                )
+
+                val message = awaitItem()
+                assertEquals(thisMonday, message.date)
+                assertFalse(message.isToday)
+            }
+        }
+
+    @Test
+    fun unTickingIsAnnouncedAsWhatItDid() =
+        runTest {
+            val (_, viewModel) = viewModel(completions = listOf(Completion(HabitId("read"), today)))
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = false),
+                )
+
+                // `completed` is what the tap DID, so the screen picks the "cleared" sentence.
+                assertFalse(awaitItem().completed)
+            }
+        }
+
+    @Test
+    fun theOfferRestoresExactlyWhatTheTapChanged() =
+        runTest {
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+                )
+
+                // Derived from the message rather than stored beside it, so the two cannot disagree.
+                assertEquals(
+                    WeekEvent.UndoPressed(habitId = HabitId("read"), date = today, completed = false),
+                    awaitItem().undo,
+                )
+            }
+        }
+
+    @Test
+    fun aRefusedFutureWriteSaysNothingEither() =
+        runTest {
+            // Nothing was written, so there is nothing to announce and nothing to offer back. M6.7
+            // owns telling the user why the tap did nothing.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today.plusDays(1), completed = true),
+                )
+
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun aFastHandKeepsOnlyTheNewestOfferRatherThanAQueue() =
+        runTest {
+            // ⭐ The `CONFLATED` channel, asserted rather than assumed. Checking off habit after
+            // habit is the normal way this screen is used; a buffered channel would hold every one
+            // and the screen would walk through them long after the taps that earned them.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.onEvent(
+                WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+            )
+            viewModel.onEvent(
+                WeekEvent.DayToggled(habitId = HabitId("run"), date = today, completed = true),
+            )
+
+            viewModel.messages.test {
+                assertEquals("Run", awaitItem().habitName)
+                expectNoEvents()
+            }
+        }
+
+    // --- undo (M6.6) --------------------------------------------------------------------------
+
+    @Test
+    fun undoWritesTheValueItCarries() =
+        runTest {
+            val (repository, viewModel) = viewModel(completions = listOf(Completion(HabitId("read"), today)))
+            content(viewModel)
+
+            viewModel.onEvent(
+                WeekEvent.UndoPressed(habitId = HabitId("read"), date = today, completed = false),
+            )
+
+            assertEquals(
+                listOf(FakeHabitRepository.Write(HabitId("read"), today, false)),
+                repository.writes,
+            )
+        }
+
+    @Test
+    fun undoAnnouncesNothing() =
+        runTest {
+            // ⭐⭐ The one that stops an endless loop. If undo earned a message, that message would
+            // offer to undo the undo, and the next press would offer to undo *that*, for as long as
+            // the user kept tapping. It is also right on its own terms: the pill flips back in front
+            // of them, so there is nothing left to say.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.UndoPressed(habitId = HabitId("read"), date = today, completed = true),
+                )
+
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun aTapIsNeverGatedOnHavingSomethingToSayAboutIt() =
+        runTest {
+            // ⚠ The message needs a habit **name**, which is read back from the current state. This
+            // pins that the write happens anyway if that lookup ever comes back empty: `CLAUDE.md` §1
+            // makes the local write unconditional, and losing a sentence must never lose a tick.
+            // Nothing has subscribed here, so `uiState` is still Loading and the lookup finds nothing.
+            val (repository, viewModel) = viewModel()
+
+            viewModel.onEvent(
+                WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+            )
+
+            assertEquals(
+                listOf(FakeHabitRepository.Write(HabitId("read"), today, true)),
+                repository.writes,
+            )
+            viewModel.messages.test { expectNoEvents() }
         }
 }

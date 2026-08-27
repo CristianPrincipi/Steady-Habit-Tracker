@@ -20,13 +20,13 @@ import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
 import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.core.ui.toDayStatus
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.model.PeriodCell
 import java.util.Locale
-import androidx.compose.ui.text.intl.Locale as ComposeLocale
 
 /**
  * Everything the Week screen draws — `docs/design-spec.md` §3.
@@ -56,14 +56,9 @@ fun WeekContent(
 ) {
     // The design system does no date maths and no localisation, so both are resolved once here and
     // handed down — to the header for its `Aug 17 – Aug 23` label, and to the cards for their
-    // weekday initials and spoken dates.
-    //
-    // ⚠ `androidx.compose.ui.text.intl.Locale.current`, not `LocalConfiguration.current.locales[0]`
-    // and not `java.util.Locale.getDefault()`. Lint's `NonObservableLocale` rejects both: the first
-    // reads a Configuration field composition does not observe, the second is read once and then
-    // goes stale for the life of the process. This one is state-backed, so the labels actually
-    // change when the user changes their language.
-    val locale = remember(ComposeLocale.current) { Locale.forLanguageTag(ComposeLocale.current.toLanguageTag()) }
+    // weekday initials and spoken dates. `rememberCurrentLocale` carries the reason it is not the
+    // two obvious one-liners; Lint rejects both.
+    val locale = rememberCurrentLocale()
 
     Column(modifier = modifier.fillMaxSize()) {
         // Pinned above the list rather than scrolling with it — `docs/design-spec.md` §1's diagram.
