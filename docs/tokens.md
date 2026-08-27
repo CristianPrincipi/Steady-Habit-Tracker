@@ -238,7 +238,7 @@ Everything is a CSS transition; there is no keyframe animation, no spring, no sh
 | `active:scale-[0.98]` | scale to 0.98 (Connect button) | as above |
 | `transition-all` / `transition-opacity` / `transition-colors` | default 150ms ease | `MaterialTheme` default easing; keep it short |
 | `hover:*` | pointer hover states | **No Android equivalent — drop.** Replaced by ripple/press-scale. |
-| `backdrop-blur-xl` on bottom nav | 24px backdrop blur over `#111113`/95 | Needs `RenderEffect` (API 31+). `minSdk` is 26 → **fall back to an opaque `#111113` bar below 31.** |
+| `backdrop-blur-xl` on bottom nav | 24px backdrop blur over `#111113`/95 | ⭐ **NOT PORTED — the user's call, 2026-08-27 (ADR-066).** The opaque `#111113` bar is not a fallback any more, it is the v1 design, at every API level. A real backdrop blur needs `RenderEffect` (API 31+, `minSdk` is 26) or a dependency; the user looked at the flat bar in M5.6 and accepted it. |
 
 ---
 

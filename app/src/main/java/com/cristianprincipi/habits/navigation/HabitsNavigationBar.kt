@@ -33,10 +33,14 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * label. All three signals are the design's, and all three are tokens rather than numbers typed
  * here (`CLAUDE.md` §6).
  *
- * ⚠ **The design's `backdrop-blur-xl` is not implemented, deliberately.** A true backdrop blur needs
- * `RenderEffect` (API 31+, and `minSdk` is 26) or a third-party modifier, and `CLAUDE.md` §8 says to
- * ask before adding a dependency. `docs/tokens.md` §9 already names the fallback: an opaque
- * `#111113` bar, which is `colorScheme.surface`. That is what this draws, at every API level.
+ * ⭐ **The design's `backdrop-blur-xl` is not implemented, and that is now a decision rather than a
+ * gap** — the user looked at the flat bar in M5.6 and accepted it (ADR-066). A true backdrop blur
+ * needs `RenderEffect` (API 31+, and `minSdk` is 26) or a third-party modifier, and `CLAUDE.md` §8
+ * says to ask before adding a dependency.
+ *
+ * So the opaque `#111113` bar — `colorScheme.surface` — is **the v1 design, at every API level**,
+ * not a fallback awaiting the real thing. Do not go looking for a blur to finish. If `minSdk` ever
+ * reaches 31 the blur becomes free, and ADR-066 is the note saying it was wanted.
  */
 @Composable
 fun HabitsNavigationBar(
