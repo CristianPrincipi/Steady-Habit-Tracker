@@ -18,6 +18,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -156,6 +157,12 @@ class WeekCheckOffPersistenceTest {
             // Read only when there are no habits to draw, which is never in this test — seeded
             // habits are the whole premise. A permanently idle status keeps it out of the way.
             syncStatus = IdleSyncStatus,
+            // Fixed at the seeded day. Rollover is `WeekViewModelTest`'s subject; this one is about
+            // a write reaching the file and surviving the stack being rebuilt over it.
+            today =
+                object : TodayFlow {
+                    override fun invoke() = flowOf(LocalDate.now(clock))
+                },
             clock = clock,
         )
     }

@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.week
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
+import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
@@ -32,25 +33,32 @@ import javax.inject.Inject
 /**
  * Drives the Week screen — the landing tab, and the only place a habit is checked off (ADR-009).
  *
- * One input that changes, one that streams. The **reference week** is a `MutableStateFlow` here
- * rather than a parameter, because `‹` and `›` have to move it and nothing outside this screen has
- * an opinion about which week is showing; `flatMapLatest` then swaps the underlying query whenever
- * it moves, cancelling the week the user just paged away from.
+ * Two inputs that change and one that streams. Which week is showing lives in [anchor] rather than
+ * in a parameter, because `‹` and `›` have to move it and nothing outside this screen has an opinion
+ * about it; `flatMapLatest` then swaps the underlying query whenever it moves, cancelling the week
+ * the user just paged away from.
  *
  * `GetHabitsForWeek` does the real work — it is the thing that joins habits to completions and
  * decides what each of the seven cells means. This class picks a week, labels the result,
  * forwards five gestures, and says once what each check-off changed.
  *
- * ### ⚠ Two facts here are true only at the moment they are emitted
+ * ### ⭐ Midnight is an input, not a moment that gets missed — M6.9, ADR-073
  *
- * [WeekUiState.Content.isCurrentWeek] and `HabitPeriod.todayIndex` are both computed against the
- * injected clock **when a value is produced**. Nothing re-emits at midnight, so an app left open
- * across a day boundary keeps yesterday's ring and keeps calling last week "this week" until
- * something upstream changes.
+ * [WeekUiState.Content.isCurrentWeek] and `HabitPeriod.todayIndex` are both *emission-time* facts:
+ * they describe the day the value was built on. That is fine as long as a new value gets built when
+ * the day changes, and nothing used to do that — an app left open across midnight kept yesterday's
+ * ring and went on calling last week "this week" for ever.
  *
- * That is not an oversight, it is `Plan.md` **M6.9**, which exists for exactly this. It is called
- * out here because the bug it describes is invisible in every test with a fixed clock — which is
- * every test in this file.
+ * ⚠ **M6.7 turned that from a cosmetic staleness into a dead screen.** Pills are disabled by
+ * `DayStatus.FUTURE`, so after midnight the new today was still drawn — and still gated — as
+ * tomorrow. The first check-off of the day did nothing at all, silently, which is the one
+ * interaction this whole app exists for.
+ *
+ * [TodayFlow] closes it by making today an input. Every day change re-emits, so the ring moves, the
+ * pill becomes writable, and a week that has stopped being the current one says so.
+ *
+ * ⚠ **The week follows only if the user has not paged away** — see [anchor], where `null` carries
+ * exactly that.
  *
  * ### A check-off says what it changed, once
  *
@@ -80,36 +88,66 @@ class WeekViewModel
         private val toggleCompletion: ToggleCompletion,
         // Read for one branch only — see `emptyReason`. Never awaited, never a gate (`CLAUDE.md` §1).
         private val syncStatus: SyncStatusRepository,
+        // M6.9. The clock below answers "what day is it"; this one says when that answer changes.
+        private val today: TodayFlow,
         // Injected rather than read, so "which week is this?" is a testable claim (`CLAUDE.md` §6).
         private val clock: Clock,
     ) : ViewModel() {
         /**
-         * Which week is on screen, as its first day.
+         * Which week the user has pinned, or `null` for **whichever week contains today**.
          *
-         * **Always a week start, and it stays one without being re-checked.** Only two things can
-         * put an arbitrary date in here — construction and [WeekEvent.ThisWeekPressed], both of
-         * which start from "today" — and both go through [currentWeek], which normalises. Stepping
-         * ±7 days from a week start lands on a week start, so paging cannot drift off the boundary.
+         * ⭐⭐ **`null` is the whole of M6.9's answer, and it is why this is not a `LocalDate`.**
+         * It used to hold the shown week outright, resolved once from "today" at construction — so
+         * an app open across midnight went on showing the week that *was* current, for ever. Making
+         * "I am following today" a value rather than a coincidence means the rollover needs no
+         * bookkeeping at all: [snapshot] recomputes the week from whatever [today] last said, and a
+         * user who paged away holds a date here that midnight cannot touch.
          *
-         * It matters because [WeekUiState.Content.weekStart] is what the `‹ Aug 17 – Aug 23 ›` label
-         * is derived from, while the seven cells come from `GetHabitsForWeek`. Those two must agree,
-         * and they agree by construction rather than by coincidence.
+         * **Always a week start when it is non-null**, and it stays one without being re-checked.
+         * [moveWeeks] is the only writer of a concrete value and it steps ±7 days from a week start,
+         * which lands on a week start. It matters because [WeekUiState.Content.weekStart] is what the
+         * `‹ Aug 17 – Aug 23 ›` label is derived from while the seven cells come from
+         * `GetHabitsForWeek` — those two agree by construction rather than by coincidence.
+         *
+         * ⚠ **And `null` means exactly "the current week", never merely "unset"** — [moveWeeks]
+         * normalises back to it, so paging away and back is indistinguishable from never having
+         * paged, and behaves the same at midnight. Without that, a round trip would leave a pinned
+         * date that happened to equal today's week and would quietly stop following.
          */
-        private val referenceWeek = MutableStateFlow(currentWeek())
+        private val anchor = MutableStateFlow<LocalDate?>(null)
+
+        /** The week on screen, and the day that decides which of its cells is today. */
+        private data class Snapshot(
+            val week: LocalDate,
+            val today: LocalDate,
+        )
+
+        /**
+         * Which week to draw, recomputed every time either input moves.
+         *
+         * Carrying [today] alongside the week rather than reading a clock further down is the point:
+         * `isCurrentWeek` and the ring then describe **the same instant as each other**, and a
+         * Monday-to-Tuesday rollover — which does not change the week at all — still produces a
+         * different value here, so it cannot be conflated away by anything downstream.
+         */
+        private val snapshot: Flow<Snapshot> =
+            combine(anchor, today()) { pinned, today ->
+                Snapshot(week = pinned ?: startOfWeek(today), today = today)
+            }
 
         /**
          * The week on screen and the habits over it, as one value.
          *
-         * `flatMapLatest` swaps the underlying query whenever [referenceWeek] moves, cancelling the
-         * week the user just paged away from. The week is carried alongside the habits rather than
-         * read back afterwards, because by the time a slow query returns [referenceWeek] may have
-         * moved on — pairing them here is what stops the label describing a different week from the
-         * pills below it.
+         * `flatMapLatest` swaps the underlying query whenever [snapshot] moves, cancelling the week
+         * the user just paged away from. The snapshot is carried alongside the habits rather than
+         * read back afterwards, because by the time a slow query returns the user may have paged on
+         * — pairing them here is what stops the label describing a different week from the pills
+         * below it.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
-        private val visibleWeek: Flow<Pair<LocalDate, List<HabitPeriod>>> =
-            referenceWeek.flatMapLatest { week ->
-                getHabitsForWeek(week).map { habits -> week to habits }
+        private val visibleWeek: Flow<Pair<Snapshot, List<HabitPeriod>>> =
+            snapshot.flatMapLatest { visible ->
+                getHabitsForWeek(visible.week).map { habits -> visible to habits }
             }
 
         /**
@@ -145,8 +183,8 @@ class WeekViewModel
                 .distinctUntilChanged()
 
         val uiState: StateFlow<WeekUiState> =
-            combine(visibleWeek, emptyReason) { (week, habits), reason ->
-                stateFor(week, habits, reason)
+            combine(visibleWeek, emptyReason) { (visible, habits), reason ->
+                stateFor(visible, habits, reason)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
@@ -222,7 +260,7 @@ class WeekViewModel
                 }
 
                 WeekEvent.PreviousWeekPressed -> {
-                    stepWeeks(-1)
+                    moveWeeks(-1)
                 }
 
                 // Deliberately unbounded in both directions. Paging past the last habit's start date
@@ -230,11 +268,14 @@ class WeekViewModel
                 // both are honest, both are cheap, and a clamp would need a rule the design does not
                 // give (`docs/design-spec.md` §3 draws only `‹` and `›`).
                 WeekEvent.NextWeekPressed -> {
-                    stepWeeks(+1)
+                    moveWeeks(+1)
                 }
 
+                // Back to following today, rather than to today's week as a fixed date — so the one
+                // control whose whole promise is "put me back on the current week" keeps that
+                // promise past midnight as well.
                 WeekEvent.ThisWeekPressed -> {
-                    referenceWeek.value = currentWeek()
+                    anchor.value = null
                 }
             }
         }
@@ -244,11 +285,26 @@ class WeekViewModel
          *
          * `LocalDate.plusDays` counts days on a calendar, so a week that contains a daylight-saving
          * change is still seven days long. Adding `7 * 24` hours to an instant would not be.
+         *
+         * The step starts from [currentWeek] when nothing is pinned yet, which is how the first
+         * `‹` off the landing screen knows where it is. Landing back **on** the current week clears
+         * the pin instead of storing it — see [anchor]: a pinned date equal to today's week looks
+         * identical on screen and behaves differently at midnight, and two states that render the
+         * same must not be allowed to diverge later.
          */
-        private fun stepWeeks(weeks: Long) {
-            referenceWeek.value = referenceWeek.value.plusDays(weeks * DAYS_PER_WEEK)
+        private fun moveWeeks(weeks: Long) {
+            val current = currentWeek()
+            val moved = (anchor.value ?: current).plusDays(weeks * DAYS_PER_WEEK)
+            anchor.value = moved.takeIf { it != current }
         }
 
+        /**
+         * Today's week, read from the clock **now**.
+         *
+         * Safe here where it would not be in [snapshot]: an event happens at a moment, so reading the
+         * clock is the correct answer to "which week is current *as the user presses this*".
+         * Rendering is the case that needs [today] instead, because it outlives the moment.
+         */
         private fun currentWeek(): LocalDate = startOfWeek(LocalDate.now(clock))
 
         /**
@@ -268,7 +324,7 @@ class WeekViewModel
                 ?.name
 
         private fun stateFor(
-            week: LocalDate,
+            visible: Snapshot,
             habits: List<HabitPeriod>,
             reason: WeekEmptyReason,
         ): WeekUiState =
@@ -280,9 +336,12 @@ class WeekViewModel
                 WeekUiState.Empty(reason)
             } else {
                 WeekUiState.Content(
-                    weekStart = week,
+                    weekStart = visible.week,
                     habits = habits,
-                    isCurrentWeek = week == currentWeek(),
+                    // Against the snapshot's own day, not the clock's. Reading the clock here would
+                    // reintroduce exactly the bug M6.9 removes: a second, later answer to "what day
+                    // is it" inside a value built from an earlier one.
+                    isCurrentWeek = visible.week == startOfWeek(visible.today),
                 )
             }
 

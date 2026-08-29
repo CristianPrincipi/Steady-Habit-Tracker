@@ -3,7 +3,9 @@ package com.cristianprincipi.habits.feature.week
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
 import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
+import com.cristianprincipi.habits.core.testing.FakeTodayFlow
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
+import com.cristianprincipi.habits.core.testing.MutableClock
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.DayState
@@ -21,7 +23,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -36,9 +37,10 @@ import java.time.ZoneOffset
  * The repository is a fake because *how* a cell becomes `COMPLETED` is `GetHabitsForPeriodTest`'s
  * subject. This file is about which week is showing and what the four events do to it.
  *
- * ⚠ **Every test here runs on a fixed clock, so none of them can see the day-rollover bug**
- * (`Plan.md` M6.9). `isCurrentWeek` and `todayIndex` are emission-time facts; a test whose clock
- * never moves cannot notice them going stale. That gap is the reason M6.9 is a step.
+ * The clock is a [MutableClock] rather than a `Clock.fixed`, and every test that does not call
+ * [rollOverTo] reads it as though it were fixed at [today]. The ones that do call it are M6.9's:
+ * `isCurrentWeek` and `todayIndex` are emission-time facts, and what makes them correct is not that
+ * they are recomputed but that **something re-emits when the day changes**.
  */
 class WeekViewModelTest {
     @get:Rule
@@ -47,7 +49,25 @@ class WeekViewModelTest {
     /** Wednesday. The week it belongs to runs Mon 24 Aug – Sun 30 Aug 2026. */
     private val today = LocalDate.of(2026, 8, 26)
     private val thisMonday = LocalDate.of(2026, 8, 24)
-    private val clock = Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
+
+    /**
+     * Movable rather than fixed, for M6.9's sake — see [rollOverTo]. Every test that does not call
+     * that reads it exactly as a `Clock.fixed` at [today].
+     */
+    private val clock = MutableClock(today.atStartOfDay(ZoneOffset.UTC).toInstant())
+    private val todayFlow = FakeTodayFlow(today)
+
+    /**
+     * Midnight, as the app actually experiences it.
+     *
+     * **Both, always.** In production the ticker reads the clock it reports on, so they cannot
+     * disagree; a test that moved only the flow would be asserting against a state the app has no
+     * way to reach, and one that moved only the clock would prove nothing, because nothing re-emits.
+     */
+    private fun rollOverTo(date: LocalDate) {
+        clock.setTo(date)
+        todayFlow.setTo(date)
+    }
 
     /** Drives [WeekUiState.Empty]'s reason, and nothing else on this screen (M6.8). */
     private val status = MutableStateFlow<SyncStatus>(SyncStatus.Idle(lastSyncedAt = null))
@@ -65,8 +85,22 @@ class WeekViewModelTest {
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
             syncStatus = syncStatus,
+            today = todayFlow,
             clock = clock,
         )
+
+    /** The first habit's cell for [date], as the screen would draw it. */
+    private fun stateOn(
+        state: WeekUiState,
+        date: LocalDate,
+    ): DayState =
+        (state as WeekUiState.Content)
+            .habits
+            .first()
+            .cells
+            .filterIsInstance<PeriodCell.Day>()
+            .first { cell -> cell.date == date }
+            .state
 
     private suspend fun content(viewModel: WeekViewModel): WeekUiState.Content {
         var state: WeekUiState = WeekUiState.Loading
@@ -325,6 +359,140 @@ class WeekViewModelTest {
                     .filterIsInstance<PeriodCell.Day>()
                     .map { it.state }
             assertTrue("expected every cell BEFORE_START, got $states", states.all { it == DayState.BEFORE_START })
+        }
+
+    // --- midnight (M6.9) ------------------------------------------------------------------------
+
+    @Test
+    fun theRingMovesWhenTheDayChangesUnderAnOpenApp() =
+        runTest {
+            val (_, viewModel) = viewModel()
+
+            viewModel.uiState.test {
+                // Wednesday is index 2 of a Monday-based week.
+                assertEquals(2, (awaitItem() as WeekUiState.Content).habits.first().todayIndex)
+
+                rollOverTo(today.plusDays(1))
+
+                assertEquals(3, (awaitItem() as WeekUiState.Content).habits.first().todayIndex)
+            }
+        }
+
+    @Test
+    fun theNewDaysPillStopsBeingAFutureDayAndBecomesWritable() =
+        runTest {
+            // ⭐⭐ The symptom that makes M6.9 more than cosmetic. M6.7 disables a pill whose cell is
+            // FUTURE, so before this step the first check-off of a new day did nothing at all,
+            // silently — the one interaction the whole app exists for.
+            val (_, viewModel) = viewModel()
+            val tomorrow = today.plusDays(1)
+
+            viewModel.uiState.test {
+                assertEquals(DayState.FUTURE, stateOn(awaitItem(), tomorrow))
+
+                rollOverTo(tomorrow)
+
+                assertEquals(DayState.INCOMPLETE, stateOn(awaitItem(), tomorrow))
+            }
+        }
+
+    @Test
+    fun crossingIntoANewWeekCarriesTheViewWithIt() =
+        runTest {
+            // ADR-009 makes "open onto the current week with today ringed" the landing tab's whole
+            // premise. A view that stayed on last week would put a "This week" tap in front of the
+            // new day's first check-off.
+            val (_, viewModel) = viewModel()
+
+            viewModel.uiState.test {
+                assertEquals(thisMonday, (awaitItem() as WeekUiState.Content).weekStart)
+
+                // Sunday 30 Aug → Monday 31 Aug.
+                rollOverTo(LocalDate.of(2026, 8, 31))
+
+                val state = awaitItem() as WeekUiState.Content
+                assertEquals(LocalDate.of(2026, 8, 31), state.weekStart)
+                assertTrue(state.isCurrentWeek)
+            }
+        }
+
+    @Test
+    fun aWeekYouPagedToStaysWhereYouLeftItWhenMidnightPasses() =
+        runTest {
+            // The other half of the rule. Following is right for someone who never left the current
+            // week; moving the grid under someone who deliberately went looking at a past one is
+            // not, and they are told where they are by "This week" lighting up.
+            val (_, viewModel) = viewModel()
+            viewModel.onEvent(WeekEvent.PreviousWeekPressed)
+
+            viewModel.uiState.test {
+                assertEquals(thisMonday.minusDays(7), (awaitItem() as WeekUiState.Content).weekStart)
+
+                rollOverTo(LocalDate.of(2026, 8, 31))
+
+                // ⭐ **No emission at all**, which is the stronger claim. A pinned week is made of
+                // seven days whose meaning does not depend on which later day it happens to be, so
+                // the state is not merely equivalent — it is equal, and `StateFlow` conflates it.
+                expectNoEvents()
+
+                val state = viewModel.uiState.value as WeekUiState.Content
+                assertEquals(thisMonday.minusDays(7), state.weekStart)
+                assertFalse(state.isCurrentWeek)
+            }
+        }
+
+    @Test
+    fun pagingAwayAndBackResumesFollowingRatherThanPinningTodaysWeek() =
+        runTest {
+            // ⚠ The invariant `moveWeeks` normalises for. Landing back on the current week by paging
+            // looks identical to never having paged, so it must behave identically at midnight —
+            // otherwise two states that render the same diverge a few hours later.
+            val (_, viewModel) = viewModel()
+            viewModel.onEvent(WeekEvent.PreviousWeekPressed)
+            viewModel.onEvent(WeekEvent.NextWeekPressed)
+
+            viewModel.uiState.test {
+                assertEquals(thisMonday, (awaitItem() as WeekUiState.Content).weekStart)
+
+                rollOverTo(LocalDate.of(2026, 8, 31))
+
+                assertEquals(LocalDate.of(2026, 8, 31), (awaitItem() as WeekUiState.Content).weekStart)
+            }
+        }
+
+    @Test
+    fun thisWeekGoesBackToFollowingRatherThanToTodaysWeekAsAFixedDate() =
+        runTest {
+            val (_, viewModel) = viewModel()
+            repeat(3) { viewModel.onEvent(WeekEvent.PreviousWeekPressed) }
+            viewModel.onEvent(WeekEvent.ThisWeekPressed)
+
+            viewModel.uiState.test {
+                assertEquals(thisMonday, (awaitItem() as WeekUiState.Content).weekStart)
+
+                rollOverTo(LocalDate.of(2026, 8, 31))
+
+                assertEquals(LocalDate.of(2026, 8, 31), (awaitItem() as WeekUiState.Content).weekStart)
+            }
+        }
+
+    @Test
+    fun aDayChangeInsideTheSameWeekStillReachesTheScreen() =
+        runTest {
+            // ⚠ Wednesday → Thursday does not move the week at all, so the value the week is derived
+            // from is unchanged. `Snapshot` carries the day as well for exactly this reason: without
+            // it there would be nothing for anything downstream to tell apart.
+            val (_, viewModel) = viewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+
+                rollOverTo(today.plusDays(1))
+
+                val state = awaitItem() as WeekUiState.Content
+                assertEquals(thisMonday, state.weekStart)
+                assertEquals(3, state.habits.first().todayIndex)
+            }
         }
 
     // --- check-off ----------------------------------------------------------------------------
