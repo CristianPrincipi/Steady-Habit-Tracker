@@ -9,14 +9,18 @@ import com.cristianprincipi.habits.core.testing.MutableClock
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.DayState
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.PeriodCell
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
+import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -691,6 +695,75 @@ class WeekViewModelTest {
             }
         }
 
+    // --- said once, or not at all (M6.10) -------------------------------------------------------
+
+    @Test
+    fun aMessageAlreadyShownIsNotSaidAgainWhenTheScreenComesBack() =
+        runTest {
+            // ⭐⭐ **The claim `WeekMessage` is built on, and nothing pinned it until M6.10.** Its
+            // KDoc says a message in `UiState` "is shown again after every rotation, every tab
+            // return and every process restore", and that is the whole reason it travels on a
+            // `Channel`. A rotation is exactly this: the collector goes away and a new one arrives.
+            val (_, viewModel) = viewModel()
+            // The message names the habit, and the name is read back from the current state — so
+            // the state has to exist first. `aTapIsNeverGatedOnHavingSomethingToSayAboutIt` is the
+            // test for the other case, where it does not.
+            content(viewModel)
+
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = today, completed = true))
+
+            viewModel.messages.test { assertEquals(read.name, awaitItem().habitName) }
+
+            // The screen is rebuilt. "Read checked off for today" must not be announced twice for
+            // one tap the user made before the rotation.
+            viewModel.messages.test { expectNoEvents() }
+        }
+
+    @Test
+    fun aBacklogOfTapsIsNeverDumpedAtAScreenThatComesBack() =
+        runTest {
+            // ⚠ `WeekViewModel._messages`' KDoc: "returning to the tab cannot dump a history at the
+            // user". Three taps with nobody listening must leave one offer, not three — and it must
+            // be the newest, because it is the only one whose sentence still describes the screen.
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = today, completed = true))
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = run.id, date = today, completed = true))
+            viewModel.onEvent(
+                WeekEvent.DayToggled(habitId = read.id, date = today.minusDays(1), completed = true),
+            )
+
+            viewModel.messages.test {
+                val only = awaitItem()
+                assertEquals(read.name, only.habitName)
+                assertEquals(today.minusDays(1), only.date)
+                expectNoEvents()
+            }
+        }
+
+    @Test
+    fun theScreenRendersEvenIfSyncStatusNeverAnswers() =
+        runTest {
+            // ⭐ M6.8 claimed `onStart` means reading sync status "can never delay a render", and
+            // `combine` waits for every source — so a status flow that never emits would otherwise
+            // hold the app's landing screen at Loading with habits sitting in Room. That is exactly
+            // the gating `CLAUDE.md` §1 forbids, and the seed is what prevents it.
+            val silent = FakeHabitRepository(listOf(read, run), emptyList())
+            val model =
+                WeekViewModel(
+                    getHabitsForWeek = GetHabitsForWeek(silent, clock),
+                    toggleCompletion = ToggleCompletion(silent, clock),
+                    syncStatus = SilentSyncStatus,
+                    today = todayFlow,
+                    clock = clock,
+                )
+
+            model.uiState.test {
+                assertTrue(awaitItem() is WeekUiState.Content)
+            }
+        }
+
     // --- undo (M6.6) --------------------------------------------------------------------------
 
     @Test
@@ -747,4 +820,20 @@ class WeekViewModelTest {
             )
             viewModel.messages.test { expectNoEvents() }
         }
+}
+
+/**
+ * A [SyncStatusRepository] whose status never arrives.
+ *
+ * Not a plausible production state so much as the shape of one: any `Flow` assembled from DataStore
+ * and WorkManager can be slow on a cold start, and `combine` cannot tell "slow" from "never".
+ */
+private object SilentSyncStatus : SyncStatusRepository {
+    override fun observeStatus(): Flow<SyncStatus> = emptyFlow()
+
+    override fun requestSync() = Unit
+
+    override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = emptyFlow()
+
+    override suspend fun dismissDiscardedEdits() = Unit
 }

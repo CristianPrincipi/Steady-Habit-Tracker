@@ -9,6 +9,8 @@ import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,6 +23,7 @@ import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.model.PeriodCell
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -55,6 +58,10 @@ class WeekRenderTest {
     private val events = mutableListOf<WeekEvent>()
 
     private var syncStatusOpened = 0
+
+    /** The [subject]'s period, as the screen is drawing it. */
+    private fun subjectPeriod(): HabitPeriod =
+        SampleHabits.weekPeriods(reference).first { period -> period.habit.id == subject.id }
 
     /** `createComposeRule` has no activity, so strings come from the app context. */
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
@@ -240,6 +247,48 @@ class WeekRenderTest {
         assertEquals(monday, toggled().date)
     }
 
+    // --- the card's second line (M6.10) --------------------------------------------------------
+
+    @Test
+    fun theCardsSecondLineCountsTheDaysActuallyDoneOutOfSeven() {
+        // ⚠ Untested until M6.10, and it is arithmetic rather than decoration: `completedCount`
+        // counts only COMPLETED, so a version that counted "not future" or "has a record" would
+        // read plausibly and be wrong every week. The denominator is the week, not the habit.
+        showWeek()
+
+        val done = subjectPeriod().cells.count { cell -> cell is PeriodCell.Day && cell.state == DayState.COMPLETED }
+
+        composeTestRule
+            .onNodeWithText(string(R.string.week_card_summary).format(done, DAYS_IN_A_WEEK))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun aWeekWithNothingDoneReadsAsNoneOfSevenRatherThanBlank() {
+        // ⭐ The floor case, and the one that would expose an off-by-one or a blank slot. The line
+        // is drawn unconditionally (ADR-027 deleted the description it was meant to hold), so an
+        // empty string here would read as a card that failed to load rather than as a quiet week.
+        composeTestRule.setContent {
+            HabitsTheme {
+                WeekContent(
+                    state =
+                        WeekUiState.Content(
+                            weekStart = monday,
+                            habits = SampleHabits.weekPeriods(reference, completions = emptyList()),
+                            isCurrentWeek = true,
+                        ),
+                    onEvent = {},
+                    onOpenSyncStatus = {},
+                )
+            }
+        }
+
+        composeTestRule
+            .onAllNodesWithText(string(R.string.week_card_summary).format(0, DAYS_IN_A_WEEK))
+            .onFirst()
+            .assertIsDisplayed()
+    }
+
     // --- the empty state (M6.8) ---------------------------------------------------------------
 
     private fun showEmpty(reason: WeekEmptyReason) {
@@ -296,5 +345,10 @@ class WeekRenderTest {
 
         composeTestRule.onNodeWithContentDescription(string(R.string.week_previous)).assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription(string(R.string.week_next)).assertDoesNotExist()
+    }
+
+    private companion object {
+        /** The card's denominator is the week, not the habit — seven, always. */
+        const val DAYS_IN_A_WEEK = 7
     }
 }
