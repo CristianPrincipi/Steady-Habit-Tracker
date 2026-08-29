@@ -26,10 +26,15 @@ import com.cristianprincipi.habits.data.local.RoomTransactionRunner
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.repository.HabitRepositoryImpl
+import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.SyncStatus
+import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -148,6 +153,9 @@ class WeekCheckOffPersistenceTest {
         return WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
+            // Read only when there are no habits to draw, which is never in this test — seeded
+            // habits are the whole premise. A permanently idle status keeps it out of the way.
+            syncStatus = IdleSyncStatus,
             clock = clock,
         )
     }
@@ -158,7 +166,7 @@ class WeekCheckOffPersistenceTest {
             HabitsTheme {
                 live.value?.let { model ->
                     val state by model.uiState.collectAsStateWithLifecycle()
-                    WeekContent(state = state, onEvent = model::onEvent)
+                    WeekContent(state = state, onEvent = model::onEvent, onOpenSyncStatus = {})
                 }
             }
         }
@@ -259,4 +267,21 @@ class WeekCheckOffPersistenceTest {
         /** Generous: this waits on Room's executor and the main looper, not on a test scheduler. */
         const val TIMEOUT_MILLIS = 5_000L
     }
+}
+
+/**
+ * A sync that never runs, never fails and has never finished.
+ *
+ * The check-off loop does not read sync status — `CLAUDE.md` §1 keeps it off the render path — so
+ * the only honest stand-in here is one that says nothing at all. `WeekRenderTest` is where the two
+ * things it *can* say get asserted.
+ */
+private object IdleSyncStatus : SyncStatusRepository {
+    override fun observeStatus(): Flow<SyncStatus> = flowOf(SyncStatus.Idle(lastSyncedAt = null))
+
+    override fun requestSync() = Unit
+
+    override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = flowOf(emptyList())
+
+    override suspend fun dismissDiscardedEdits() = Unit
 }

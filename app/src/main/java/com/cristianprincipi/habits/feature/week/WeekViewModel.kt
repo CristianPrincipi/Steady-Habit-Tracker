@@ -6,6 +6,8 @@ import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.SyncStatus
+import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,8 +17,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -57,13 +62,15 @@ import javax.inject.Inject
  * ### ⚠ A refused write still says nothing
  *
  * `ToggleCompletion` returns `false` when the date has not happened yet, and [onEvent] sends no
- * message for it. That is not an oversight carried over: **M6.7 makes future pills untappable**, so
- * the refusal is about to stop being reachable through the UI at all, and inventing a sentence for
- * it now would design M6.7's screen a step early. The guard stays where it is either way — it is
- * the domain's rule, and the ViewModel must not route around it.
+ * message for it. **M6.7 made future pills untappable** (ADR-071), so nothing a finger can do
+ * reaches that branch any more — and a sentence explaining a tap the user could not make would say
+ * less than the dimmed pill already does. The guard stays where it is regardless: it is the
+ * domain's rule, the pill only mirrors it, and if the two ever disagree the pill is the bug.
  *
- * **The window worth knowing about:** until M6.7 lands, a tap on a future pill does nothing and
- * says nothing. That is the whole of the gap.
+ * ### An empty screen is the one place sync status is read
+ *
+ * With no habits in Room there is nothing to draw and nothing to explain it, so [emptyReason] says
+ * whether the first import is on its way or has failed. It gates nothing — see that property.
  */
 @HiltViewModel
 class WeekViewModel
@@ -71,6 +78,8 @@ class WeekViewModel
     constructor(
         private val getHabitsForWeek: GetHabitsForWeek,
         private val toggleCompletion: ToggleCompletion,
+        // Read for one branch only — see `emptyReason`. Never awaited, never a gate (`CLAUDE.md` §1).
+        private val syncStatus: SyncStatusRepository,
         // Injected rather than read, so "which week is this?" is a testable claim (`CLAUDE.md` §6).
         private val clock: Clock,
     ) : ViewModel() {
@@ -88,19 +97,64 @@ class WeekViewModel
          */
         private val referenceWeek = MutableStateFlow(currentWeek())
 
+        /**
+         * The week on screen and the habits over it, as one value.
+         *
+         * `flatMapLatest` swaps the underlying query whenever [referenceWeek] moves, cancelling the
+         * week the user just paged away from. The week is carried alongside the habits rather than
+         * read back afterwards, because by the time a slow query returns [referenceWeek] may have
+         * moved on — pairing them here is what stops the label describing a different week from the
+         * pills below it.
+         */
         @OptIn(ExperimentalCoroutinesApi::class)
+        private val visibleWeek: Flow<Pair<LocalDate, List<HabitPeriod>>> =
+            referenceWeek.flatMapLatest { week ->
+                getHabitsForWeek(week).map { habits -> week to habits }
+            }
+
+        /**
+         * `SyncStatus` collapsed to the only two things the empty screen has words for (M6.8).
+         *
+         * Read **only** in the empty branch, and it is worth saying why that is not a contradiction
+         * of `CLAUDE.md` §3.5's *"sync is invisible until it fails"*. It is invisible here too: with
+         * habits in Room this value changes nothing on screen. What §3.5 forbids is sync failure
+         * blocking the check-off loop, and an empty screen has no loop to block — it has a user
+         * looking at nothing, owed the *"clear, human-readable message with a retry affordance"* the
+         * same rule asks for.
+         *
+         * ### ⚠ Three deliberate narrowings
+         *
+         * **`WaitingForNetwork` is not a failure.** §1 makes offline the normal case, and
+         * WorkManager releases a held run by itself; asking the user to act on it is the nagging
+         * M4.16 removed from the sync-status card.
+         *
+         * **`distinctUntilChanged` keeps `Content` still.** Without it a sync starting and finishing
+         * would re-run [stateFor] and rebuild a whole `Content` for a field it does not carry.
+         *
+         * **`onStart` means this can never delay a render.** `combine` waits for every source, so a
+         * sync status that was slow to arrive would hold the app's landing screen at `Loading` with
+         * habits sitting in Room — exactly the gating §1 forbids. The seed is the calm answer, and
+         * `distinctUntilChanged` drops it again if the real first value agrees.
+         */
+        private val emptyReason: Flow<WeekEmptyReason> =
+            syncStatus
+                .observeStatus()
+                .map { status ->
+                    if (status is SyncStatus.Failed) WeekEmptyReason.SyncFailed else WeekEmptyReason.SyncPending
+                }.onStart { emit(WeekEmptyReason.SyncPending) }
+                .distinctUntilChanged()
+
         val uiState: StateFlow<WeekUiState> =
-            referenceWeek
-                .flatMapLatest { week ->
-                    getHabitsForWeek(week).map { habits -> stateFor(week, habits) }
-                }.stateIn(
-                    scope = viewModelScope,
-                    started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
-                    // Not an empty Content, and not Empty: neither is known yet. Starting at either
-                    // would flash a wrong screen on every cold start — Empty in particular reads as
-                    // "you have no habits", which is a sentence no one should see while loading.
-                    initialValue = WeekUiState.Loading,
-                )
+            combine(visibleWeek, emptyReason) { (week, habits), reason ->
+                stateFor(week, habits, reason)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
+                // Not an empty Content, and not Empty: neither is known yet. Starting at either
+                // would flash a wrong screen on every cold start — Empty in particular reads as
+                // "you have no habits", which is a sentence no one should see while loading.
+                initialValue = WeekUiState.Loading,
+            )
 
         /**
          * ⚠ **`CONFLATED`, so a fast hand does not build a queue of stale offers.**
@@ -216,12 +270,14 @@ class WeekViewModel
         private fun stateFor(
             week: LocalDate,
             habits: List<HabitPeriod>,
+            reason: WeekEmptyReason,
         ): WeekUiState =
             if (habits.isEmpty()) {
                 // Week-independent: habits are global, so an empty list here means there are no
                 // active habits at all rather than none *this* week. `WeekUiState.Empty` explains
-                // why that distinction matters and why it carries no week.
-                WeekUiState.Empty
+                // why that distinction matters, why it carries no week, and why the only thing that
+                // reaches it is an import that has not landed yet.
+                WeekUiState.Empty(reason)
             } else {
                 WeekUiState.Content(
                     weekStart = week,

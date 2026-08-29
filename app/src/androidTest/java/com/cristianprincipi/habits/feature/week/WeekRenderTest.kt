@@ -1,11 +1,13 @@
 package com.cristianprincipi.habits.feature.week
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -52,6 +54,8 @@ class WeekRenderTest {
 
     private val events = mutableListOf<WeekEvent>()
 
+    private var syncStatusOpened = 0
+
     /** `createComposeRule` has no activity, so strings come from the app context. */
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
@@ -66,6 +70,7 @@ class WeekRenderTest {
                             isCurrentWeek = true,
                         ),
                     onEvent = { event -> events += event },
+                    onOpenSyncStatus = {},
                 )
             }
         }
@@ -235,15 +240,61 @@ class WeekRenderTest {
         assertEquals(monday, toggled().date)
     }
 
+    // --- the empty state (M6.8) ---------------------------------------------------------------
+
+    private fun showEmpty(reason: WeekEmptyReason) {
+        composeTestRule.setContent {
+            HabitsTheme {
+                WeekContent(
+                    state = WeekUiState.Empty(reason),
+                    onEvent = {},
+                    onOpenSyncStatus = { syncStatusOpened++ },
+                )
+            }
+        }
+    }
+
     @Test
     fun theEmptyStateOffersNoWayToCreateAHabit() {
-        // ⚠ Placeholder copy — M6.8 owns the wording. What is pinned is the shape it has to keep:
-        // no call to action, because ADR-010 means there is no habit creation to offer.
-        composeTestRule.setContent {
-            HabitsTheme { WeekContent(state = WeekUiState.Empty, onEvent = {}) }
-        }
+        // ⚠ The copy is undesigned and M6.11 judges it. What is pinned here is the shape neither
+        // sentence may lose: ADR-010 means there is no habit creation to offer, in either case.
+        showEmpty(WeekEmptyReason.SyncFailed)
 
-        composeTestRule.onNodeWithText(string(R.string.week_empty_title)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(string(R.string.week_empty_body)).assertIsDisplayed()
+        // The only action on the failed screen goes to sync status. If a "New habit" button ever
+        // appears beside it, this fails — which is the point.
+        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_action)).assertIsDisplayed()
+        composeTestRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+    }
+
+    @Test
+    fun anImportOnItsWayAsksTheUserForNothing() {
+        // ⭐ Every first-run user sees this, because the setup wizard saves the mapping — which
+        // flips the shell's gate — before it awaits the first sync (ADR-072). A control here would
+        // be asking someone to fix a sync that is already working.
+        showEmpty(WeekEmptyReason.SyncPending)
+
+        composeTestRule.onNodeWithText(string(R.string.week_empty_pending_title)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.week_empty_pending_body)).assertIsDisplayed()
+        composeTestRule.onAllNodes(hasClickAction()).assertCountEquals(0)
+    }
+
+    @Test
+    fun aFailedImportLeadsToTheOneScreenThatCanExplainIt() {
+        showEmpty(WeekEmptyReason.SyncFailed)
+
+        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_title)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_action)).performClick()
+
+        assertEquals(1, syncStatusOpened)
+    }
+
+    @Test
+    fun neitherEmptyScreenDrawsTheWeekSubNav() {
+        // The header takes `state as? Content`, so paging must not appear over a screen with no
+        // week to page — `WeekUiState.Empty` carries none, deliberately.
+        showEmpty(WeekEmptyReason.SyncPending)
+
+        composeTestRule.onNodeWithContentDescription(string(R.string.week_previous)).assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription(string(R.string.week_next)).assertDoesNotExist()
     }
 }

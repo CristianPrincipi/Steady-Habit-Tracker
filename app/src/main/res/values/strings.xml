@@ -196,18 +196,34 @@
       drawn unconditionally, so leaving it blank holds the space and reads like a failed load —
       this puts the most useful fact a week view has there instead. UNDESIGNED; see Plan.md M6.11.
 
-      week_empty_* is a placeholder for M6.8, which owns the real copy. It deliberately offers no
-      call to action: ADR-010 removed habit creation, because a habit IS a checkbox property in the
-      user's Notion database, so there is no "+" this app could ever honour.
+      week_empty_* is M6.8's, and the copy is UNDESIGNED - the user judges it at M6.11 with the
+      rest of M6's wording.
+
+      There is no "add a habit" call to action and there never will be: ADR-010 removed habit
+      creation, because a habit IS a checkbox property in the user's Notion database.
+
+      Two sentences, not one, and the reason is ADR-072. The only thing that empties this screen is
+      an import that has not landed - and every first-run user sees it, because the setup wizard
+      saves the mapping (which flips the shell's gate) BEFORE it awaits the first sync. If that sync
+      then fails, the wizard holding the error is already off screen, so this is the only surface
+      left to say so. Hence: on its way, or it failed and here is where to look.
+
+      The failure REASON is deliberately absent. SyncStatusScreen renders every SyncFailure with the
+      sentence and the retry that belong to it; a second rendering here would be two places to keep
+      in step.
     -->
     <string name="week_card_summary">%1$d of %2$d</string>
     <string name="week_previous">Previous week</string>
     <string name="week_next">Next week</string>
     <string name="week_this_week">This week</string>
     <string name="week_pill_description">%1$s, %2$s</string>
-    <string name="week_empty_emoji">☑️</string>
-    <string name="week_empty_title">No habits yet</string>
-    <string name="week_empty_body">Habits come from the checkbox columns in your Notion database. Pick which ones to track in Settings.</string>
+    <string name="week_empty_pending_emoji">☑️</string>
+    <string name="week_empty_pending_title">Your habits are on their way</string>
+    <string name="week_empty_pending_body">They come from the checkbox columns in your Notion database, and appear here as soon as the first sync finishes.</string>
+    <string name="week_empty_failed_emoji">⚠️</string>
+    <string name="week_empty_failed_title">Your habits haven\'t arrived</string>
+    <string name="week_empty_failed_body">The last sync didn\'t finish, so there is nothing to show yet. Notion sync has the reason and a way to try again.</string>
+    <string name="week_empty_failed_action">Open Notion sync</string>
 
     <!--
       Undo snackbar (M6.6) — UNDESIGNED. The prototype has no snackbar because it has no click

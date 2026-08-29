@@ -48,6 +48,10 @@ import kotlinx.coroutines.flow.collectLatest
  */
 @Composable
 fun WeekScreen(
+    // Only reachable from the empty state, and only when the first import failed — see [WeekEmpty].
+    // The landing tab needs a way through to sync status because that failure has nowhere else to
+    // be reported: the wizard that would have shown it is off screen by then (ADR-072).
+    onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WeekViewModel = hiltViewModel(),
 ) {
@@ -57,6 +61,7 @@ fun WeekScreen(
         state = state,
         messages = viewModel.messages,
         onEvent = viewModel::onEvent,
+        onOpenSyncStatus = onOpenSyncStatus,
         modifier = modifier,
     )
 }
@@ -78,6 +83,7 @@ internal fun WeekWithUndo(
     state: WeekUiState,
     messages: Flow<WeekMessage>,
     onEvent: (WeekEvent) -> Unit,
+    onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
@@ -85,7 +91,12 @@ internal fun WeekWithUndo(
     UndoSnackbars(messages = messages, hostState = snackbarHostState, onEvent = onEvent)
 
     Box(modifier = modifier.fillMaxSize()) {
-        WeekContent(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+        WeekContent(
+            state = state,
+            onEvent = onEvent,
+            onOpenSyncStatus = onOpenSyncStatus,
+            modifier = Modifier.fillMaxSize(),
+        )
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
     }
 }

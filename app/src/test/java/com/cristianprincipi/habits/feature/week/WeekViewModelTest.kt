@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.week
 
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
+import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.Completion
@@ -9,8 +10,11 @@ import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.PeriodCell
+import com.cristianprincipi.habits.domain.model.SyncFailure
+import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,6 +49,10 @@ class WeekViewModelTest {
     private val thisMonday = LocalDate.of(2026, 8, 24)
     private val clock = Clock.fixed(today.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
 
+    /** Drives [WeekUiState.Empty]'s reason, and nothing else on this screen (M6.8). */
+    private val status = MutableStateFlow<SyncStatus>(SyncStatus.Idle(lastSyncedAt = null))
+    private val syncStatus = FakeSyncStatusRepository(status)
+
     private val read = testHabit(id = "read", name = "Read", startDate = LocalDate.of(2026, 1, 1))
     private val run = testHabit(id = "run", name = "Run", startDate = LocalDate.of(2026, 1, 1))
 
@@ -56,6 +64,7 @@ class WeekViewModelTest {
         WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
+            syncStatus = syncStatus,
             clock = clock,
         )
 
@@ -205,7 +214,9 @@ class WeekViewModelTest {
         runTest {
             val (_, viewModel) = viewModel(habits = emptyList())
 
-            viewModel.uiState.test { assertEquals(WeekUiState.Empty, awaitItem()) }
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+            }
         }
 
     @Test
@@ -218,7 +229,83 @@ class WeekViewModelTest {
 
             repeat(3) { viewModel.onEvent(WeekEvent.PreviousWeekPressed) }
 
-            viewModel.uiState.test { assertEquals(WeekUiState.Empty, awaitItem()) }
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+            }
+        }
+
+    // --- why the screen is empty (M6.8) -------------------------------------------------------
+
+    @Test
+    fun aRunningFirstImportReadsAsOnItsWayRatherThanAsAProblem() =
+        runTest {
+            val (_, viewModel) = viewModel(habits = emptyList())
+            status.value = SyncStatus.Syncing(lastSyncedAt = null)
+
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+            }
+        }
+
+    @Test
+    fun aSyncHeldUntilTheNetworkReturnsIsNotAFailure() =
+        runTest {
+            // ⭐ `CLAUDE.md` §1 makes offline the normal case, and WorkManager releases a held run
+            // by itself — there is nothing for the user to do, so there is nothing to tell them to
+            // do. The same call M4.16 made for the sync-status card, made again here.
+            val (_, viewModel) = viewModel(habits = emptyList())
+            status.value = SyncStatus.WaitingForNetwork(lastSyncedAt = null)
+
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+            }
+        }
+
+    @Test
+    fun aFailedFirstImportSaysSoRatherThanWaitingForEver() =
+        runTest {
+            val (_, viewModel) = viewModel(habits = emptyList())
+            status.value = SyncStatus.Failed(SyncFailure.DatabaseNotShared, lastSyncedAt = null)
+
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncFailed), awaitItem())
+            }
+        }
+
+    @Test
+    fun aFailureThatArrivesWhileTheEmptyScreenIsOpenChangesWhatItSays() =
+        runTest {
+            // ⭐⭐ **The case ADR-072 exists for**, in order. `submitMapping` saves the mapping,
+            // which flips `HabitsShell`'s gate, and only *then* awaits the first sync — so the user
+            // is already looking at this screen when that sync fails. The wizard holding the error
+            // is gone by then, which makes this the only surface left to say anything.
+            val (_, viewModel) = viewModel(habits = emptyList())
+
+            viewModel.uiState.test {
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+
+                status.value = SyncStatus.Failed(SyncFailure.Offline, lastSyncedAt = null)
+
+                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncFailed), awaitItem())
+            }
+        }
+
+    @Test
+    fun aFailedSyncChangesNothingOnScreenWhileThereAreHabitsToDraw() =
+        runTest {
+            // ⚠ `CLAUDE.md` §3.5: sync is invisible until it fails, and §1 keeps it away from the
+            // check-off loop entirely. Reading the status for the empty branch must not leak into
+            // the branch that matters — not as a message, and not as a re-emission that rebuilds
+            // every card mid-tap.
+            val (_, viewModel) = viewModel()
+
+            viewModel.uiState.test {
+                assertTrue(awaitItem() is WeekUiState.Content)
+
+                status.value = SyncStatus.Failed(SyncFailure.TokenRejected, lastSyncedAt = null)
+
+                expectNoEvents()
+            }
         }
 
     @Test

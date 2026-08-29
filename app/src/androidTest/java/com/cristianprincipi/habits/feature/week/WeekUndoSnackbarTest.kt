@@ -76,6 +76,7 @@ class WeekUndoSnackbarTest {
                         ),
                     messages = messages,
                     onEvent = { event -> events += event },
+                    onOpenSyncStatus = {},
                 )
             }
         }

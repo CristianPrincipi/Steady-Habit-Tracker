@@ -23,6 +23,7 @@ import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Completion
+import com.cristianprincipi.habits.feature.week.WeekEmptyReason
 import com.cristianprincipi.habits.feature.week.WeekEvent
 import com.cristianprincipi.habits.feature.week.WeekMessage
 import com.cristianprincipi.habits.feature.week.WeekUiState
@@ -43,7 +44,15 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * this wires that straight into the real `WeekContent`.
  *
  * It is also how M6.4, M6.5 and M6.8 get looked at: paging, check-off and the empty state are all
- * reachable here without any data at all.
+ * reachable here without any data at all. The empty state needs asking for, because the interesting
+ * thing about it is that it appears when there is nothing to build a screen from:
+ *
+ * ```
+ * adb shell am start -n …/….gallery.WeekPreviewActivity --es state pending
+ * adb shell am start -n …/….gallery.WeekPreviewActivity --es state failed
+ * ```
+ *
+ * Anything else — including no extra at all — is the sample week.
  *
  * ### Exported, unlike [ShellHarnessActivity], and safe to be
  *
@@ -71,12 +80,22 @@ class WeekPreviewActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    SampleWeek()
+                    SampleWeek(empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)))
                 }
             }
         }
     }
 }
+
+private const val EXTRA_STATE = "state"
+
+/** `null` for the sample week; a reason to render [WeekUiState.Empty] instead. */
+private fun emptyReasonFrom(extra: String?): WeekEmptyReason? =
+    when (extra) {
+        "pending" -> WeekEmptyReason.SyncPending
+        "failed" -> WeekEmptyReason.SyncFailed
+        else -> null
+    }
 
 /**
  * The real `WeekWithUndo` over an in-memory week that a tap actually changes.
@@ -91,7 +110,7 @@ class WeekPreviewActivity : ComponentActivity() {
  * emulator would be showing behaviour the app does not have.
  */
 @Composable
-private fun SampleWeek() {
+private fun SampleWeek(empty: WeekEmptyReason?) {
     val reference = SampleHabits.referenceDate
     val thisWeek = startOfWeek(reference)
 
@@ -102,12 +121,13 @@ private fun SampleWeek() {
     // The same shape `WeekViewModel` produces, minus Room: `weekPeriods` is anchored on the shown
     // week while "today" stays at the reference date, so paging away really does dim the pills and
     // light up "This week".
-    val state =
+    val content =
         WeekUiState.Content(
             weekStart = weekStart,
             habits = SampleHabits.weekPeriods(reference, completed, weekStart),
             isCurrentWeek = weekStart == thisWeek,
         )
+    val state = empty?.let(WeekUiState::Empty) ?: content
 
     WeekWithUndo(
         state = state,
@@ -117,7 +137,7 @@ private fun SampleWeek() {
                 is WeekEvent.DayToggled -> {
                     val row = Completion(event.habitId, event.date)
                     completed = if (event.completed) completed + row else completed - row
-                    val habit = state.habits.first { period -> period.habit.id == event.habitId }.habit
+                    val habit = content.habits.first { period -> period.habit.id == event.habitId }.habit
                     messages.trySend(
                         WeekMessage(
                             habitId = event.habitId,
@@ -148,6 +168,8 @@ private fun SampleWeek() {
                 }
             }
         },
+        // Real navigation is the shell's; here it is the one thing this activity cannot show.
+        onOpenSyncStatus = {},
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
     )
 }

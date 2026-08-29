@@ -95,6 +95,7 @@ class WeekTouchTargetTest {
                             isCurrentWeek = true,
                         ),
                     onEvent = { event -> events += event },
+                    onOpenSyncStatus = {},
                 )
             }
         }

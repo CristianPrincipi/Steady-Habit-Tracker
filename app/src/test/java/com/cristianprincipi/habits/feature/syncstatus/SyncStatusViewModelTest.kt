@@ -3,13 +3,12 @@ package com.cristianprincipi.habits.feature.syncstatus
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.datetime.Elapsed
 import com.cristianprincipi.habits.core.testing.FakeNotionSetupRepository
+import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
-import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -231,29 +230,4 @@ class SyncStatusViewModelTest {
             discardedSide = EditSide.Local,
             resolvedAt = now,
         )
-}
-
-/** A [SyncStatusRepository] that answers from two flows and counts what it was asked to do. */
-private class FakeSyncStatusRepository(
-    private val status: MutableStateFlow<SyncStatus>,
-    private val notices: MutableStateFlow<List<DiscardedEditNotice>>,
-) : SyncStatusRepository {
-    var syncRequests = 0
-        private set
-
-    var dismissals = 0
-        private set
-
-    override fun observeStatus(): Flow<SyncStatus> = status
-
-    override fun requestSync() {
-        syncRequests++
-    }
-
-    override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = notices
-
-    override suspend fun dismissDiscardedEdits() {
-        dismissals++
-        notices.value = emptyList()
-    }
 }
