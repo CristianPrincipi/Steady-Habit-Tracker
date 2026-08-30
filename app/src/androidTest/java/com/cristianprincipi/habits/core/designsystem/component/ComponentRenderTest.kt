@@ -50,8 +50,15 @@ class ComponentRenderTest {
         composeTestRule.setContent {
             HabitsTheme {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState()).width(GALLERY_WIDTH)) {
-                    HabitIcon(emoji = "🎸", habitColor = HabitsTheme.colors.habit.blue, size = HabitIconSize.SMALL)
-                    HabitIcon(emoji = "💧", habitColor = HabitsTheme.colors.habit.green)
+                    HabitIcon(
+                        emoji = "🎸",
+                        name = "Learn Guitar",
+                        habitColor = HabitsTheme.colors.habit.blue,
+                        size = HabitIconSize.SMALL,
+                    )
+                    HabitIcon(emoji = "💧", name = "Drink water", habitColor = HabitsTheme.colors.habit.green)
+                    // The M7.2 fallback: no emoji, so the circle carries the name's initial.
+                    HabitIcon(emoji = "", name = "Meditate", habitColor = HabitsTheme.colors.habit.orange)
                     SectionEyebrow(text = "YEAR OVERVIEW")
                     HabitChip(
                         emoji = "🎸",

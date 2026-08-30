@@ -30,6 +30,7 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 @Composable
 fun HabitIcon(
     emoji: String,
+    name: String,
     habitColor: Color,
     modifier: Modifier = Modifier,
     size: HabitIconSize = HabitIconSize.LARGE,
@@ -52,7 +53,16 @@ fun HabitIcon(
                 ).clearAndSetSemantics { },
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = emoji, style = textStyle)
+        // ⚠ The glyph, not the emoji: a habit whose Notion property carries no emoji draws its
+        // initial instead of an empty circle (M7.2, the user's call). `habitGlyph` owns that rule.
+        // The colour is set only for the fallback — an emoji carries its own and `Color.Unspecified`
+        // leaves it alone, where tinting would flatten it to a silhouette.
+        val glyph = habitGlyph(emoji, name)
+        Text(
+            text = glyph,
+            style = textStyle,
+            color = if (glyph == emoji) Color.Unspecified else habitColor,
+        )
     }
 }
 
@@ -67,10 +77,16 @@ private fun HabitIconPreview() {
                     .spacedBy(Spacing.chipGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HabitIcon(emoji = "🎸", habitColor = HabitsTheme.colors.habit.blue, size = HabitIconSize.SMALL)
-            HabitIcon(emoji = "💧", habitColor = HabitsTheme.colors.habit.green)
-            HabitIcon(emoji = "🧘", habitColor = HabitsTheme.colors.habit.orange)
-            HabitIcon(emoji = "📖", habitColor = HabitsTheme.colors.habit.purple)
+            HabitIcon(
+                emoji = "🎸",
+                name = "Learn Guitar",
+                habitColor = HabitsTheme.colors.habit.blue,
+                size = HabitIconSize.SMALL,
+            )
+            HabitIcon(emoji = "💧", name = "Drink water", habitColor = HabitsTheme.colors.habit.green)
+            HabitIcon(emoji = "🧘", name = "Morning Yoga", habitColor = HabitsTheme.colors.habit.orange)
+            // No emoji — the case the user's own database does not contain today (M7.2).
+            HabitIcon(emoji = "", name = "Meditate", habitColor = HabitsTheme.colors.habit.purple)
         }
     }
 }

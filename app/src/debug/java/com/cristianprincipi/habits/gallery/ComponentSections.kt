@@ -45,11 +45,20 @@ fun HabitIconSection() {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
         GalleryLabel("Small, 32dp — the Month card")
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.chipGap)) {
-            SampleHabits.forEach { HabitIcon(it.emoji, it.colour(), size = HabitIconSize.SMALL) }
+            SampleHabits.forEach { HabitIcon(it.emoji, it.name, it.colour(), size = HabitIconSize.SMALL) }
         }
         GalleryLabel("Large, 40dp — the Week and Year cards")
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.chipGap)) {
-            SampleHabits.forEach { HabitIcon(it.emoji, it.colour()) }
+            SampleHabits.forEach { HabitIcon(it.emoji, it.name, it.colour()) }
+        }
+        // ⚠ The case the user's own database does not contain, and therefore the one no screenshot
+        // of this app has ever shown: a Notion checkbox column named without a leading emoji. The
+        // circle carries the name's initial rather than drawing empty (M7.2, ADR-077).
+        GalleryLabel("No emoji — the initial stands in")
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.chipGap)) {
+            HabitIcon("", "Meditate", SampleHabits.first().colour(), size = HabitIconSize.SMALL)
+            HabitIcon("", "Meditate", SampleHabits.first().colour())
+            HabitIcon("", "walk the dog", SampleHabits.last().colour())
         }
     }
 }

@@ -63,7 +63,7 @@ fun HabitChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "$emoji $name",
+            text = habitLabel(emoji, name),
             // Selected reverses the fill and the ink: white on the habit colour, versus the habit
             // colour on a tint of itself.
             color = if (selected) HabitsTheme.colors.text.primary else habitColor,

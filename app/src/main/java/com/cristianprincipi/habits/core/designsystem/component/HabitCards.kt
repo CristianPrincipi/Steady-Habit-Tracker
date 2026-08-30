@@ -171,7 +171,7 @@ private fun HabitCardHeader(
         horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HabitIcon(emoji = emoji, habitColor = habitColor, size = iconSize)
+        HabitIcon(emoji = emoji, name = name, habitColor = habitColor, size = iconSize)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = name,
