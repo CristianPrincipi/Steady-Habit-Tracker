@@ -27,6 +27,11 @@ class FakeNotionSetupRepository : NotionSetupRepository {
 
     override val isConfigured: Flow<Boolean> = configured
 
+    /** What the app has learned about where the database lives. Settable, like every other answer. */
+    val notionDatabaseUrl = MutableStateFlow<String?>(null)
+
+    override val databaseUrl: Flow<String?> = notionDatabaseUrl
+
     val savedTokens = mutableListOf<String>()
     val savedMappings = mutableListOf<SavedNotionMapping>()
 

@@ -18,8 +18,14 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 /**
  * Settings — `docs/design-spec.md` §6.
  *
- * ⚠ **Barely a stub, and deliberately not empty.** M7 builds the real screen; until then this
- * carries the one thing that cannot wait: a way into sync status.
+ * ⚠ **Still a stub, and deliberately not empty.** M11.1 builds the real screen; until then this
+ * carries the two things that cannot wait — a way into sync status, and a way into the habit list.
+ *
+ * ⭐ **The habit row is M7.5's, and it is the user's chosen entry point.** `ManageHabits` had been
+ * declared and unreachable since M5.3, waiting on a header `+` that ADR-010 means must never exist.
+ * Settings won it over a glyph on the Week header because that screen is reference plus one
+ * preference rather than a per-week action — and because **M7.8's route back to the Notion mapping
+ * links from the same place**, beside the connection it belongs to.
  *
  * ⭐ **Why that row exists.** M5.2 deleted `HabitsAppRoot`, which had been showing `SyncStatusScreen`
  * to every configured user — the only thing pointing at it. Without a row here the Notion
@@ -33,6 +39,7 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 @Composable
 fun SettingsScreen(
     onOpenSyncStatus: () -> Unit,
+    onOpenHabits: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -47,6 +54,12 @@ fun SettingsScreen(
             style = MaterialTheme.typography.headlineSmall,
             color = HabitsTheme.colors.text.primary,
         )
+        // Habits first: it is the row a user opens to look at something, where the other is the row
+        // they open when something is wrong.
+        SecondaryButton(
+            text = stringResource(R.string.settings_habits),
+            onClick = onOpenHabits,
+        )
         SecondaryButton(
             text = stringResource(R.string.settings_notion_sync),
             onClick = onOpenSyncStatus,
@@ -58,6 +71,6 @@ fun SettingsScreen(
 @Composable
 private fun SettingsScreenPreview() {
     HabitsTheme {
-        SettingsScreen(onOpenSyncStatus = {})
+        SettingsScreen(onOpenSyncStatus = {}, onOpenHabits = {})
     }
 }

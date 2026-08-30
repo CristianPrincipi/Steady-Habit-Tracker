@@ -38,6 +38,21 @@ interface NotionSetupRepository {
     val isConfigured: Flow<Boolean>
 
     /**
+     * A link to the user's habit database in Notion, or `null` while the app has not learned one.
+     *
+     * ⭐ **The one thing this app can hand to Notion instead of asking it for something.** ADR-010
+     * makes the habit set read-only here — a habit *is* a column in that database — so "go and
+     * change it where it lives" is the honest answer, and a screen that says that owes the user a
+     * way there.
+     *
+     * **`null` is normal and temporary.** The wizard keeps a *data source* id, and a `notion.so`
+     * link needs the *database* id, which the schema fetch on the first sync supplies. So a
+     * connection made by an older build, or one whose first sync has not landed, has none yet. A
+     * consumer disables its control and says so rather than hiding it (ADR-060).
+     */
+    val databaseUrl: Flow<String?>
+
+    /**
      * Stores the pasted token, encrypted under the Android Keystore.
      *
      * Does **not** validate it: that is [findSources]'s job, because the only way to know a token

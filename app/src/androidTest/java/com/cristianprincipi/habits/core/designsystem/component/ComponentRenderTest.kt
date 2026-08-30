@@ -4,17 +4,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -96,6 +100,12 @@ class ComponentRenderTest {
                         completionLabel = "84%",
                         completionEyebrow = "COMPLETION",
                         days = previewYear(),
+                    )
+                    ColorSwatchRow(
+                        colors = HabitsTheme.colors.habit.assignable,
+                        selectedIndex = 0,
+                        contentDescriptions = SWATCH_NAMES,
+                        onSelect = {},
                     )
                     EmptyState(emoji = "🌱", title = "No habits yet", body = "Nothing here.")
                 }
@@ -180,6 +190,98 @@ class ComponentRenderTest {
         assertRingIsVisible(days = List(DAYS_IN_WEEK) { DayStatus.INCOMPLETE }, case = "incomplete")
     }
 
+    // --- the selected colour has to be visible, on every colour (M7.5) ------------------------
+
+    @Test
+    fun theSelectedSwatchLooksDifferentOnEveryColourInThePalette() {
+        // ⭐ M6.11's lesson applied before it could bite again. The obvious marker for a chosen
+        // swatch is a ring, and `Modifier.border` draws INSIDE the bounds — a ring around a circle
+        // filled with the same colour is invisible, which is exactly how the today marker vanished
+        // on a completed pill. So the marker is a check glyph, and this asserts the property rather
+        // than the glyph: **selecting a swatch must change what it looks like**, for all four.
+        //
+        // All four matter separately. A marker can read on blue and disappear on orange, and a test
+        // that only ever selected the first colour would never find out.
+        var selected by mutableStateOf(0)
+        composeTestRule.setContent {
+            HabitsTheme {
+                // ⚠ **The background is load-bearing, and its absence made this test lie.** A bare
+                // `setContent` draws on the host's white, and a 28dp circle inside a 48dp target
+                // leaves plenty of that white in frame — so the brightest pixel was 0.96 whether or
+                // not anything was selected. The app is dark-only; the test has to be too.
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    ColorSwatchRow(
+                        colors = HabitsTheme.colors.habit.assignable,
+                        selectedIndex = selected,
+                        contentDescriptions = SWATCH_NAMES,
+                        onSelect = {},
+                    )
+                }
+            }
+        }
+
+        SWATCH_NAMES.forEachIndexed { index, name ->
+            selected = index
+            composeTestRule.waitForIdle()
+            val chosen = brightestPixel(composeTestRule.onNodeWithContentDescription(name).captureToImage())
+
+            selected = NO_SELECTION
+            composeTestRule.waitForIdle()
+            val plain = brightestPixel(composeTestRule.onNodeWithContentDescription(name).captureToImage())
+
+            assertTrue(
+                "selecting the $name swatch put nothing brighter on it: $chosen against $plain",
+                chosen > plain + MARKER_CONTRAST,
+            )
+        }
+    }
+
+    /**
+     * The luminance of the lightest pixel in an image.
+     *
+     * ⚠ **This replaced a plain "the two images differ" comparison, which is what the week pill's
+     * ring test uses — and here it was not enough.** Against the mutant that matters (a ring in the
+     * habit's own colour, `Modifier.border` drawing inside the bounds — the M6.11 defect) the two
+     * images *do* differ: a same-colour stroke over the fill's antialiased edge moves a few hundred
+     * edge pixels while being invisible to a person. The test passed on a marker nobody could see.
+     *
+     * An unselected swatch is a flat fill on a dark ground, so its brightest pixel *is* the fill.
+     * Anything drawn on top in the same colour cannot raise that; a white check raises it to ~1.0.
+     * So this asserts the property the design actually needs — **the marker contrasts with what is
+     * behind it** — rather than "something changed".
+     */
+    private fun brightestPixel(image: ImageBitmap): Float {
+        val pixels = image.toPixelMap()
+        var brightest = 0f
+        for (y in 0 until pixels.height) {
+            for (x in 0 until pixels.width) {
+                brightest = maxOf(brightest, pixels[x, y].luminance())
+            }
+        }
+        return brightest
+    }
+
+    @Test
+    fun aColourSwatchIsAFullTouchTargetEvenThoughItIsDrawnSmaller() {
+        // The same rule as a week pill: the design's 28dp circle keeps its size and the target
+        // around it grows. Four of these sit in a row, so a shortfall would be four missed taps.
+        composeTestRule.setContent {
+            HabitsTheme {
+                ColorSwatchRow(
+                    colors = HabitsTheme.colors.habit.assignable,
+                    selectedIndex = 0,
+                    contentDescriptions = SWATCH_NAMES,
+                    onSelect = {},
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription(SWATCH_NAMES.last())
+            .assertHeightIsAtLeast(Sizing.minimumTouchTarget)
+            .assertWidthIsAtLeast(Sizing.minimumTouchTarget)
+    }
+
     /** Renders [days] with and without a ring on the same pill and fails if they look identical. */
     private fun assertRingIsVisible(
         days: List<DayStatus>,
@@ -255,6 +357,22 @@ class ComponentRenderTest {
 
         /** `WeekPills`' own contract for "this week does not contain today". */
         const val NO_TODAY = -1
+
+        /** `ColorSwatchRow`'s equivalent: a stored colour that is not in the palette shown. */
+        const val NO_SELECTION = -1
+
+        /**
+         * How much brighter the marker has to be than the swatch it sits on.
+         *
+         * Measured, not guessed: the four fills land between 0.44 and 0.67 luminance and the check
+         * is white, so the real gap is 0.33 at its narrowest (purple is the widest at 0.56). 0.15
+         * sits well below every one of those and well above the antialiasing noise that a
+         * same-colour marker produces, which is the whole reason this number exists.
+         */
+        const val MARKER_CONTRAST = 0.15f
+
+        /** The four assignable habit colours, in `HabitPalette.assignable` order. */
+        val SWATCH_NAMES = listOf("Blue", "Green", "Orange", "Purple")
 
         /** One pill per `DayStatus`, in enum order, then two fillers to make up the seven. */
         val EVERY_STATUS =

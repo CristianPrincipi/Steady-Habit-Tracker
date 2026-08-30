@@ -17,6 +17,21 @@ class NotionDatabaseLinkTest {
     private val dashed = "8f2c41d9-7b5e-40a3-ac6e-1d9f0b73e254"
 
     @Test
+    fun aLinkIsBuiltInTheShapeThisAppCanReadBack() {
+        // The pair is the contract: whatever `urlFor` produces, `idOrNull` has to take back. A
+        // change to either — a `?v=` view id appended, a different host — fails here rather than
+        // in a browser the test suite cannot see.
+        assertEquals(id, NotionDatabaseLink.idOrNull(NotionDatabaseLink.urlFor(id)))
+    }
+
+    @Test
+    fun aLinkIsBuiltUnHyphenated() {
+        // §16: a Notion URL carries the un-hyphenated form, so this produces what the user would
+        // have copied rather than what the API happens to also accept.
+        assertEquals("https://www.notion.so/$id", NotionDatabaseLink.urlFor(dashed))
+    }
+
+    @Test
     fun aBareIdIsAlreadyAnAnswer() {
         assertEquals(id, NotionDatabaseLink.idOrNull(id))
     }

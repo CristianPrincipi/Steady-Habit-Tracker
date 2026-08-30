@@ -62,6 +62,14 @@ class NotionSetupRepositoryImpl
 
         override val isConfigured: Flow<Boolean> = mappingStore.mapping.map { mapping -> mapping != null }
 
+        // The id is stored and the URL is derived, rather than the other way round: a stored URL
+        // would be a second spelling of the same fact, and `NotionDatabaseLink` already owns how a
+        // Notion link is spelled in both directions.
+        override val databaseUrl: Flow<String?> =
+            mappingStore.mapping.map { mapping ->
+                mapping?.databaseId?.value?.let(NotionDatabaseLink::urlFor)
+            }
+
         override suspend fun saveToken(token: String) {
             tokenStore.save(NotionToken(token.trim()))
         }

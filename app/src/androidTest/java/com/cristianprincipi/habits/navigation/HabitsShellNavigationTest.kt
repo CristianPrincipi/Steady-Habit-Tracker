@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -63,6 +64,18 @@ class HabitsShellNavigationTest {
      */
     private fun weekIsShowing() = heading(R.string.screen_title_week)
 
+    /**
+     * The Settings row that opens the habit list.
+     *
+     * ⚠ It carries the **same string** as that screen's own title — both are "Your habits" — so it
+     * is found by its click action rather than by its text, exactly as [heading] finds the other
+     * half of the pair by the absence of one.
+     */
+    private fun habitsRow() =
+        composeTestRule
+            .onAllNodesWithText(string(R.string.settings_habits))
+            .filterToOne(hasClickAction())
+
     @Test
     fun theShellOpensOnWeekWithEveryTabPresent() {
         // Week, not Month — the user's decision (`docs/design-spec.md` §1). Getting the start
@@ -102,6 +115,24 @@ class HabitsShellNavigationTest {
         Espresso.pressBack()
 
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).assertIsDisplayed()
+        tab(R.string.tab_settings).assertIsSelected()
+    }
+
+    @Test
+    fun settingsReachesTheHabitListAndBackReturnsToTheShell() {
+        // ⭐ M7.5's entry point, and the reason it needed one: `ManageHabits` had been declared and
+        // unreachable since M5.3, waiting on a header `+` that ADR-010 means must never exist. The
+        // user chose this row over a glyph on the Week header.
+        tab(R.string.tab_settings).performClick()
+        habitsRow().performClick()
+
+        // The title, not the list: whether any habit is stored depends on what a previous run left
+        // in Room, and the claim here is that the destination is reachable.
+        heading(R.string.screen_title_habits).assertIsDisplayed()
+
+        Espresso.pressBack()
+
+        heading(R.string.screen_title_settings).assertIsDisplayed()
         tab(R.string.tab_settings).assertIsSelected()
     }
 

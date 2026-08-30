@@ -14,6 +14,7 @@ import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.preferences.SettingsDataStore
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionParentDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
 import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
@@ -43,6 +44,15 @@ object PropertyIds {
 
     /** `Weight` — the user's own daily data, deliberately never in the mapping. */
     const val WEIGHT = "Nw%7Cb"
+
+    /**
+     * The database that *contains* [DATA_SOURCE] — what a `notion.so` link is built from.
+     *
+     * Hex of the right shape, and no real workspace id (`NotionDatabaseLinkTest`'s rule). It is a
+     * different string from [DATA_SOURCE] on purpose: the two ids are not interchangeable, and a
+     * fixture that reused one would let a mix-up pass.
+     */
+    const val DATABASE = "8f2c41d97b5e40a3ac6e1d9f0b73e254"
 }
 
 /**
@@ -72,12 +82,24 @@ val syncTestClock: Clock = Clock.fixed(Instant.parse("2026-08-23T12:00:00Z"), Zo
 val august19: LocalDate = LocalDate.of(2026, 8, 19)
 val august20: LocalDate = LocalDate.of(2026, 8, 20)
 
-/** A data source keyed the way Notion keys one: by property **name**. */
+/**
+ * A data source keyed the way Notion keys one: by property **name**.
+ *
+ * **It carries its database parent by default, because a real one always does.** M7.5 reads that
+ * parent to build the link out to Notion, and a fixture without it would let every sync test pass
+ * while the real response was being parsed wrongly. Pass `databaseId = null` for the one case that
+ * has no database parent — an externally synced source.
+ */
 fun dataSourceOf(
     vararg properties: NotionPropertySchemaDto,
     id: String = PropertyIds.DATA_SOURCE,
+    databaseId: String? = PropertyIds.DATABASE,
 ): NotionDataSourceDto =
-    NotionDataSourceDto(id = id, properties = properties.associateBy(NotionPropertySchemaDto::name))
+    NotionDataSourceDto(
+        id = id,
+        properties = properties.associateBy(NotionPropertySchemaDto::name),
+        parent = databaseId?.let { NotionParentDto(type = "database_id", databaseId = it) },
+    )
 
 /**
  * A page, keyed by property **name**, with the id inside the value.

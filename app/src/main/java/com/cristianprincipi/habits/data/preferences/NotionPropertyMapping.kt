@@ -38,6 +38,23 @@ value class NotionDataSourceId(
 )
 
 /**
+ * The database that *contains* the data source — the id that appears in a Notion URL.
+ *
+ * ⚠ **A different type from [NotionDataSourceId], and the separation is the point.** Both are
+ * UUIDv4s and neither works where the other belongs: every API call in this app takes the data
+ * source id, and every `notion.so` link is built from the database id. This app once held only the
+ * first, which is why `NotionDatabaseLink` could parse a URL and nothing could produce one.
+ *
+ * Learned rather than chosen: the user picks a *database* in the wizard, but what the wizard keeps
+ * is the data source, so this arrives later — off the `parent` of the schema the sync engine already
+ * fetches (`NotionDataSourceDto.databaseId`).
+ */
+@JvmInline
+value class NotionDatabaseId(
+    val value: String,
+)
+
+/**
  * What the user told us their Notion database means. **The whole of it.**
  *
  * `CLAUDE.md` §3.4 describes this as "one dropdown per domain field" — which property is the habit
@@ -62,9 +79,13 @@ value class NotionDataSourceId(
  * schema at the moment they are shown, and from `HabitEntity.notionPropertyName` when the schema is
  * not to hand.
  *
- * **What is deliberately *not* here.** The database id: the user picks a database during setup, but
- * every subsequent call takes the data source id, so keeping the database id would be a second
- * identity to hold consistent for no reader. The habits' names, colours and start dates: those are
+ * ⭐ **[databaseId] used to be on the "deliberately not here" list, and M7.5 gave it a reader.** The
+ * argument was sound while it lasted: every call past setup takes the data source id, so a database
+ * id would have been a second identity to hold consistent for nobody. Then the manage-habits screen
+ * needed to *link the user to their own database*, which is the one thing the data source id cannot
+ * do. It is stored beside the mapping, not instead of it, and never sent anywhere.
+ *
+ * **What is still deliberately *not* here.** The habits' names, colours and start dates: those are
  * Room's, and one copy of a fact is enough. The sync cursor: that is
  * [com.cristianprincipi.habits.domain.repository.SettingsRepository]'s `lastSyncedAt`, and a
  * mapping that changed when a sync finished would invalidate a cache the user never touched.
@@ -91,6 +112,18 @@ data class NotionPropertyMapping(
      * it can say so.
      */
     val habitPropertyIds: Set<NotionPropertyId>,
+    /**
+     * Where this data source's database lives, for the link out to Notion. `null` until learned.
+     *
+     * **Nullable because it is learned rather than chosen**, and because every mapping saved before
+     * M7.5 has none. The wizard cannot fill it in — it keeps the data source — so the first sync
+     * after a connection is what supplies it (`SyncEngine`), and a screen that wants it says so by
+     * disabling its control rather than by waiting.
+     *
+     * It rides with the mapping so that it dies with the mapping: a disconnect wipes both, and
+     * re-mapping onto a different database cannot leave a link pointing at the old one.
+     */
+    val databaseId: NotionDatabaseId? = null,
 ) {
     init {
         // These are `require`s rather than a nullable factory because every construction site is
@@ -101,6 +134,9 @@ data class NotionPropertyMapping(
         require(habitPropertyIds.none { it.value.isBlank() }) { "A habit property id cannot be blank." }
         require(dayKeyPropertyId !in habitPropertyIds) {
             "The day-key property cannot also be a habit: ${dayKeyPropertyId.value}"
+        }
+        require(databaseId == null || databaseId.value.isNotBlank()) {
+            "A database id, once known, cannot be blank."
         }
     }
 }

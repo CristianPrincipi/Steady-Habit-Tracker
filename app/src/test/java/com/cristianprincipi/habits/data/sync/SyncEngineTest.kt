@@ -7,9 +7,11 @@ import com.cristianprincipi.habits.core.testing.august20
 import com.cristianprincipi.habits.core.testing.connectedWorld
 import com.cristianprincipi.habits.core.testing.dataSourceOf
 import com.cristianprincipi.habits.core.testing.defaultMapping
+import com.cristianprincipi.habits.core.testing.defaultSchema
 import com.cristianprincipi.habits.core.testing.page
 import com.cristianprincipi.habits.core.testing.syncTestClock
 import com.cristianprincipi.habits.data.local.entity.SyncState
+import com.cristianprincipi.habits.data.preferences.NotionDatabaseId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.remote.notion.NotionError
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
@@ -214,6 +216,50 @@ class SyncEngineTest {
 
             assertEquals(SyncOutcome.NotConfigured, world.engine.sync())
             assertTrue(world.habits.current.isEmpty())
+        }
+
+    // ---- where the database lives (M7.5) -------------------------------------------------------
+
+    @Test
+    fun aSyncLearnsWhereTheDatabaseLives() =
+        runTest {
+            // The wizard cannot save this: it keeps a DATA SOURCE id, and a notion.so link needs the
+            // DATABASE id. The schema fetched to validate the mapping carries it, so the first sync
+            // after any connection supplies it — at no extra request.
+            val world = connectedWorld()
+
+            world.engine.sync()
+
+            assertEquals(NotionDatabaseId(PropertyIds.DATABASE), world.mappingStore.read()?.databaseId)
+        }
+
+    @Test
+    fun aBrokenMappingStillLearnsWhereTheDatabaseLives() =
+        runTest {
+            // ⭐ The case the ordering exists for. A mapping breaks when a column is deleted in
+            // Notion, and the fix is to go to Notion — so this is precisely when the user needs the
+            // link. Recording it AFTER the validation would withhold it exactly then.
+            val world = connectedWorld()
+            world.api.schema = dataSourceOf(NotionPropertySchemaDto(PropertyIds.DATE, "Date", "date"))
+
+            val outcome = world.engine.sync()
+
+            assertTrue(outcome is SyncOutcome.MappingBroken)
+            assertEquals(NotionDatabaseId(PropertyIds.DATABASE), world.mappingStore.read()?.databaseId)
+        }
+
+    @Test
+    fun aDataSourceWithNoDatabaseParentIsSyncedAnyway() =
+        runTest {
+            // An externally synced source parents to a data source rather than a database. There is
+            // no link to build, and that is not a reason to refuse to sync the habits.
+            val world = SyncWorld(schema = defaultSchema.copy(parent = null))
+            world.connect()
+
+            val outcome = world.engine.sync()
+
+            assertTrue(outcome is SyncOutcome.Success)
+            assertNull(world.mappingStore.read()?.databaseId)
         }
 
     @Test

@@ -26,6 +26,7 @@ class NotionMappingStoreTest {
     private val readId = NotionPropertyId("ZI%40W")
     private val journalId = NotionPropertyId("Ye%3Aq")
     private val dateId = NotionPropertyId("M%3BBw")
+    private val databaseId = NotionDatabaseId("8f2c41d97b5e40a3ac6e1d9f0b73e254")
 
     private val mapping =
         NotionPropertyMapping(
@@ -33,6 +34,53 @@ class NotionMappingStoreTest {
             dayKeyPropertyId = dateId,
             habitPropertyIds = setOf(readId, journalId),
         )
+
+    @Test
+    fun theDatabaseIdIsLearnedAfterTheMappingWasSaved() =
+        runTest {
+            // The order the app actually does it in: the wizard saves a mapping it cannot fill this
+            // field in on — it holds a data source id — and the first sync supplies it.
+            val store = NotionMappingStore(InMemoryDataStore())
+            store.save(mapping)
+
+            store.rememberDatabaseId(databaseId)
+
+            assertEquals(databaseId, store.read()?.databaseId)
+        }
+
+    @Test
+    fun learningTheDatabaseIdChangesNothingElseAboutTheMapping() =
+        runTest {
+            val store = NotionMappingStore(InMemoryDataStore())
+            store.save(mapping)
+
+            store.rememberDatabaseId(databaseId)
+
+            assertEquals(mapping.copy(databaseId = databaseId), store.read())
+        }
+
+    @Test
+    fun aDatabaseIdIsNotRememberedWhenThereIsNoMappingToPutItOn() =
+        runTest {
+            // A disconnect landing between the schema fetch and this call. Writing anyway would
+            // leave a lone id in a file the app treats as "not configured".
+            val store = NotionMappingStore(InMemoryDataStore())
+
+            store.rememberDatabaseId(databaseId)
+
+            assertNull(store.read())
+        }
+
+    @Test
+    fun aMappingSavedBeforeM75HasNoDatabaseIdAndStillReads() =
+        runTest {
+            // The blob every existing install holds. A field added as required would have sent the
+            // user back through setup to recover a link.
+            val stored = NotionMappingStore(storeHolding(OLD_BLOB)).read()
+
+            assertEquals(NotionDataSourceId("ds-1"), stored?.dataSourceId)
+            assertNull(stored?.databaseId)
+        }
 
     @Test
     fun aFirstRunHasNoMapping() =
@@ -188,4 +236,16 @@ class NotionMappingStoreTest {
         InMemoryDataStore().apply {
             edit { preferences -> preferences[stringPreferencesKey("notion_property_mapping")] = blob }
         }
+
+    private companion object {
+        /**
+         * A mapping as builds before M7.5 wrote it — three keys, no `database_id`.
+         *
+         * Written out rather than produced by the code under test on purpose: a fixture built by
+         * `encode` would change shape the moment `encode` did, which is exactly the regression this
+         * is here to catch.
+         */
+        const val OLD_BLOB =
+            """{"data_source_id":"ds-1","day_key_property_id":"M%3BBw","habit_property_ids":["ZI%40W"]}"""
+    }
 }

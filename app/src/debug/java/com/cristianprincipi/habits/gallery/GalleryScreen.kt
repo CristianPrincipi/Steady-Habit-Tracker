@@ -114,6 +114,7 @@ private fun gallerySections(): List<GalleryEntry> =
         GalleryEntry("SHAPE AND SPACING") { ShapeSection() },
         GalleryEntry("ICONS") { IconSection() },
         GalleryEntry("HABIT ICON") { HabitIconSection() },
+        GalleryEntry("COLOUR SWATCHES") { ColorSwatchSection() },
         GalleryEntry("CHIPS AND NAV") { ChipsAndNavSection() },
         GalleryEntry("WEEK PILLS") { WeekPillsSection() },
         GalleryEntry("DOT GRIDS") { DotGridSection() },

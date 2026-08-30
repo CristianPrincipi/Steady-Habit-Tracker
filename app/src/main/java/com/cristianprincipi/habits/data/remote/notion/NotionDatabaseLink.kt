@@ -39,6 +39,25 @@ object NotionDatabaseLink {
     }
 
     /**
+     * The inverse: a link to a database, from its id.
+     *
+     * ⭐ **The only URL this app ever produces**, and it is produced to be *handed to the browser*,
+     * never fetched — `CLAUDE.md` §8 restricts the hosts the app contacts, and `api.notion.com`
+     * remains the only one. Opening `notion.so` is the user leaving, the same as any link.
+     *
+     * Dashes come off for the same reason [idOrNull] strips them: §16 records that a Notion URL
+     * carries the un-hyphenated form, so this produces what the user would have copied. No `?v=`
+     * view id is appended — we have never seen one, and Notion opens the database's default view
+     * without it.
+     *
+     * ⚠ **Nothing validates that [databaseId] is a database.** It comes from the `parent` of the
+     * schema Notion itself returned, so the only way to get this wrong is for Notion to have lied.
+     */
+    fun urlFor(databaseId: String): String = "$WORKSPACE/${databaseId.replace("-", "")}"
+
+    private const val WORKSPACE = "https://www.notion.so"
+
+    /**
      * A UUIDv4 in either shape: `8-4-4-4-12` hex with the dashes optional.
      *
      * Written out group by group rather than as `[0-9a-fA-F-]{32,36}`, because the loose version

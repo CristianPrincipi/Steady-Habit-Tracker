@@ -124,6 +124,15 @@ object Sizing {
     /** `w-7 h-7` — the rounded chip holding a stat tile's icon. */
     val statTileIcon: Dp = 28.dp
 
+    /**
+     * One colour in the habit's colour picker. **Below the touch minimum**; see [minimumTouchTarget].
+     *
+     * ⚠ **Not from the prototype** — it designs no colour picker at all (`docs/design-spec.md` §7
+     * Q7 is still open on where a habit's colour even comes from). 28dp is the [statTileIcon] step,
+     * chosen so four swatches and their 48dp targets fit a narrow phone in one row.
+     */
+    val colorSwatch: Dp = 28.dp
+
     /** `w-8 h-8` — the habit icon on a Month card. */
     val habitIconSmall: Dp = 32.dp
 

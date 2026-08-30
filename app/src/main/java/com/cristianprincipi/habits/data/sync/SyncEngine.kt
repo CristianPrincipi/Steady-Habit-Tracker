@@ -6,6 +6,7 @@ import com.cristianprincipi.habits.data.local.dao.DayDao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
+import com.cristianprincipi.habits.data.preferences.NotionDatabaseId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.remote.notion.NotionApi
@@ -121,6 +122,15 @@ class SyncEngine
                     is NotionResult.Failure -> return SyncOutcome.Failed(result.error)
                     is NotionResult.Success -> result.value
                 }
+
+            // ⭐ Where the app learns which database it is looking at — free, because this schema was
+            // fetched to validate the mapping and carries its own parent (`NotionDataSourceDto`).
+            //
+            // ⚠ **Before the validation, deliberately.** A broken mapping is exactly when the user
+            // needs the link out to Notion, since fixing it means going there — and the run below
+            // returns at the next branch. Learning where the database is has nothing to do with
+            // whether the columns still match.
+            schema.databaseId?.let { id -> mappingStore.rememberDatabaseId(NotionDatabaseId(id)) }
 
             val valid =
                 when (val check = NotionMappingValidator.validate(mapping, schema)) {

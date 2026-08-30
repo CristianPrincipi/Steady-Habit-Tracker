@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.navigation
 
 import android.content.Context
 import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -49,9 +50,10 @@ import org.junit.runner.RunWith
  * correct in all of them, and the one real defect was in the setup wizard, which is outside this
  * graph (see `NotionSetupShortViewportTest`).
  *
- * `ManageHabits` is not exercised here: it has no entry point until M6/M7.5 build the header's `+`,
- * so there is no way to reach it without reaching past the harness into the `NavController`. It is
- * the same `StubScreen` behind the same `composable<>` entry as the five tabs.
+ * ⭐ **`ManageHabits` IS exercised here now.** That note used to say it could not be — it had no
+ * entry point and could only be reached by reaching past the harness into the `NavController`. M7.5
+ * gave it a Settings row, and it stopped being a `StubScreen` in the same step, so it is exactly the
+ * kind of screen [noDestinationIsPaddedTwice] exists for: a real layout, reached without a tab.
  */
 @RunWith(AndroidJUnit4::class)
 class HabitsShellInsetsTest {
@@ -158,6 +160,32 @@ class HabitsShellInsetsTest {
         assertTrue(
             "${string(R.string.sync_title)} starts at $syncTop, above the $barTop status bar",
             syncTop >= barTop,
+        )
+    }
+
+    @Test
+    fun theHabitListIsPaddedOnceLikeEveryOtherDestination() {
+        // ⭐ The second screen without a bottom bar (M7.5), and the first one built after the rule
+        // was written down. Both halves are asserted in one walk: clear of the status bar, and not a
+        // whole second bar below it — which is what a `windowInsetsPadding` added here would look
+        // like. Its own debug harness needs exactly that padding, because it stands outside the
+        // shell; this screen must not have it, because it stands inside.
+        val barTop = systemBarTop()
+        assertTrue("expected a non-zero top inset to test against, got $barTop", barTop > 0)
+
+        tab(R.string.tab_settings).performClick()
+        composeTestRule
+            .onAllNodesWithText(string(R.string.settings_habits))
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        val top = headingTop(R.string.screen_title_habits)
+        assertTrue("the habit list starts at $top, above the $barTop status bar", top >= barTop)
+        assertTrue(
+            "the habit list starts at $top — a whole extra status bar below the $barTop inset, " +
+                "which is what applying the shell's insets a second time looks like",
+            top < barTop * 2,
         )
     }
 

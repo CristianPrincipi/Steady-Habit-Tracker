@@ -109,11 +109,15 @@ fun HabitsShell(
             composable<Year> { YearScreen() }
             composable<Stats> { StatsScreen() }
             composable<Settings> {
-                SettingsScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
+                SettingsScreen(
+                    onOpenSyncStatus = { navController.navigate(SyncStatus) },
+                    onOpenHabits = { navController.navigate(ManageHabits) },
+                )
             }
             composable<SyncStatus> { SyncStatusScreen() }
-            // ⚠ Declared but unreachable until the header's `+` exists (M6/M7.5). That is a stated
-            // gap, unlike sync status, which the user asked to keep reachable from M5.2 on.
+            // ⭐ Reachable since M7.5, from Settings — the user's choice over a glyph on the Week
+            // header. The `+` this once waited on must never exist: ADR-010 makes a habit a column
+            // in the user's Notion database, so a create button would be a control that cannot work.
             composable<ManageHabits> { ManageHabitsScreen() }
         }
     }

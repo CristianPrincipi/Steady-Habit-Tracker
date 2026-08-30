@@ -54,6 +54,18 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+          The habit list against sample data (M7.5). Same reason and same safety as the Week preview
+          above: the screen shows nothing until a Notion connection has imported habits, and it is
+          in no Figma frame at all — so it has to be looked at before it is shown to anyone.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.ManageHabitsPreviewActivity
+        -->
+        <activity
+            android:name=".gallery.ManageHabitsPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"

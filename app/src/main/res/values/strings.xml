@@ -169,6 +169,16 @@
     <string name="settings_notion_sync">Notion sync</string>
 
     <!--
+      The way into the habit list (M7.5). It is a Settings row rather than a glyph on the Week
+      header — the user's choice: this screen is reference plus one preference, not a per-week
+      action, and M7.8's route back to the mapping links from the same place.
+
+      The design's header `+` is NOT that glyph and never will be: ADR-010 makes a habit a column in
+      the user's Notion database, so there is nothing this app can create.
+    -->
+    <string name="settings_habits">Your habits</string>
+
+    <!--
       Header titles — docs/design-spec.md §1. Deliberately NOT the same strings as the tab labels:
       the design's header reads "Statistics" where the tab reads "Stats", and the Month header will
       eventually read the month's name rather than "Month" at all (M8).
@@ -178,7 +188,12 @@
     <string name="screen_title_year">Year</string>
     <string name="screen_title_stats">Statistics</string>
     <string name="screen_title_settings">Settings</string>
-    <string name="screen_title_habits">Habits</string>
+    <!--
+      "Your habits", not "Habits" — the user's choice on 2026-08-30, over "Habits" and
+      "Habits &amp; colours". The screen appears in no Figma frame (docs/design-spec.md §0), so the
+      name was theirs to settle rather than inherited from M5.3's stub.
+    -->
+    <string name="screen_title_habits">Your habits</string>
 
     <!--
       Scaffolding (M5.3). Every screen showing this is replaced by the milestone that builds it, and
@@ -224,6 +239,33 @@
     <string name="week_empty_failed_title">Your habits haven\'t arrived</string>
     <string name="week_empty_failed_body">The last sync didn\'t finish, so there is nothing to show yet. Notion sync has the reason and a way to try again.</string>
     <string name="week_empty_failed_action">Open Notion sync</string>
+
+    <!--
+      The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
+
+      Two facts do all the work here, and both are ADR-010's: a habit IS a checkbox column in the
+      user's Notion database, and the colour is the one thing that is ours. So the copy says where
+      the name and the history live, and says that the colour does not go there. There is no "add a
+      habit" call to action and there never will be.
+
+      ⚠ What this copy deliberately does NOT promise: that a column added in Notion becomes a
+      habit. It does not — only the saved mapping decides (M7.4/ADR-079), because Weight, Sleep,
+      Area and Progress share the same database. M7.8 builds the route that adopts a new column and
+      owns the sentence that describes it.
+
+      habits_notion_pending is the disabled button's helper. It leads with what happens next rather
+      than with what is missing, which is the wording the user chose for sync_waiting_for_network.
+    -->
+    <string name="habits_body">Each of these is a checkbox column in your Notion database, so its name and its history live there.</string>
+    <string name="habits_colour_body">Tap a colour to change how a habit looks in this app. Colours stay on this phone — Notion never sees them.</string>
+    <string name="habits_open_in_notion">Open in Notion</string>
+    <string name="habits_notion_pending">Available after the next sync.</string>
+    <string name="habits_inactive">Its column was removed from Notion. The history here is kept.</string>
+    <string name="habits_empty">No habits yet. They arrive from Notion with the first sync.</string>
+    <string name="habits_colour_blue">Blue</string>
+    <string name="habits_colour_green">Green</string>
+    <string name="habits_colour_orange">Orange</string>
+    <string name="habits_colour_purple">Purple</string>
 
     <!--
       Undo snackbar (M6.6) — UNDESIGNED. The prototype has no snackbar because it has no click

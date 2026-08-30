@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.cristianprincipi.habits.core.designsystem.component.ColorSwatchRow
 import com.cristianprincipi.habits.core.designsystem.component.DayStatus
 import com.cristianprincipi.habits.core.designsystem.component.EmptyState
 import com.cristianprincipi.habits.core.designsystem.component.HabitChip
@@ -60,6 +61,31 @@ fun HabitIconSection() {
             HabitIcon("", "Meditate", SampleHabits.first().colour())
             HabitIcon("", "walk the dog", SampleHabits.last().colour())
         }
+    }
+}
+
+@Composable
+fun ColorSwatchSection() {
+    // Live rather than static, for the reason this file's header gives: the tests already prove it
+    // draws. What a person needs in the hand is whether the check reads on every one of the four
+    // colours — the M6.11 failure mode, where a marker vanished into the fill behind it.
+    var selected by remember { mutableIntStateOf(0) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+        GalleryLabel("The habit palette — the only edit v1 can make to a habit")
+        ColorSwatchRow(
+            colors = HabitsTheme.colors.habit.assignable,
+            selectedIndex = selected,
+            contentDescriptions = listOf("Blue", "Green", "Orange", "Purple"),
+            onSelect = { selected = it },
+        )
+        GalleryLabel("Nothing selected — a stored colour outside the palette")
+        ColorSwatchRow(
+            colors = HabitsTheme.colors.habit.assignable,
+            selectedIndex = -1,
+            contentDescriptions = listOf("Blue", "Green", "Orange", "Purple"),
+            onSelect = {},
+        )
     }
 }
 

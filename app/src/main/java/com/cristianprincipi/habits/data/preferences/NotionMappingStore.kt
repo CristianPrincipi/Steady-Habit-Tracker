@@ -68,6 +68,26 @@ class NotionMappingStore
         }
 
         /**
+         * Records where the database lives, if that is news.
+         *
+         * ⭐ **A read-modify-write inside one `edit`, not a `read()` then a `save()`.** DataStore
+         * runs the block under its own lock, so the mapping this reads is the one it writes back.
+         * The two-call version would race the user re-mapping in another screen and could put a
+         * whole stale mapping back on top of a fresh one — to record a field neither of them typed.
+         *
+         * **Silent when there is nothing to do**: no mapping stored (a disconnect landed first) or
+         * the same id already held. The common case is every sync after the first, and it must not
+         * cost a file write.
+         */
+        suspend fun rememberDatabaseId(databaseId: NotionDatabaseId) {
+            dataStore.edit { preferences ->
+                val current = preferences[MAPPING]?.let(::decode) ?: return@edit
+                if (current.databaseId == databaseId) return@edit
+                preferences[MAPPING] = encode(current.copy(databaseId = databaseId))
+            }
+        }
+
+        /**
          * Forgets the connection's shape. Part of disconnect (`CLAUDE.md` §3.6), beside the token.
          *
          * Removes one key rather than clearing the file: `lastSyncedAt` lives here too, and the user
@@ -83,6 +103,7 @@ class NotionMappingStore
                     dataSourceId = mapping.dataSourceId.value,
                     dayKeyPropertyId = mapping.dayKeyPropertyId.value,
                     habitPropertyIds = mapping.habitPropertyIds.map(NotionPropertyId::value),
+                    databaseId = mapping.databaseId?.value,
                 ),
             )
 
@@ -107,6 +128,7 @@ class NotionMappingStore
                     dayKeyPropertyId = NotionPropertyId(storedMapping.dayKeyPropertyId),
                     // List -> LinkedHashSet: the stored order is the habit order.
                     habitPropertyIds = storedMapping.habitPropertyIds.map(::NotionPropertyId).toSet(),
+                    databaseId = storedMapping.databaseId?.let(::NotionDatabaseId),
                 )
             }.getOrNull()
 
@@ -121,6 +143,14 @@ class NotionMappingStore
             @SerialName("data_source_id") val dataSourceId: String,
             @SerialName("day_key_property_id") val dayKeyPropertyId: String,
             @SerialName("habit_property_ids") val habitPropertyIds: List<String>,
+            /**
+             * Absent from every mapping written before M7.5, hence the default.
+             *
+             * A missing database id is not a broken mapping — it is one saved by a build that did
+             * not know to ask, and the next sync fills it in. Making it required would send every
+             * existing user back through setup for a field that only draws a link.
+             */
+            @SerialName("database_id") val databaseId: String? = null,
         )
 
         private companion object {
