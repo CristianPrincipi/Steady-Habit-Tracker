@@ -127,6 +127,46 @@ class SyncEngineTest {
             assertTrue(world.completions.current.any { it.habitId == journal.id })
         }
 
+    @Test
+    fun aHabitThatComesBackReusesItsOldRowRatherThanStartingASecondOne() =
+        runTest {
+            // ⭐⭐ **The drift case M7.4 does not name: add-after-remove.** Its three cases are added,
+            // renamed and removed, and all three have tests — but a habit removed from the mapping
+            // and later put back travels a path none of them describe, and it is the one where the
+            // damage would be permanent rather than cosmetic.
+            //
+            // ⚠ **Both ingredients are already guarded, and that is exactly why this is worth
+            // having.** `HabitDaoTest.findAllSeesInactiveHabitsToo` pins that the query sees inactive
+            // rows, and `HabitImporter` reuses `previous?.id` — but nothing composes them, and the
+            // composition is what M7.4's Definition of Done actually promises: "no data loss".
+            //
+            // If the importer ever stopped seeing the inactive row, this habit would be minted a
+            // fresh UUID; the old row would keep every completion, the new one would show an empty
+            // history, and **nothing would look broken** — the habit would simply appear to have
+            // started today. That is the worst shape of failure available here.
+            val world = connectedWorld()
+            world.api.givePage(page("p1", august19, checks = mapOf(PropertyIds.JOURNAL to true)))
+            world.engine.sync()
+            val before = world.habits.current.single { it.notionPropertyId == PropertyIds.JOURNAL }
+            world.habits.setColor(before.id, "PURPLE")
+
+            // Unmapped — the column is still in Notion, the user just stopped calling it a habit.
+            world.mappingStore.save(defaultMapping.copy(habitPropertyIds = setOf(NotionPropertyId(PropertyIds.READ))))
+            world.engine.sync()
+
+            // … and mapped again.
+            world.mappingStore.save(defaultMapping)
+            world.engine.sync()
+
+            // `single` is half the assertion: two rows for one property id would throw here.
+            val after = world.habits.current.single { it.notionPropertyId == PropertyIds.JOURNAL }
+            assertEquals(before.id, after.id)
+            assertTrue(after.isActive)
+            assertEquals(1, world.completions.current.count { it.habitId == after.id })
+            // The local colour is app-only and survives the round trip out of the mapping and back.
+            assertEquals("PURPLE", after.color)
+        }
+
     // ---- start dates ---------------------------------------------------------------------------
 
     @Test
