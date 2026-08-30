@@ -79,7 +79,13 @@ fun WeekHeader(
         // a control that does nothing.
         if (week != null) {
             NavArrows(
-                label = weekRangeLabel(week.weekStart, week.weekEndInclusive, locale),
+                label =
+                    weekRangeLabel(
+                        weekStart = week.weekStart,
+                        weekEndInclusive = week.weekEndInclusive,
+                        locale = locale,
+                        currentYear = week.currentYear,
+                    ),
                 previousContentDescription = stringResource(R.string.week_previous),
                 nextContentDescription = stringResource(R.string.week_next),
                 onPrevious = { onEvent(WeekEvent.PreviousWeekPressed) },
@@ -147,10 +153,26 @@ private fun WeekHeaderEmptyPreview() {
     }
 }
 
+@Preview(name = "Header — another year", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360)
+@Composable
+private fun WeekHeaderOtherYearPreview() {
+    HabitsTheme {
+        WeekHeader(
+            // Paged back past New Year, so the label carries the year it belongs to (M6.11).
+            week = previewWeek(isCurrentWeek = false, weeksBack = 40),
+            onEvent = {},
+            locale = Locale.UK,
+        )
+    }
+}
+
 /** `SampleHabits.referenceDate` rather than a literal, so one date governs every preview in M6. */
-private fun previewWeek(isCurrentWeek: Boolean) =
-    WeekUiState.Content(
-        weekStart = startOfWeek(SampleHabits.referenceDate),
-        habits = emptyList(),
-        isCurrentWeek = isCurrentWeek,
-    )
+private fun previewWeek(
+    isCurrentWeek: Boolean,
+    weeksBack: Long = 0,
+) = WeekUiState.Content(
+    weekStart = startOfWeek(SampleHabits.referenceDate).minusWeeks(weeksBack),
+    habits = emptyList(),
+    isCurrentWeek = isCurrentWeek,
+    currentYear = SampleHabits.referenceDate.year,
+)

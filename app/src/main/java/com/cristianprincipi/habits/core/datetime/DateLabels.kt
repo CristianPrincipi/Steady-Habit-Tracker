@@ -41,13 +41,19 @@ fun weekdayLabels(locale: Locale): List<String> =
  *
  * An en dash, not a hyphen: it is a range, and the design draws one.
  *
- * ### ⚠ No year, and that is the design's call rather than an oversight
+ * ### ⚠ The year appears only when it is not [currentYear] — the user's call at M6.11
  *
- * The prototype shows `Aug 17 – Aug 23` and nothing more. Paging back far enough therefore makes
- * the label ambiguous — which the prototype never had to care about, because its arrows are inert
- * like every other control in it (`docs/design-spec.md` §0). The remedy `Plan.md` M6.4 asks for is
- * a **jump back to this week**, not a year in the label, so that is what the header carries. If a
- * year turns out to be wanted, this is the one function that changes. Flagged at M6.11.
+ * The prototype shows `Aug 17 – Aug 23` and nothing more, and never had to care that paging back
+ * makes that ambiguous, because its arrows are inert like every other control in it
+ * (`docs/design-spec.md` §0). Ours page. M6.4 shipped the design's format and flagged it; the user
+ * chose the hedge over both alternatives — **no year in the common case, a year the moment the week
+ * is not in the current one**, so the label costs nothing on the screen you open every day and stops
+ * lying on the one you reach after eleven taps back.
+ *
+ * **Decided per endpoint, not per range**, which is what makes a week straddling New Year read
+ * correctly: with [currentYear] 2026, `Dec 28 – Jan 3, 2027` says exactly which January that is
+ * while leaving December alone. A range test would have had to pick one year for both ends and be
+ * wrong about the other.
  *
  * ### The pattern is `MMM d`, which is right for English and approximate elsewhere
  *
@@ -55,17 +61,37 @@ fun weekdayLabels(locale: Locale): List<String> =
  * than a pattern — some locales lead with the day, and a few would want the month only once — and
  * `java.time` has no public skeleton API. `MMM d` is honest about being the design's format; the
  * month and day names inside it still come from the locale.
+ *
+ * @param currentYear the year to treat as "now", passed in rather than read: `CLAUDE.md` §6 keeps
+ *   the clock out of everything below the ViewModel, and `WeekUiState.Content.currentYear` carries
+ *   it from the same snapshot that decides which cell is today — so the label and the ring can
+ *   never describe two different days.
  */
 fun weekRangeLabel(
     weekStart: LocalDate,
     weekEndInclusive: LocalDate,
     locale: Locale,
+    currentYear: Int,
 ): String {
-    val format = DateTimeFormatter.ofPattern(WEEK_RANGE_PATTERN, locale)
-    return "${weekStart.format(format)} $EN_DASH ${weekEndInclusive.format(format)}"
+    val start = weekStart.format(weekRangeFormat(weekStart.year, currentYear, locale))
+    val end = weekEndInclusive.format(weekRangeFormat(weekEndInclusive.year, currentYear, locale))
+    return "$start $EN_DASH $end"
 }
 
+private fun weekRangeFormat(
+    year: Int,
+    currentYear: Int,
+    locale: Locale,
+): DateTimeFormatter =
+    DateTimeFormatter.ofPattern(
+        if (year == currentYear) WEEK_RANGE_PATTERN else WEEK_RANGE_PATTERN_WITH_YEAR,
+        locale,
+    )
+
 private const val WEEK_RANGE_PATTERN = "MMM d"
+
+/** `yyyy`, the year of era — not `YYYY`, which is the week-based year and off by one each New Year. */
+private const val WEEK_RANGE_PATTERN_WITH_YEAR = "MMM d, yyyy"
 
 /** `–`, written as an escape so it cannot be mistaken for a hyphen in a diff. */
 private const val EN_DASH = "–"

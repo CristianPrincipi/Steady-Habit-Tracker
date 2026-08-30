@@ -50,7 +50,8 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * @param dayContentDescriptions what a screen reader announces per pill; the pill itself is a
  *   checkbox, so these should name the date, not the state.
  * @param todayIndex which pill gets the ring, or `-1` for a week that does not contain today. The
- *   ring is drawn whether or not that day is complete.
+ *   ring is drawn whether or not that day is complete — see [todayRing], which is what makes that
+ *   true in pixels rather than only in code.
  * @param onToggle fired with the index of a day that can be checked off. **Days that cannot are
  *   disabled rather than silently inert** — see [isCheckable]. A tap on tomorrow does not reach
  *   here, does not reach the domain, and says nothing (`Plan.md` M6.7).
@@ -143,7 +144,11 @@ private fun RowScope.DayPill(
                     ).then(
                         // The design rings today whether or not it is complete, so this is not an
                         // `else` on the fill above.
-                        if (isToday) Modifier.border(Sizing.todayRing, habitColor, shape) else Modifier,
+                        if (isToday) {
+                            Modifier.border(Sizing.todayRing, todayRing(completed, habitColor, checkColor), shape)
+                        } else {
+                            Modifier
+                        },
                     ),
             contentAlignment = Alignment.Center,
         ) {
@@ -159,6 +164,32 @@ private fun RowScope.DayPill(
         }
     }
 }
+
+/**
+ * The colour of the ring that marks today — M6.11, and it is not one colour.
+ *
+ * ### ⚠ Drawn in the habit's colour, the ring disappears the moment the day is done
+ *
+ * `Modifier.border` draws **inside** the pill's bounds; a completed pill is *filled* with the habit
+ * colour, so a habit-coloured ring on top of it is the same colour on the same colour and reads as
+ * nothing at all. That is not an edge case — a habit done every day this week never shows its today
+ * marker once, and the user watched exactly that on a device at M6.11 (four of five habits).
+ *
+ * The prototype does not have this problem and never had to solve it: it rings today with a
+ * `box-shadow`, which sits **outside** the element, so it got a slightly larger pill where Compose
+ * gives a slightly smaller inside edge. Reproducing that here would cost width the row does not
+ * have — seven pills across a card already leaves each one 44.2dp (ADR-069), below the 48dp the
+ * height reaches.
+ *
+ * **So the ring changes colour instead of position:** [completedColor] — the same token the tick
+ * inside it uses, so the two read as one mark — on a completed pill, and [habitColor] on every
+ * other, which is the design's own treatment and the case that always worked.
+ */
+private fun todayRing(
+    completed: Boolean,
+    habitColor: Color,
+    completedColor: Color,
+): Color = if (completed) completedColor else habitColor
 
 /**
  * Whether a tap on this day can do anything — `Plan.md` M6.7.

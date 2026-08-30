@@ -227,7 +227,8 @@
 
     <!--
       Undo snackbar (M6.6) — UNDESIGNED. The prototype has no snackbar because it has no click
-      handlers at all (docs/design-spec.md §0), so this copy is ours and the user judges it (M6.11).
+      handlers at all (docs/design-spec.md §0), so this copy is ours. The user read it at M6.11 and
+      kept the wording; what they changed was WHEN it fires, not what it says.
 
       The sentence names the HABIT and the DAY on purpose. The flipped pill already says that
       something happened; what it cannot say is that the tap landed on Thursday when Wednesday was
@@ -235,11 +236,11 @@
       cards actually invite. Naming both is the whole reason the message exists; "Done" or "Saved"
       would be the nagging-about-a-normal-condition this feature is already at risk of.
 
-      week_day_today fills the same slot as a date, so "today" reads in place of "Wed, Aug 27" on
-      the tap the landing screen gets most often. It is lowercase because it sits mid-sentence.
+      There is no "today" variant any more, and the absence is the decision: M6.11 made a tap on
+      today SILENT, so %2$s is always a real date. A "today" string would be a resource nothing can
+      reach. See WeekViewModel.habitToAnnounce.
     -->
     <string name="week_undo_checked">%1$s checked off for %2$s</string>
     <string name="week_undo_cleared">%1$s cleared for %2$s</string>
-    <string name="week_day_today">today</string>
     <string name="week_undo_action">Undo</string>
 </resources>

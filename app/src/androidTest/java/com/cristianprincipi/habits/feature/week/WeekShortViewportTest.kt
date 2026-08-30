@@ -114,6 +114,7 @@ class WeekShortViewportTest {
                                 weekStart = monday,
                                 habits = manyHabits(habitCount),
                                 isCurrentWeek = true,
+                                currentYear = reference.year,
                             ),
                         onEvent = { event -> events += event },
                         onOpenSyncStatus = {},

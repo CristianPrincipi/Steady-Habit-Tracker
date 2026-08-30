@@ -24,25 +24,32 @@ import java.time.LocalDate
  * below exists: the sentence names the habit and the day, and [undo] is what makes the naming
  * actionable instead of merely informative.
  *
+ * ### ⚠ One of these never describes today — M6.11
+ *
+ * ADR-070 built the snackbar for **every** check-off and put the frequency to the user, because a
+ * sentence on the commonest action in the app runs against their stated taste for persistent state
+ * over toasts. Their answer was to keep the naming and drop the nag: today's column is the one the
+ * ring points at and the one the landing tab exists to make trivial, so it says nothing, while a
+ * back-fill onto any other column still gets named. `WeekViewModel.habitToAnnounce` is where that
+ * is decided and why.
+ *
+ * The consequence here is that [date] is **always** worth printing — there is no longer a case
+ * where the honest word for it is "today".
+ *
  * ⚠ **Undesigned — the prototype has no snackbar because it has no click handlers at all**
- * (`docs/design-spec.md` §0). Built on M2's design system; the user judges it at M6.11, and the
- * question worth putting to them is the frequency rather than the appearance. See ADR-070.
+ * (`docs/design-spec.md` §0). Built on M2's design system. See ADR-070 and ADR-075.
  *
  * @param habitName carried rather than looked up later, so the sentence names the habit **as it was
  *   when the tap happened**. A message is shown once, immediately; re-resolving the name from a
  *   state that has since re-emitted would only introduce a way for the two to disagree.
  * @param completed what the tap *did*, not what to do about it — `true` for a check-off, `false`
  *   for a clear. [undo] is the inverse and is derived, so the two cannot drift apart.
- * @param isToday whether [date] is today, decided by the ViewModel's injected clock. The screen
- *   cannot work this out for itself: `CLAUDE.md` §6 keeps `now` out of composables, and the whole
- *   point of injecting a clock is that a test can move it.
  */
 data class WeekMessage(
     val habitId: HabitId,
     val habitName: String,
     val date: LocalDate,
     val completed: Boolean,
-    val isToday: Boolean,
 ) {
     /**
      * The event that puts it back.

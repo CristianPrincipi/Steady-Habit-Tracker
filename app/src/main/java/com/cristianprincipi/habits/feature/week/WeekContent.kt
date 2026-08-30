@@ -281,6 +281,7 @@ private fun WeekContentPreview() {
                     weekStart = startOfWeek(SampleHabits.referenceDate),
                     habits = SampleHabits.weekPeriods(),
                     isCurrentWeek = true,
+                    currentYear = SampleHabits.referenceDate.year,
                 ),
             onEvent = {},
             onOpenSyncStatus = {},

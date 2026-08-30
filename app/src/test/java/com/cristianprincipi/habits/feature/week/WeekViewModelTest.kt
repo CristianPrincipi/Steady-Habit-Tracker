@@ -577,10 +577,40 @@ class WeekViewModelTest {
     // --- what a check-off says (M6.6) ---------------------------------------------------------
 
     @Test
-    fun aCheckOffNamesTheHabitAndTheDayItChanged() =
+    fun aCheckOffOnAnotherDayNamesTheHabitAndTheDayItChanged() =
         runTest {
             // ⭐ The whole point of the message. A filled pill says *something* happened; only this
             // can say it was Read, on this day — the two things a mis-tap gets wrong.
+            //
+            // ⚠ **On a day that is not today**, since M6.11 — see [aTapOnTodaySaysNothingAtAll].
+            val (_, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.messages.test {
+                viewModel.onEvent(
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = thisMonday, completed = true),
+                )
+
+                assertEquals(
+                    WeekMessage(
+                        habitId = HabitId("read"),
+                        habitName = "Read",
+                        date = thisMonday,
+                        completed = true,
+                    ),
+                    awaitItem(),
+                )
+            }
+        }
+
+    @Test
+    fun aTapOnTodaySaysNothingAtAll() =
+        runTest {
+            // ⭐⭐ **The user's M6.11 call, and the one that could have deleted this feature.**
+            // ADR-070 fired on every write, which put a sentence on the commonest action in the app
+            // and ran against the user's stated taste for persistent state over toasts. What
+            // survives is the identification, spent only where a mis-aim is plausible: today is the
+            // column the ring points at and the tap the landing tab exists for, so it is silent.
             val (_, viewModel) = viewModel()
             content(viewModel)
 
@@ -589,47 +619,57 @@ class WeekViewModelTest {
                     WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
                 )
 
-                assertEquals(
-                    WeekMessage(
-                        habitId = HabitId("read"),
-                        habitName = "Read",
-                        date = today,
-                        completed = true,
-                        isToday = true,
-                    ),
-                    awaitItem(),
-                )
+                expectNoEvents()
             }
         }
 
     @Test
-    fun aPastDayIsAnnouncedByItsDateRatherThanAsToday() =
+    fun aSilentTapOnTodayStillWritesTheTick() =
         runTest {
-            // `isToday` is the only clock-dependent field on the message, and it decides whether the
-            // screen says "today" or "Mon, Aug 24". The Monday of the shown week is genuinely past.
+            // ⚠ **Silence is not refusal**, and this is what stops the two being confused. The
+            // local write is unconditional (`CLAUDE.md` §1); M6.11 removed a sentence, not a
+            // check-off, and today is the tap this whole screen exists to make cheap.
+            val (repository, viewModel) = viewModel()
+            content(viewModel)
+
+            viewModel.onEvent(
+                WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+            )
+
+            assertEquals(
+                listOf(FakeHabitRepository.Write(HabitId("read"), today, true)),
+                repository.writes,
+            )
+        }
+
+    @Test
+    fun theDayThatGoesQuietMovesAtMidnight() =
+        runTest {
+            // ⭐ The rule is "today", not a date decided once. This date was silent while it *was*
+            // today; after the rollover the same tap is back-fill and gets named. That is why the
+            // clock is read when the finger lands rather than remembered from construction.
             val (_, viewModel) = viewModel()
             content(viewModel)
+            rollOverTo(today.plusDays(1))
 
             viewModel.messages.test {
                 viewModel.onEvent(
-                    WeekEvent.DayToggled(habitId = HabitId("run"), date = thisMonday, completed = true),
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
                 )
 
-                val message = awaitItem()
-                assertEquals(thisMonday, message.date)
-                assertFalse(message.isToday)
+                assertEquals(today, awaitItem().date)
             }
         }
 
     @Test
     fun unTickingIsAnnouncedAsWhatItDid() =
         runTest {
-            val (_, viewModel) = viewModel(completions = listOf(Completion(HabitId("read"), today)))
+            val (_, viewModel) = viewModel(completions = listOf(Completion(HabitId("read"), thisMonday)))
             content(viewModel)
 
             viewModel.messages.test {
                 viewModel.onEvent(
-                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = false),
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = thisMonday, completed = false),
                 )
 
                 // `completed` is what the tap DID, so the screen picks the "cleared" sentence.
@@ -645,12 +685,12 @@ class WeekViewModelTest {
 
             viewModel.messages.test {
                 viewModel.onEvent(
-                    WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+                    WeekEvent.DayToggled(habitId = HabitId("read"), date = thisMonday, completed = true),
                 )
 
                 // Derived from the message rather than stored beside it, so the two cannot disagree.
                 assertEquals(
-                    WeekEvent.UndoPressed(habitId = HabitId("read"), date = today, completed = false),
+                    WeekEvent.UndoPressed(habitId = HabitId("read"), date = thisMonday, completed = false),
                     awaitItem().undo,
                 )
             }
@@ -683,10 +723,10 @@ class WeekViewModelTest {
             content(viewModel)
 
             viewModel.onEvent(
-                WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+                WeekEvent.DayToggled(habitId = HabitId("read"), date = thisMonday, completed = true),
             )
             viewModel.onEvent(
-                WeekEvent.DayToggled(habitId = HabitId("run"), date = today, completed = true),
+                WeekEvent.DayToggled(habitId = HabitId("run"), date = thisMonday, completed = true),
             )
 
             viewModel.messages.test {
@@ -710,12 +750,12 @@ class WeekViewModelTest {
             // test for the other case, where it does not.
             content(viewModel)
 
-            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = today, completed = true))
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = thisMonday, completed = true))
 
             viewModel.messages.test { assertEquals(read.name, awaitItem().habitName) }
 
-            // The screen is rebuilt. "Read checked off for today" must not be announced twice for
-            // one tap the user made before the rotation.
+            // The screen is rebuilt. "Read checked off for Mon, Aug 24" must not be announced twice
+            // for one tap the user made before the rotation.
             viewModel.messages.test { expectNoEvents() }
         }
 
@@ -728,8 +768,8 @@ class WeekViewModelTest {
             val (_, viewModel) = viewModel()
             content(viewModel)
 
-            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = today, completed = true))
-            viewModel.onEvent(WeekEvent.DayToggled(habitId = run.id, date = today, completed = true))
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = thisMonday, completed = true))
+            viewModel.onEvent(WeekEvent.DayToggled(habitId = run.id, date = thisMonday, completed = true))
             viewModel.onEvent(
                 WeekEvent.DayToggled(habitId = read.id, date = today.minusDays(1), completed = true),
             )
@@ -808,14 +848,17 @@ class WeekViewModelTest {
             // pins that the write happens anyway if that lookup ever comes back empty: `CLAUDE.md` §1
             // makes the local write unconditional, and losing a sentence must never lose a tick.
             // Nothing has subscribed here, so `uiState` is still Loading and the lookup finds nothing.
+            //
+            // ⚠ **Not today's date**, or this would pass on M6.11's silence rather than on the
+            // empty lookup it claims to test — and would keep passing if the lookup ever broke.
             val (repository, viewModel) = viewModel()
 
             viewModel.onEvent(
-                WeekEvent.DayToggled(habitId = HabitId("read"), date = today, completed = true),
+                WeekEvent.DayToggled(habitId = HabitId("read"), date = thisMonday, completed = true),
             )
 
             assertEquals(
-                listOf(FakeHabitRepository.Write(HabitId("read"), today, true)),
+                listOf(FakeHabitRepository.Write(HabitId("read"), thisMonday, true)),
                 repository.writes,
             )
             viewModel.messages.test { expectNoEvents() }

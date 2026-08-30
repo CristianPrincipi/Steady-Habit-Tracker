@@ -60,12 +60,15 @@ import javax.inject.Inject
  * ⚠ **The week follows only if the user has not paged away** — see [anchor], where `null` carries
  * exactly that.
  *
- * ### A check-off says what it changed, once
+ * ### A check-off on another day says what it changed, once
  *
- * Every accepted write sends a [WeekMessage] down [messages], which `WeekScreen` turns into the
- * undo snackbar (M6.6). It is a `Channel` rather than a field on [WeekUiState] because it must be
- * said exactly once — `CLAUDE.md` §6's rule for one-shots, and the reason a rotation does not
- * re-announce a tap the user made a minute ago.
+ * An accepted write sends a [WeekMessage] down [messages], which `WeekScreen` turns into the undo
+ * snackbar (M6.6). It is a `Channel` rather than a field on [WeekUiState] because it must be said
+ * exactly once — `CLAUDE.md` §6's rule for one-shots, and the reason a rotation does not re-announce
+ * a tap the user made a minute ago.
+ *
+ * ⚠ **A tap on today says nothing at all** — the user's M6.11 call, replacing M6.6's "every write".
+ * See [habitToAnnounce] for why the split falls there and not somewhere else.
  *
  * ### ⚠ A refused write still says nothing
  *
@@ -219,10 +222,11 @@ class WeekViewModel
         fun onEvent(event: WeekEvent) {
             when (event) {
                 is WeekEvent.DayToggled -> {
-                    // Resolved here, synchronously, rather than inside the coroutine: this is the
-                    // habit as it was named when the finger landed. By the time the write returns,
-                    // the state has already re-emitted.
-                    val habitName = habitName(event.habitId)
+                    // Both resolved here, synchronously, rather than inside the coroutine: this is
+                    // the habit as it was named and the day as it stood when the finger landed. By
+                    // the time the write returns, the state has already re-emitted — and a clock
+                    // read after a suspend point could answer a different day than the tap did.
+                    val announce = habitToAnnounce(event.habitId, event.date)
                     viewModelScope.launch {
                         // The write lands in Room and returns; Notion finds out when the sync engine
                         // next runs (`CLAUDE.md` §1). The `false` means "that day has not happened
@@ -233,14 +237,13 @@ class WeekViewModel
                                 date = event.date,
                                 completed = event.completed,
                             )
-                        if (written && habitName != null) {
+                        if (written && announce != null) {
                             _messages.trySend(
                                 WeekMessage(
                                     habitId = event.habitId,
-                                    habitName = habitName,
+                                    habitName = announce,
                                     date = event.date,
                                     completed = event.completed,
-                                    isToday = event.date == LocalDate.now(clock),
                                 ),
                             )
                         }
@@ -308,20 +311,41 @@ class WeekViewModel
         private fun currentWeek(): LocalDate = startOfWeek(LocalDate.now(clock))
 
         /**
-         * The name to put in a [WeekMessage], or `null` if there is nothing to name.
+         * The name to put in a [WeekMessage], or `null` when this tap should say nothing.
          *
-         * ⚠ **`null` in practice means the tap came from a card that is not on screen**, which no
-         * gesture can produce: the pill lives inside the very row this reads back. Returning null
-         * rather than inventing a placeholder keeps the impossible case honest — the write still
-         * happens, and what is skipped is only the sentence about it. Naming a habit "Habit" would
-         * be worse than saying nothing, because the whole value of the message is the name.
+         * ### ⚠ Today is silent — the user's call at M6.11
+         *
+         * A sentence on **every** check-off is a sentence on the commonest action in the app, and
+         * `MEMORY`/ADR-070 §2 had it against the user's stated taste for persistent state over
+         * toasts. What the snackbar buys is *identification*, and identification is worth paying for
+         * exactly where a mis-aim is plausible: today's column is the one the ring points at and the
+         * one the landing tab exists to make trivial, while a tap on any other column is deliberate
+         * back-fill onto an unmarked pill, where the neighbouring **column** and the neighbouring
+         * **row** are the two mistakes this screen invites (`WeekMessage`).
+         *
+         * So the rule is a date comparison, not a new concept: **the day the user is obviously
+         * aiming at gets no sentence; any other day gets named.**
+         *
+         * ⚠ **Read at tap time, before the write suspends.** A clock read after `toggleCompletion`
+         * returns could answer a different day than the tap did, which would make the app go quiet
+         * on a back-fill or start talking about today — rare, and impossible to reproduce.
+         *
+         * ⚠ **`null` also means the tap came from a card that is not on screen**, which no gesture
+         * can produce: the pill lives inside the very row this reads back. Returning null rather
+         * than inventing a placeholder keeps the impossible case honest — the write still happens,
+         * and what is skipped is only the sentence about it. Naming a habit "Habit" would be worse
+         * than saying nothing, because the whole value of the message is the name.
          */
-        private fun habitName(id: HabitId): String? =
+        private fun habitToAnnounce(
+            id: HabitId,
+            date: LocalDate,
+        ): String? =
             (uiState.value as? WeekUiState.Content)
                 ?.habits
                 ?.firstOrNull { period -> period.habit.id == id }
                 ?.habit
                 ?.name
+                ?.takeIf { date != LocalDate.now(clock) }
 
         private fun stateFor(
             visible: Snapshot,
@@ -338,10 +362,11 @@ class WeekViewModel
                 WeekUiState.Content(
                     weekStart = visible.week,
                     habits = habits,
-                    // Against the snapshot's own day, not the clock's. Reading the clock here would
-                    // reintroduce exactly the bug M6.9 removes: a second, later answer to "what day
-                    // is it" inside a value built from an earlier one.
+                    // Both against the snapshot's own day, not the clock's. Reading the clock here
+                    // would reintroduce exactly the bug M6.9 removes: a second, later answer to
+                    // "what day is it" inside a value built from an earlier one.
                     isCurrentWeek = visible.week == startOfWeek(visible.today),
+                    currentYear = visible.today.year,
                 )
             }
 

@@ -52,7 +52,7 @@ class DateLabelsTest {
     @Test
     fun aWeekRangeReadsAsTheDesignDraws() {
         // `docs/design-spec.md` §3 draws exactly this.
-        val label = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.UK)
+        val label = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.UK, THIS_YEAR)
 
         assertEquals("Aug 17 – Aug 23", label)
     }
@@ -61,7 +61,7 @@ class DateLabelsTest {
     fun theSeparatorIsAnEnDashRatherThanAHyphen() {
         // It is a range. The two characters are near-identical in a diff, which is why the constant
         // is written as an escape and why this is asserted rather than eyeballed.
-        val label = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.UK)
+        val label = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.UK, THIS_YEAR)
 
         assertTrue("expected an en dash in $label", label.contains('–'))
         assertTrue("expected no hyphen in $label", !label.contains('-'))
@@ -75,33 +75,61 @@ class DateLabelsTest {
         // British English abbreviates September to four letters where American English uses three,
         // so `Locale.US` would render "Sep 6" here. It is a small demonstration of why these names
         // come from `java.time` rather than from seven `<string>`s somebody maintains by hand.
-        val label = weekRangeLabel(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6), Locale.UK)
+        val label = weekRangeLabel(LocalDate.of(2026, 8, 31), LocalDate.of(2026, 9, 6), Locale.UK, THIS_YEAR)
 
         assertEquals("Aug 31 – Sept 6", label)
     }
 
     @Test
     fun theMonthAbbreviationItselfFollowsTheLocale() {
-        val british = weekRangeLabel(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7), Locale.UK)
-        val american = weekRangeLabel(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7), Locale.US)
+        val british = weekRangeLabel(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7), Locale.UK, THIS_YEAR)
+        val american = weekRangeLabel(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 7), Locale.US, THIS_YEAR)
 
         assertTrue("expected the British four-letter form in $british", british.contains("Sept"))
         assertTrue("expected the American three-letter form in $american", american.contains("Sep 1"))
     }
 
     @Test
-    fun aWeekCrossingAYearStillReadsSensibly() {
-        // ⚠ No year, per the design — so this is ambiguous by construction, and the remedy is the
-        // header's "This week" jump rather than a longer label. Pinned so the choice is deliberate
-        // and a future session can see what changing it would change.
-        val label = weekRangeLabel(LocalDate.of(2026, 12, 28), LocalDate.of(2027, 1, 3), Locale.UK)
+    fun theYearIsAbsentForAWeekInsideTheCurrentOne() {
+        // The common case, and the design's format: the label you see every day is unchanged by
+        // M6.11. Anything else would put a year on the landing screen 51 weeks out of 52.
+        val label = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.UK, THIS_YEAR)
 
-        assertEquals("Dec 28 – Jan 3", label)
+        assertTrue("expected no year in $label", !label.contains("2026"))
+    }
+
+    @Test
+    fun aWeekCrossingIntoTheNextYearNamesOnlyTheEndThatLeavesIt() {
+        // ⚠ The reason the decision is per endpoint rather than per range. December is still this
+        // year and says nothing; January is not, and says which January it is. A range-level test
+        // would have had to pick one year for both ends and be wrong about the other.
+        val label = weekRangeLabel(LocalDate.of(2026, 12, 28), LocalDate.of(2027, 1, 3), Locale.UK, THIS_YEAR)
+
+        assertEquals("Dec 28 – Jan 3, 2027", label)
+    }
+
+    @Test
+    fun aWeekWhollyInAnotherYearNamesItAtBothEnds() {
+        // Page back far enough and "Aug 17 – Aug 23" could be any year — the ambiguity M6.11 was
+        // asked about. Both ends carry it because both are equally in the wrong year.
+        val label = weekRangeLabel(LocalDate.of(2024, 8, 19), LocalDate.of(2024, 8, 25), Locale.UK, THIS_YEAR)
+
+        assertEquals("Aug 19, 2024 – Aug 25, 2024", label)
+    }
+
+    @Test
+    fun theYearIsTheYearOfEraRatherThanTheWeekBasedOne() {
+        // ⚠ `yyyy` not `YYYY`. The week-based year rolls at the ISO week boundary, so a `YYYY`
+        // pattern would print 2027 for a 31 December that belongs to 2026 — wrong on exactly the
+        // one week of the year this feature exists to disambiguate.
+        val label = weekRangeLabel(LocalDate.of(2024, 12, 30), LocalDate.of(2025, 1, 5), Locale.UK, THIS_YEAR)
+
+        assertEquals("Dec 30, 2024 – Jan 5, 2025", label)
     }
 
     @Test
     fun theMonthNameFollowsTheLocale() {
-        val french = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.FRANCE)
+        val french = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.FRANCE, THIS_YEAR)
 
         assertTrue("expected a French month in $french", french.contains("août"))
     }
@@ -126,3 +154,13 @@ class DateLabelsTest {
         assertEquals(false, uk == france)
     }
 }
+
+/**
+ * The year the suite treats as "now" — `SampleHabits.referenceDate` is in it, and so is every date
+ * these tests call ordinary.
+ *
+ * Passed in rather than read from a clock because `weekRangeLabel` takes it as a parameter, which is
+ * the whole point: `CLAUDE.md` §6 keeps `now` out of everything below the ViewModel, so the one
+ * place that knows what year it is stays the one place a test has to control.
+ */
+private const val THIS_YEAR = 2026

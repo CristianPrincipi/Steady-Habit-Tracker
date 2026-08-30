@@ -4,12 +4,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -18,6 +24,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -144,9 +151,74 @@ class ComponentRenderTest {
         composeTestRule.runOnIdle { assertEquals(emptyList<Int>(), toggled) }
     }
 
+    // --- the today ring has to be visible, not merely drawn (M6.11) ---------------------------
+
+    @Test
+    fun theTodayRingChangesACompletedPillsPixels() {
+        // ⭐⭐ **The M6.11 defect, as a regression guard.** The ring was drawn in the habit's colour
+        // inside a pill *filled* with that colour, so on a completed day it was the same colour on
+        // the same colour and rendered as nothing at all — a habit done every day never showed its
+        // today marker once. Every existing assertion passed throughout: the modifier was applied,
+        // the semantics were right, the size was right. Only the pixels were wrong.
+        //
+        // So this asserts the property the bug broke rather than a colour value: **ringing a pill
+        // must change what it looks like.** It cannot be satisfied by drawing an invisible border,
+        // and it does not break when the palette is retuned.
+        assertRingIsVisible(days = List(DAYS_IN_WEEK) { DayStatus.COMPLETED }, case = "completed")
+    }
+
+    @Test
+    fun theTodayRingStillChangesAnIncompletePillsPixels() {
+        // The case that always worked, pinned so the fix for the other one cannot quietly cost it.
+        assertRingIsVisible(days = List(DAYS_IN_WEEK) { DayStatus.INCOMPLETE }, case = "incomplete")
+    }
+
+    /** Renders [days] with and without a ring on the same pill and fails if they look identical. */
+    private fun assertRingIsVisible(
+        days: List<DayStatus>,
+        case: String,
+    ) {
+        var ringed by mutableStateOf(true)
+        composeTestRule.setContent {
+            HabitsTheme {
+                TestWeekCard(
+                    days = days,
+                    todayIndex = if (ringed) TODAY_INDEX else NO_TODAY,
+                    onToggle = {},
+                )
+            }
+        }
+
+        val withRing = composeTestRule.onNodeWithContentDescription(FRIDAY).captureToImage()
+        ringed = false
+        composeTestRule.waitForIdle()
+        val withoutRing = composeTestRule.onNodeWithContentDescription(FRIDAY).captureToImage()
+
+        assertTrue(
+            "the today ring made no visible difference to a $case pill",
+            differs(withRing, withoutRing),
+        )
+    }
+
+    private fun differs(
+        a: ImageBitmap,
+        b: ImageBitmap,
+    ): Boolean {
+        val left = a.toPixelMap()
+        val right = b.toPixelMap()
+        if (left.width != right.width || left.height != right.height) return true
+        for (y in 0 until left.height) {
+            for (x in 0 until left.width) {
+                if (left[x, y] != right[x, y]) return true
+            }
+        }
+        return false
+    }
+
     @androidx.compose.runtime.Composable
     private fun TestWeekCard(
         days: List<DayStatus> = previewWeek(),
+        todayIndex: Int = TODAY_INDEX,
         onToggle: (Int) -> Unit,
     ) {
         WeekHabitCard(
@@ -157,7 +229,7 @@ class ComponentRenderTest {
             days = days,
             dayLabels = PREVIEW_DAY_LABELS,
             dayContentDescriptions = PREVIEW_DAY_LABELS,
-            todayIndex = TODAY_INDEX,
+            todayIndex = todayIndex,
             onToggleDay = onToggle,
             modifier = Modifier.width(GALLERY_WIDTH),
         )
@@ -172,6 +244,10 @@ class ComponentRenderTest {
         const val FRIDAY = "Fri"
         const val WEDNESDAY_INDEX = 2
         const val TODAY_INDEX = 4
+        const val DAYS_IN_WEEK = 7
+
+        /** `WeekPills`' own contract for "this week does not contain today". */
+        const val NO_TODAY = -1
 
         /** One pill per `DayStatus`, in enum order, then two fillers to make up the seven. */
         val EVERY_STATUS =

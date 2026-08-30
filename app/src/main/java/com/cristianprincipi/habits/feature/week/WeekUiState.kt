@@ -90,15 +90,19 @@ sealed interface WeekUiState {
      *   already carries them, cell by cell, and a second copy is a second thing to get out of step.
      * @param habits one entry per active habit, each already holding its seven cells and where
      *   today sits among them. The heavy lifting is `GetHabitsForWeek`'s; this state is a courier.
-     * @param isCurrentWeek whether [weekStart] is the week containing today. **The one field here
-     *   that needs a clock**, which is precisely why it is a field: `CLAUDE.md` §6 keeps `now` out
-     *   of composables, so the ViewModel answers the question and the UI reads a boolean. M6.4's
+     * @param isCurrentWeek whether [weekStart] is the week containing today. One of the two fields
+     *   here that need a clock, which is precisely why they are fields: `CLAUDE.md` §6 keeps `now`
+     *   out of composables, so the ViewModel answers the question and the UI reads a value. M6.4's
      *   "jump to this week" affordance is `!isCurrentWeek` and nothing more.
+     * @param currentYear the year today falls in, for the sub-nav label — `weekRangeLabel` prints a
+     *   year only for an endpoint that is not in it (M6.11). Read from the **same snapshot** as
+     *   [isCurrentWeek], so the label and the today ring can never describe different days.
      */
     data class Content(
         val weekStart: LocalDate,
         val habits: List<HabitPeriod>,
         val isCurrentWeek: Boolean,
+        val currentYear: Int,
     ) : WeekUiState {
         /**
          * The last day of the shown week, for the `‹ Aug 17 – Aug 23 ›` label (M6.4).

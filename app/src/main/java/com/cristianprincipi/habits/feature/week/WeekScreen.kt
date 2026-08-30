@@ -129,12 +129,13 @@ private fun UndoSnackbars(
     val locale = rememberCurrentLocale()
     val checked = stringResource(R.string.week_undo_checked)
     val cleared = stringResource(R.string.week_undo_cleared)
-    val today = stringResource(R.string.week_day_today)
     val undo = stringResource(R.string.week_undo_action)
 
     LaunchedEffect(messages, hostState, locale) {
         messages.collectLatest { message ->
-            val day = if (message.isToday) today else shortDateLabel(message.date, locale)
+            // Always a date, never "today": M6.11 made a tap on today silent, so no message that
+            // reaches here describes it. `WeekMessage` carries the reasoning.
+            val day = shortDateLabel(message.date, locale)
             val result =
                 hostState.showSnackbar(
                     message = (if (message.completed) checked else cleared).format(message.habitName, day),

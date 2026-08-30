@@ -126,6 +126,7 @@ private fun SampleWeek(empty: WeekEmptyReason?) {
             weekStart = weekStart,
             habits = SampleHabits.weekPeriods(reference, completed, weekStart),
             isCurrentWeek = weekStart == thisWeek,
+            currentYear = reference.year,
         )
     val state = empty?.let(WeekUiState::Empty) ?: content
 
@@ -138,15 +139,18 @@ private fun SampleWeek(empty: WeekEmptyReason?) {
                     val row = Completion(event.habitId, event.date)
                     completed = if (event.completed) completed + row else completed - row
                     val habit = content.habits.first { period -> period.habit.id == event.habitId }.habit
-                    messages.trySend(
-                        WeekMessage(
-                            habitId = event.habitId,
-                            habitName = habit.name,
-                            date = event.date,
-                            completed = event.completed,
-                            isToday = event.date == reference,
-                        ),
-                    )
+                    // ⚠ Silent for today, exactly as `WeekViewModel.habitToAnnounce` is (M6.11).
+                    // This activity is only worth looking at while it behaves like the real thing.
+                    if (event.date != reference) {
+                        messages.trySend(
+                            WeekMessage(
+                                habitId = event.habitId,
+                                habitName = habit.name,
+                                date = event.date,
+                                completed = event.completed,
+                            ),
+                        )
+                    }
                 }
 
                 // Silent, like the ViewModel's — announcing an undo offers to undo the undo.

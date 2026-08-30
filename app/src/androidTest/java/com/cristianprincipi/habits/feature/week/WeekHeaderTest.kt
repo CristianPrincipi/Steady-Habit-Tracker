@@ -49,6 +49,7 @@ class WeekHeaderTest {
                             weekStart = monday,
                             habits = emptyList(),
                             isCurrentWeek = isCurrentWeek,
+                            currentYear = monday.year,
                         ),
                     onEvent = { event -> events += event },
                     locale = Locale.UK,

@@ -93,6 +93,7 @@ class WeekTouchTargetTest {
                             weekStart = monday,
                             habits = SampleHabits.weekPeriods(reference, history),
                             isCurrentWeek = true,
+                            currentYear = reference.year,
                         ),
                     onEvent = { event -> events += event },
                     onOpenSyncStatus = {},

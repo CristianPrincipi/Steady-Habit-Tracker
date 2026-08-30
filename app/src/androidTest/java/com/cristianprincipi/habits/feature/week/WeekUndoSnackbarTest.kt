@@ -73,6 +73,7 @@ class WeekUndoSnackbarTest {
                             weekStart = monday,
                             habits = SampleHabits.weekPeriods(),
                             isCurrentWeek = true,
+                            currentYear = reference.year,
                         ),
                     messages = messages,
                     onEvent = { event -> events += event },
@@ -85,7 +86,6 @@ class WeekUndoSnackbarTest {
     private fun send(
         date: LocalDate = monday,
         completed: Boolean = true,
-        isToday: Boolean = false,
         habit: Habit = subject,
     ) = messages.tryEmit(
         WeekMessage(
@@ -93,7 +93,6 @@ class WeekUndoSnackbarTest {
             habitName = habit.name,
             date = date,
             completed = completed,
-            isToday = isToday,
         ),
     )
 
@@ -131,18 +130,12 @@ class WeekUndoSnackbarTest {
         awaitText(string(R.string.week_undo_cleared).format(subject.name, expectedDay(monday)))
     }
 
-    @Test
-    fun todayIsNamedAsTodayRatherThanByItsDate() {
-        showWeek()
-
-        // The tap the landing screen gets most often. `isToday` is decided by the ViewModel's
-        // injected clock, which is why it arrives on the message instead of being worked out here.
-        send(date = reference, completed = true, isToday = true)
-
-        awaitText(
-            string(R.string.week_undo_checked).format(subject.name, string(R.string.week_day_today)),
-        )
-    }
+    // ⚠ **There is no "today" case here any more, and the absence is deliberate.** M6.11 made a tap
+    // on today silent, so no message this screen can receive describes today and there is no
+    // relative wording left to assert. The rule that produces the silence is the ViewModel's and is
+    // pinned there — `WeekViewModelTest.aTapOnTodaySaysNothingAtAll`, with its companion proving the
+    // tick is still written. Adding a case here for a message production cannot emit would be the
+    // unreachable branch ADR-067 argues against.
 
     // --- what pressing it does ----------------------------------------------------------------
 

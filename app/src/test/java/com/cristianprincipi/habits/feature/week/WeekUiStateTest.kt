@@ -16,7 +16,12 @@ import java.time.temporal.ChronoUnit
  */
 class WeekUiStateTest {
     private fun content(weekStart: LocalDate) =
-        WeekUiState.Content(weekStart = weekStart, habits = emptyList(), isCurrentWeek = false)
+        WeekUiState.Content(
+            weekStart = weekStart,
+            habits = emptyList(),
+            isCurrentWeek = false,
+            currentYear = weekStart.year,
+        )
 
     @Test
     fun theWeekEndsSixDaysAfterItStarts() {
