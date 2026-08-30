@@ -226,6 +226,31 @@ class HabitRepositoryImplTest {
         }
 
     @Test
+    fun aColourChangeReachesAScreenThatIsAlreadyWatching() =
+        runTest {
+            // ⭐⭐ **The property an app-local presentation store exists for**, and the one thing
+            // about colour that nothing asserted. Every other colour test writes and *then* reads,
+            // which proves the value was stored — not that anything looking at it finds out.
+            //
+            // What this pins is the case M7.5 will produce: the manage-habits screen sets a colour
+            // while the Week cards behind it are still subscribed, and they have to repaint without
+            // the user navigating away and back. A `distinctUntilChanged` keyed on anything that
+            // ignores colour — an id list, say, which is the obvious thing to "optimise" this flow
+            // with — would swallow the change and leave the app looking broken in a way no
+            // read-back test could see.
+            val habitDao = FakeHabitDao(listOf(habit(id = "a", name = "Read", sortOrder = 0)))
+            val repository = repository(habitDao = habitDao)
+
+            repository.observeHabits(includeInactive = false).test {
+                assertEquals(HabitColor.BLUE, awaitItem().single().color)
+
+                repository.setColor(habitId = HabitId("a"), color = HabitColor.PURPLE)
+
+                assertEquals(HabitColor.PURPLE, awaitItem().single().color)
+            }
+        }
+
+    @Test
     fun setColorTouchesNoDayAndOwesNotionNothing() =
         runTest {
             // Colour is app-local: the user's database has no colour property, so this edit can
