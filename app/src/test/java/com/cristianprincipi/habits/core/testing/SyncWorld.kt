@@ -105,6 +105,23 @@ fun page(
         inTrash = gone,
     )
 
+/**
+ * The same page, re-keyed with names this app has never seen. **The ids inside are untouched.**
+ *
+ * Notion keys a page's `properties` by **name**, and the user can rename a column at any moment
+ * without telling us — so between one pull and the next, every key on every page can change while
+ * nothing about the data does. `NotionPageDto.rawProperty` exists precisely because of that, and
+ * [page] alone cannot catch a regression in it: its keys always come from the schema the test also
+ * gave the app, so a name-keyed lookup would still find them and pass.
+ *
+ * These keys match nothing at all. Anything that reads by key gets `null` and the test fails
+ * loudly, which is what a mistake here would deserve: reading a renamed habit as an absent one
+ * looks exactly like a deleted habit, and the recovery is "restore history" rather than "re-map"
+ * (`docs/notion-schema.md` §6.1).
+ */
+fun NotionPageDto.keyedByUnknownNames(): NotionPageDto =
+    copy(properties = properties.values.mapIndexed { index, value -> "renamed-in-notion-$index" to value }.toMap())
+
 /** The user's `Weight` column: real data on the same page, which no sync may touch (§7). */
 fun NotionPageDto.withWeight(weight: Double): NotionPageDto =
     copy(

@@ -5,6 +5,7 @@ import com.cristianprincipi.habits.core.testing.august19
 import com.cristianprincipi.habits.core.testing.august20
 import com.cristianprincipi.habits.core.testing.connectedWorld
 import com.cristianprincipi.habits.core.testing.dateProperty
+import com.cristianprincipi.habits.core.testing.keyedByUnknownNames
 import com.cristianprincipi.habits.core.testing.page
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
 import kotlinx.coroutines.test.runTest
@@ -53,6 +54,55 @@ class SyncPullTest {
                 world.days.current.keys,
             )
             assertEquals(3, world.completions.current.size)
+        }
+
+    @Test
+    fun aPageWhosePropertyNamesAllChangedIsStillReadCorrectly() =
+        runTest {
+            // ⭐⭐ **M7.1's claim, at engine level: the habit set is keyed on the property ID and
+            // nothing in the pull path may touch a name.** `NotionMappingValidatorTest` pins the
+            // validator on its own, and `SyncPushTest` pins that the write payload is keyed by id —
+            // but between them sat the whole read path, tested only against pages whose keys came
+            // from the schema the test had also handed the app. A name-keyed lookup would have
+            // found those keys and passed.
+            //
+            // Here every key is a stranger, exactly as it would be the day after the user renames
+            // their columns and before any schema fetch. The ids are unchanged, so the correct
+            // answer is unchanged, and the day still lands with `Read` ticked and `Journal` not.
+            val world = connectedWorld()
+            world.api.givePage(
+                page(
+                    "p1",
+                    august19,
+                    checks = mapOf(PropertyIds.READ to true, PropertyIds.JOURNAL to false),
+                ).keyedByUnknownNames(),
+            )
+
+            val outcome = world.engine.sync()
+
+            assertEquals(SyncOutcome.Success(daysPulled = 1, daysPushed = 0), outcome)
+            val read = world.habits.current.single { it.notionPropertyId == PropertyIds.READ }
+            val journal = world.habits.current.single { it.notionPropertyId == PropertyIds.JOURNAL }
+            assertEquals(
+                listOf(read.id),
+                world.completions.current.map { it.habitId },
+            )
+            assertTrue(world.completions.current.none { it.habitId == journal.id })
+        }
+
+    @Test
+    fun aDayIsStillIdentifiedWhenItsDateColumnHasBeenRenamed() =
+        runTest {
+            // The same trap one property along, and the more dangerous half: the day key is what
+            // says *which day a page is*. Reading it by name would make every page in a renamed
+            // database undatable — not a wrong day, no day at all — so the pull would import
+            // nothing and report success.
+            val world = connectedWorld()
+            world.api.givePage(page("p1", august19, checks = mapOf(PropertyIds.READ to true)).keyedByUnknownNames())
+
+            world.engine.sync()
+
+            assertEquals(setOf(august19.toEpochDay()), world.days.current.keys)
         }
 
     @Test
