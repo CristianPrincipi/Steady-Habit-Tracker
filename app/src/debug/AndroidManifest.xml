@@ -80,6 +80,21 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+          The Month view against sample data (M8.1). Same reason and same safety as the Week
+          preview: the screen shows nothing until a Notion connection has imported habits, and its
+          arrows are worth watching move rather than reasoning about — a month steps and the grid
+          reshapes under it.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.MonthPreviewActivity
+            (add the extra `state` with value `pending` or `failed` for the empty screen; a double
+            dash cannot appear in an XML comment, so see the activity's KDoc for the whole command)
+        -->
+        <activity
+            android:name=".gallery.MonthPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"

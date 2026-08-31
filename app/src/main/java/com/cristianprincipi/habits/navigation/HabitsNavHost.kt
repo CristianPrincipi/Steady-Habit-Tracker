@@ -101,7 +101,9 @@ fun HabitsShell(
         ) {
             // ⚠ Every screen below except sync status is an M5.3 stub — a title and a line saying
             // so. The milestone that builds each one replaces it in place; see each screen's KDoc.
-            composable<Month> { MonthScreen() }
+            composable<Month> {
+                MonthScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
+            }
             // Week reaches sync status for one reason: a first import that failed leaves the
             // landing tab empty and the wizard that would have said so already gone (ADR-072).
             composable<Week> {

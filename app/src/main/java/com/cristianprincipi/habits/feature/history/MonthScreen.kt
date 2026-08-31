@@ -1,22 +1,33 @@
 package com.cristianprincipi.habits.feature.history
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import com.cristianprincipi.habits.R
-import com.cristianprincipi.habits.core.ui.StubScreen
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * Monthly completion density for every habit at once — `docs/design-spec.md` §2.
  *
- * ⚠ **A stub. M8 builds this**, together with [YearScreen]: a two-column grid of habit cards, each
- * carrying a `MonthDotGrid`. The grid itself already exists in `core/designsystem/component` because
- * Stats renders the year one too (`docs/design-spec.md` §5.2).
+ * Stateful half only: it collects the state and forwards events. Everything drawn is in
+ * [MonthContent], which is the split `CLAUDE.md` §6 asks for and the reason that file's previews can
+ * exist without a ViewModel.
  *
- * **The title will not stay "Month".** The design's header shows the month *name* — "August" — which
- * needs the clock abstraction rather than a constant, so it waits for the real screen.
+ * There is no snackbar and no one-shot channel, unlike `WeekScreen`: nothing on this screen writes
+ * anything, so there is nothing to confirm and nothing to undo.
  */
 @Composable
-fun MonthScreen(modifier: Modifier = Modifier) {
-    StubScreen(title = stringResource(R.string.screen_title_month), modifier = modifier)
+fun MonthScreen(
+    onOpenSyncStatus: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: MonthViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    MonthContent(
+        state = state,
+        onEvent = viewModel::onEvent,
+        onOpenSyncStatus = onOpenSyncStatus,
+        modifier = modifier,
+    )
 }

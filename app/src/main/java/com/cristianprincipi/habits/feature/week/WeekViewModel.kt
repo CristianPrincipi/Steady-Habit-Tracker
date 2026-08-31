@@ -5,9 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.datetime.startOfWeek
+import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
+import com.cristianprincipi.habits.core.ui.observeEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
-import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
@@ -19,10 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -163,27 +162,11 @@ class WeekViewModel
          * looking at nothing, owed the *"clear, human-readable message with a retry affordance"* the
          * same rule asks for.
          *
-         * ### ⚠ Three deliberate narrowings
-         *
-         * **`WaitingForNetwork` is not a failure.** §1 makes offline the normal case, and
-         * WorkManager releases a held run by itself; asking the user to act on it is the nagging
-         * M4.16 removed from the sync-status card.
-         *
-         * **`distinctUntilChanged` keeps `Content` still.** Without it a sync starting and finishing
-         * would re-run [stateFor] and rebuild a whole `Content` for a field it does not carry.
-         *
-         * **`onStart` means this can never delay a render.** `combine` waits for every source, so a
-         * sync status that was slow to arrive would hold the app's landing screen at `Loading` with
-         * habits sitting in Room — exactly the gating §1 forbids. The seed is the calm answer, and
-         * `distinctUntilChanged` drops it again if the real first value agrees.
+         * The collapsing itself, and the three narrowings inside it, moved to
+         * [observeEmptyReason] in M8.1 — the Month view needs the identical derivation, and two
+         * copies of "which sentence does an empty habit screen say" is exactly the pair that drifts.
          */
-        private val emptyReason: Flow<WeekEmptyReason> =
-            syncStatus
-                .observeStatus()
-                .map { status ->
-                    if (status is SyncStatus.Failed) WeekEmptyReason.SyncFailed else WeekEmptyReason.SyncPending
-                }.onStart { emit(WeekEmptyReason.SyncPending) }
-                .distinctUntilChanged()
+        private val emptyReason: Flow<HabitsEmptyReason> = syncStatus.observeEmptyReason()
 
         val uiState: StateFlow<WeekUiState> =
             combine(visibleWeek, emptyReason) { (visible, habits), reason ->
@@ -350,7 +333,7 @@ class WeekViewModel
         private fun stateFor(
             visible: Snapshot,
             habits: List<HabitPeriod>,
-            reason: WeekEmptyReason,
+            reason: HabitsEmptyReason,
         ): WeekUiState =
             if (habits.isEmpty()) {
                 // Week-independent: habits are global, so an empty list here means there are no

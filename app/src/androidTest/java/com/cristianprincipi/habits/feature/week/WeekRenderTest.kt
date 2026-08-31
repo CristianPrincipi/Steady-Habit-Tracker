@@ -20,6 +20,7 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
@@ -260,7 +261,7 @@ class WeekRenderTest {
         val done = subjectPeriod().cells.count { cell -> cell is PeriodCell.Day && cell.state == DayState.COMPLETED }
 
         composeTestRule
-            .onNodeWithText(string(R.string.week_card_summary).format(done, DAYS_IN_A_WEEK))
+            .onNodeWithText(string(R.string.habit_card_summary).format(done, DAYS_IN_A_WEEK))
             .assertIsDisplayed()
     }
 
@@ -286,14 +287,14 @@ class WeekRenderTest {
         }
 
         composeTestRule
-            .onAllNodesWithText(string(R.string.week_card_summary).format(0, DAYS_IN_A_WEEK))
+            .onAllNodesWithText(string(R.string.habit_card_summary).format(0, DAYS_IN_A_WEEK))
             .onFirst()
             .assertIsDisplayed()
     }
 
     // --- the empty state (M6.8) ---------------------------------------------------------------
 
-    private fun showEmpty(reason: WeekEmptyReason) {
+    private fun showEmpty(reason: HabitsEmptyReason) {
         composeTestRule.setContent {
             HabitsTheme {
                 WeekContent(
@@ -309,11 +310,11 @@ class WeekRenderTest {
     fun theEmptyStateOffersNoWayToCreateAHabit() {
         // ⚠ The copy is undesigned and M6.11 judges it. What is pinned here is the shape neither
         // sentence may lose: ADR-010 means there is no habit creation to offer, in either case.
-        showEmpty(WeekEmptyReason.SyncFailed)
+        showEmpty(HabitsEmptyReason.SyncFailed)
 
         // The only action on the failed screen goes to sync status. If a "New habit" button ever
         // appears beside it, this fails — which is the point.
-        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_action)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.habits_empty_failed_action)).assertIsDisplayed()
         composeTestRule.onAllNodes(hasClickAction()).assertCountEquals(1)
     }
 
@@ -322,19 +323,19 @@ class WeekRenderTest {
         // ⭐ Every first-run user sees this, because the setup wizard saves the mapping — which
         // flips the shell's gate — before it awaits the first sync (ADR-072). A control here would
         // be asking someone to fix a sync that is already working.
-        showEmpty(WeekEmptyReason.SyncPending)
+        showEmpty(HabitsEmptyReason.SyncPending)
 
-        composeTestRule.onNodeWithText(string(R.string.week_empty_pending_title)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(string(R.string.week_empty_pending_body)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.habits_empty_pending_title)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.habits_empty_pending_body)).assertIsDisplayed()
         composeTestRule.onAllNodes(hasClickAction()).assertCountEquals(0)
     }
 
     @Test
     fun aFailedImportLeadsToTheOneScreenThatCanExplainIt() {
-        showEmpty(WeekEmptyReason.SyncFailed)
+        showEmpty(HabitsEmptyReason.SyncFailed)
 
-        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_title)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(string(R.string.week_empty_failed_action)).performClick()
+        composeTestRule.onNodeWithText(string(R.string.habits_empty_failed_title)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.habits_empty_failed_action)).performClick()
 
         assertEquals(1, syncStatusOpened)
     }
@@ -343,7 +344,7 @@ class WeekRenderTest {
     fun neitherEmptyScreenDrawsTheWeekSubNav() {
         // The header takes `state as? Content`, so paging must not appear over a screen with no
         // week to page — `WeekUiState.Empty` carries none, deliberately.
-        showEmpty(WeekEmptyReason.SyncPending)
+        showEmpty(HabitsEmptyReason.SyncPending)
 
         composeTestRule.onNodeWithContentDescription(string(R.string.week_previous)).assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription(string(R.string.week_next)).assertDoesNotExist()

@@ -7,6 +7,7 @@ import com.cristianprincipi.habits.core.testing.FakeTodayFlow
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
 import com.cristianprincipi.habits.core.testing.MutableClock
 import com.cristianprincipi.habits.core.testing.testHabit
+import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
@@ -253,7 +254,7 @@ class WeekViewModelTest {
             val (_, viewModel) = viewModel(habits = emptyList())
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncPending), awaitItem())
             }
         }
 
@@ -268,7 +269,7 @@ class WeekViewModelTest {
             repeat(3) { viewModel.onEvent(WeekEvent.PreviousWeekPressed) }
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncPending), awaitItem())
             }
         }
 
@@ -281,7 +282,7 @@ class WeekViewModelTest {
             status.value = SyncStatus.Syncing(lastSyncedAt = null)
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncPending), awaitItem())
             }
         }
 
@@ -295,7 +296,7 @@ class WeekViewModelTest {
             status.value = SyncStatus.WaitingForNetwork(lastSyncedAt = null)
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncPending), awaitItem())
             }
         }
 
@@ -306,7 +307,7 @@ class WeekViewModelTest {
             status.value = SyncStatus.Failed(SyncFailure.DatabaseNotShared, lastSyncedAt = null)
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncFailed), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncFailed), awaitItem())
             }
         }
 
@@ -320,11 +321,11 @@ class WeekViewModelTest {
             val (_, viewModel) = viewModel(habits = emptyList())
 
             viewModel.uiState.test {
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncPending), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncPending), awaitItem())
 
                 status.value = SyncStatus.Failed(SyncFailure.Offline, lastSyncedAt = null)
 
-                assertEquals(WeekUiState.Empty(WeekEmptyReason.SyncFailed), awaitItem())
+                assertEquals(WeekUiState.Empty(HabitsEmptyReason.SyncFailed), awaitItem())
             }
         }
 

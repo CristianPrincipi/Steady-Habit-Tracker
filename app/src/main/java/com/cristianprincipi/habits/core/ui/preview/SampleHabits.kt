@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.core.ui.preview
 
+import com.cristianprincipi.habits.core.datetime.monthWindow
 import com.cristianprincipi.habits.core.datetime.weekWindow
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.Habit
@@ -9,6 +10,7 @@ import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.usecase.buildPeriod
 import com.cristianprincipi.habits.domain.usecase.byHabit
 import java.time.LocalDate
+import java.time.YearMonth
 
 /**
  * A realistic habit set with realistic history, for `@Preview`s and for tests.
@@ -35,6 +37,9 @@ import java.time.LocalDate
 object SampleHabits {
     /** The day the sample history ends on, when a caller does not name one. */
     val referenceDate: LocalDate = LocalDate.of(2026, 8, 22)
+
+    /** The month [referenceDate] falls in — August 2026, which starts on a Saturday. */
+    val referenceMonth: YearMonth = YearMonth.from(referenceDate)
 
     /**
      * The five habits, in the order the Notion schema lists them.
@@ -89,6 +94,30 @@ object SampleHabits {
         // [reference] stays "today". Paging away from today is exactly the case where conflating
         // them hides a bug — every day would go on looking present-tense.
         val window = weekWindow(weekOf)
+        val byHabit = completions.toList().byHabit()
+        return habits(reference).map { habit ->
+            buildPeriod(
+                habit = habit,
+                window = window,
+                completedDates = byHabit[habit.id].orEmpty(),
+                today = reference,
+            )
+        }
+    }
+
+    /**
+     * The same five habits over one calendar month, for the Month view's previews and tests.
+     *
+     * Defaults to the month [referenceDate] falls in, so the preview shows a month with a real
+     * "today" in it: completed days behind it, `FUTURE` cells after it, and `Quote`, `Diet` and
+     * `Focus` all starting partway through their own history.
+     */
+    fun monthPeriods(
+        reference: LocalDate = referenceDate,
+        completions: Collection<Completion> = completions(reference),
+        monthOf: YearMonth = YearMonth.from(reference),
+    ): List<HabitPeriod> {
+        val window = monthWindow(monthOf)
         val byHabit = completions.toList().byHabit()
         return habits(reference).map { habit ->
             buildPeriod(

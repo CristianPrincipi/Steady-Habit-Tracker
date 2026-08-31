@@ -14,12 +14,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.monthName
 import com.cristianprincipi.habits.gallery.ShellHarnessActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.YearMonth
+import java.util.Locale
 
 /**
  * M5.5 — the insets rule, asserted rather than looked at.
@@ -65,9 +68,16 @@ class HabitsShellInsetsTest {
     private fun tab(id: Int) = composeTestRule.onAllNodesWithText(string(id)).filterToOne(isSelectable())
 
     /** A screen's own title, as opposed to the tab of the same name — the tab is the selectable one. */
-    private fun headingTop(id: Int): Float =
+    private fun headingTop(id: Int): Float = headingTop(string(id))
+
+    /**
+     * The same, for a title that is not a resource.
+     *
+     * Month's is `monthName()` of whatever month it is (M8.1), so there is nothing to look up.
+     */
+    private fun headingTop(text: String): Float =
         composeTestRule
-            .onAllNodesWithText(string(id))
+            .onAllNodesWithText(text)
             .filterToOne(hasNoClickAction())
             .fetchSemanticsNode()
             .positionInRoot
@@ -96,11 +106,16 @@ class HabitsShellInsetsTest {
     /**
      * The tabs still drawn by `StubScreen`, paired with the title each draws.
      *
-     * ⚠ **Week is no longer among them.** M6.3 replaced its stub with the real `WeekContent`, which
+     * ⚠ **Neither Week nor Month is among them any more.** M6.3 replaced Week's stub with the real
+     * `WeekContent` and M8.1 replaced Month's with `MonthContent`, which
      * has no header at all — `docs/design-spec.md` §1 puts the title in the screen header and
      * **M6.4** builds it. Week is covered by [everyDestinationClearsTheStatusBar] through its empty
      * state instead, and it is deliberately out of [stubsAllStartAtTheSameHeight], because that
      * test's zero-tolerance comparison only means anything between screens that share a layout.
+     *
+     * ⚠ **Month left this list for a second reason**: its title is not a string resource at all.
+     * The design takes it from the paged-to month (`monthName`), so it is computed below rather than
+     * looked up — which is also why [everyTabAndItsFirstText] carries text and not ids.
      *
      * **This list shrinks as M6–M8 replace the stubs, and that is fine.** What it protects is the
      * exact regression M5.2 produced — one screen padding itself on top of the shell — and it keeps
@@ -109,7 +124,6 @@ class HabitsShellInsetsTest {
      */
     private val stubTabsAndHeadings =
         listOf(
-            R.string.tab_month to R.string.screen_title_month,
             R.string.tab_year to R.string.screen_title_year,
             R.string.tab_stats to R.string.screen_title_stats,
             R.string.tab_settings to R.string.screen_title_settings,
@@ -130,8 +144,11 @@ class HabitsShellInsetsTest {
      * [noDestinationIsPaddedTwice] duly failed on a perfectly correct screen, having measured that
      * emoji's line height as if it were padding.
      */
-    private val everyTabAndItsFirstText =
-        stubTabsAndHeadings + (R.string.tab_week to R.string.screen_title_week)
+    private val everyTabAndItsFirstText: List<Pair<Int, String>>
+        get() =
+            stubTabsAndHeadings.map { (tab, heading) -> tab to string(heading) } +
+                (R.string.tab_week to string(R.string.screen_title_week)) +
+                (R.string.tab_month to monthName(YearMonth.now(), Locale.getDefault()))
 
     @Test
     fun everyDestinationClearsTheStatusBar() {
@@ -145,10 +162,7 @@ class HabitsShellInsetsTest {
             composeTestRule.waitForIdle()
 
             val top = headingTop(heading)
-            assertTrue(
-                "${string(heading)} starts at $top, above the $barTop status bar",
-                top >= barTop,
-            )
+            assertTrue("$heading starts at $top, above the $barTop status bar", top >= barTop)
         }
 
         // And the one destination without a bottom bar, which is where the double-padding bug was.
@@ -264,7 +278,7 @@ class HabitsShellInsetsTest {
 
             val top = headingTop(anchor)
             assertTrue(
-                "${string(anchor)} starts at $top — a whole extra status bar below the $barTop " +
+                "$anchor starts at $top — a whole extra status bar below the $barTop " +
                     "inset, which is what applying the shell's insets a second time looks like",
                 top < barTop * 2,
             )

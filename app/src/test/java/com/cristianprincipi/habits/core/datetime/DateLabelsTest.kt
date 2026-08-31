@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.YearMonth
 import java.util.Locale
 
 /**
@@ -132,6 +133,52 @@ class DateLabelsTest {
         val french = weekRangeLabel(LocalDate.of(2026, 8, 17), LocalDate.of(2026, 8, 23), Locale.FRANCE, THIS_YEAR)
 
         assertTrue("expected a French month in $french", french.contains("août"))
+    }
+
+    // --- month labels (M8.1) -------------------------------------------------------------------
+
+    @Test
+    fun aMonthLabelReadsAsTheDesignDraws() {
+        assertEquals("August 2026", monthLabel(YearMonth.of(2026, 8), Locale.UK))
+    }
+
+    @Test
+    fun theYearIsAlwaysPrintedOnAMonthLabelEvenForTheCurrentOne() {
+        // ⭐ The one place this deliberately differs from weekRangeLabel, which drops the current
+        // year. Twelve steps back from August lands on another August, and a label that hid the
+        // year would make the arrow that got there look broken.
+        val here = monthLabel(YearMonth.of(THIS_YEAR, 8), Locale.UK)
+        val aYearBack = monthLabel(YearMonth.of(THIS_YEAR - 1, 8), Locale.UK)
+
+        assertTrue("expected the current year in $here", here.contains(THIS_YEAR.toString()))
+        assertEquals(false, here == aYearBack)
+    }
+
+    @Test
+    fun aMonthNameIsTheNameAloneWithNoYear() {
+        val name = monthName(YearMonth.of(2026, 8), Locale.UK)
+
+        assertEquals("August", name)
+        assertTrue("expected no year in $name", !name.contains("2026"))
+    }
+
+    @Test
+    fun aMonthLabelFollowsTheLocale() {
+        val uk = monthLabel(YearMonth.of(2026, 8), Locale.UK)
+        val france = monthLabel(YearMonth.of(2026, 8), Locale.FRANCE)
+
+        assertTrue("expected a French month name in $france", france.contains("août"))
+        assertEquals(false, uk == france)
+    }
+
+    @Test
+    fun aMonthStandsOnItsOwnRatherThanInsideADate() {
+        // ⚠ LLLL, not MMMM. English cannot tell the two apart, and Czech can: a heading wants the
+        // nominative "leden", while the form used inside a date is "ledna". A month name used as a
+        // page title in the genitive is a bug that only ever appears on someone else's phone.
+        val czech = Locale.forLanguageTag("cs")
+
+        assertEquals("leden 2026", monthLabel(YearMonth.of(2026, 1), czech))
     }
 
     @Test

@@ -21,9 +21,9 @@ import androidx.compose.ui.Modifier
 import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Completion
-import com.cristianprincipi.habits.feature.week.WeekEmptyReason
 import com.cristianprincipi.habits.feature.week.WeekEvent
 import com.cristianprincipi.habits.feature.week.WeekMessage
 import com.cristianprincipi.habits.feature.week.WeekUiState
@@ -90,10 +90,10 @@ class WeekPreviewActivity : ComponentActivity() {
 private const val EXTRA_STATE = "state"
 
 /** `null` for the sample week; a reason to render [WeekUiState.Empty] instead. */
-private fun emptyReasonFrom(extra: String?): WeekEmptyReason? =
+private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
     when (extra) {
-        "pending" -> WeekEmptyReason.SyncPending
-        "failed" -> WeekEmptyReason.SyncFailed
+        "pending" -> HabitsEmptyReason.SyncPending
+        "failed" -> HabitsEmptyReason.SyncFailed
         else -> null
     }
 
@@ -110,7 +110,7 @@ private fun emptyReasonFrom(extra: String?): WeekEmptyReason? =
  * emulator would be showing behaviour the app does not have.
  */
 @Composable
-private fun SampleWeek(empty: WeekEmptyReason?) {
+private fun SampleWeek(empty: HabitsEmptyReason?) {
     val reference = SampleHabits.referenceDate
     val thisWeek = startOfWeek(reference)
 

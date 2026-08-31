@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.core.datetime
 
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.format.TextStyle
@@ -95,6 +96,37 @@ private const val WEEK_RANGE_PATTERN_WITH_YEAR = "MMM d, yyyy"
 
 /** `–`, written as an escape so it cannot be mistaken for a hyphen in a diff. */
 private const val EN_DASH = "–"
+
+/**
+ * `August 2026` — the Month view's sub-nav label (`docs/design-spec.md` §2).
+ *
+ * The year is always printed, unlike [weekRangeLabel], which drops it for the current one. A week
+ * label is two dates wide and gains nothing from a year the user is already in; a month label is one
+ * word, and a `‹ August ›` that pages twelve times back to an identical `‹ August ›` would be a
+ * control whose effect is invisible.
+ *
+ * `LLLL` rather than `MMMM`: this is a month standing on its own, not one inside a date. English
+ * cannot tell the two apart, but the locales that inflect their month names can, and reading
+ * `августа 2026` — the genitive, as in "the 3rd of August" — where a heading belongs is the kind of
+ * bug that only ever shows up on someone else's phone.
+ */
+fun monthLabel(
+    month: YearMonth,
+    locale: Locale,
+): String = month.format(DateTimeFormatter.ofPattern(MONTH_LABEL_PATTERN, locale))
+
+/**
+ * `August` — the Month view's header title, which the prototype takes from the *paged-to* month
+ * rather than from today (`docs/design-spec.md` §1, `App.tsx` `headerTitles.month`).
+ */
+fun monthName(
+    month: YearMonth,
+    locale: Locale,
+): String = month.format(DateTimeFormatter.ofPattern(MONTH_NAME_PATTERN, locale))
+
+private const val MONTH_LABEL_PATTERN = "LLLL yyyy"
+
+private const val MONTH_NAME_PATTERN = "LLLL"
 
 /**
  * A date as a screen reader should hear it — "Monday, 24 August 2026".

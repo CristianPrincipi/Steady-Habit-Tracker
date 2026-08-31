@@ -193,10 +193,10 @@
 
     <!--
       Header titles — docs/design-spec.md §1. Deliberately NOT the same strings as the tab labels:
-      the design's header reads "Statistics" where the tab reads "Stats", and the Month header will
-      eventually read the month's name rather than "Month" at all (M8).
+      the design's header reads "Statistics" where the tab reads "Stats", and the Month header
+      reads the month's NAME rather than "Month" at all - so there is no screen_title_month here.
+      M8.1 built that from App.tsx's headerTitles.month, and it is monthName(), not a resource.
     -->
-    <string name="screen_title_month">Month</string>
     <string name="screen_title_week">Week</string>
     <string name="screen_title_year">Year</string>
     <string name="screen_title_stats">Statistics</string>
@@ -218,20 +218,35 @@
     <!--
       Week view (M6.3) — docs/design-spec.md §3.
 
-      week_card_summary fills the card's second line. The design calls that line a "description"
+      habit_card_summary fills the card's second line. The design calls that line a "description"
       and shows "15 min practice", but ADR-027 deleted Habit.description: Notion has nowhere to
       keep one and ADR-010 makes the habit set read-only, so there is no source for it. The slot is
       drawn unconditionally, so leaving it blank holds the space and reads like a failed load —
-      this puts the most useful fact a week view has there instead. UNDESIGNED; see Plan.md M6.11.
+      this puts the most useful fact the card has there instead. UNDESIGNED; see Plan.md M6.11.
 
-      week_empty_* is M6.8's, and the copy is UNDESIGNED - the user judges it at M6.11 with the
-      rest of M6's wording.
+      ⚠ It is habit_card_summary rather than week_card_summary because M8's Month card uses the
+      same line for the same reason. Its denominator is the days in the month, not seven.
+    -->
+    <string name="habit_card_summary">%1$d of %2$d</string>
+    <string name="week_previous">Previous week</string>
+    <string name="week_next">Next week</string>
+    <string name="week_this_week">This week</string>
+    <string name="week_pill_description">%1$s, %2$s</string>
+
+    <!--
+      The empty state EVERY habit screen shows — M6.8's copy, judged by the user at M6.11, and
+      moved out of the Week strings in M8.1 when the Month view turned out to need the identical
+      thing. The copy is UNDESIGNED.
+
+      ⚠ It is habits_empty_* rather than week_empty_* because habits are GLOBAL: they are the
+      checkbox columns of one Notion database (ADR-010), so a screen is empty when the app has no
+      habits, never when a particular week or month has none. Week, Month and Year empty together.
 
       There is no "add a habit" call to action and there never will be: ADR-010 removed habit
       creation, because a habit IS a checkbox property in the user's Notion database.
 
-      Two sentences, not one, and the reason is ADR-072. The only thing that empties this screen is
-      an import that has not landed - and every first-run user sees it, because the setup wizard
+      Two sentences, not one, and the reason is ADR-072. The only thing that empties these screens
+      is an import that has not landed - and every first-run user sees it, because the setup wizard
       saves the mapping (which flips the shell's gate) BEFORE it awaits the first sync. If that sync
       then fails, the wizard holding the error is already off screen, so this is the only surface
       left to say so. Hence: on its way, or it failed and here is where to look.
@@ -240,18 +255,24 @@
       sentence and the retry that belong to it; a second rendering here would be two places to keep
       in step.
     -->
-    <string name="week_card_summary">%1$d of %2$d</string>
-    <string name="week_previous">Previous week</string>
-    <string name="week_next">Next week</string>
-    <string name="week_this_week">This week</string>
-    <string name="week_pill_description">%1$s, %2$s</string>
-    <string name="week_empty_pending_emoji">☑️</string>
-    <string name="week_empty_pending_title">Your habits are on their way</string>
-    <string name="week_empty_pending_body">They come from the checkbox columns in your Notion database, and appear here as soon as the first sync finishes.</string>
-    <string name="week_empty_failed_emoji">⚠️</string>
-    <string name="week_empty_failed_title">Your habits haven\'t arrived</string>
-    <string name="week_empty_failed_body">The last sync didn\'t finish, so there is nothing to show yet. Notion sync has the reason and a way to try again.</string>
-    <string name="week_empty_failed_action">Open Notion sync</string>
+    <string name="habits_empty_pending_emoji">☑️</string>
+    <string name="habits_empty_pending_title">Your habits are on their way</string>
+    <string name="habits_empty_pending_body">They come from the checkbox columns in your Notion database, and appear here as soon as the first sync finishes.</string>
+    <string name="habits_empty_failed_emoji">⚠️</string>
+    <string name="habits_empty_failed_title">Your habits haven\'t arrived</string>
+    <string name="habits_empty_failed_body">The last sync didn\'t finish, so there is nothing to show yet. Notion sync has the reason and a way to try again.</string>
+    <string name="habits_empty_failed_action">Open Notion sync</string>
+
+    <!--
+      Month view (M8.1) - docs/design-spec.md §2.
+
+      The sub-nav's two arrow labels, and nothing else: the title is the month's own name and the
+      label between the arrows is "August 2026", both formatted from a YearMonth rather than stored
+      as strings. There is no "this month" - the design gives this sub-nav no jump-to-today
+      affordance, unlike week_this_week, which exists because Week is the landing tab.
+    -->
+    <string name="month_previous">Previous month</string>
+    <string name="month_next">Next month</string>
 
     <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.

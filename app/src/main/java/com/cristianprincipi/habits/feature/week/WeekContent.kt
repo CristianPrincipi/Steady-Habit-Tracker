@@ -1,7 +1,6 @@
 package com.cristianprincipi.habits.feature.week
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -17,10 +15,11 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.datetime.weekdayLabels
-import com.cristianprincipi.habits.core.designsystem.component.EmptyState
 import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
+import com.cristianprincipi.habits.core.ui.HabitsEmpty
+import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
 import com.cristianprincipi.habits.core.ui.resolve
@@ -79,7 +78,7 @@ fun WeekContent(
             }
 
             is WeekUiState.Empty -> {
-                WeekEmpty(
+                HabitsEmpty(
                     reason = state.reason,
                     onOpenSyncStatus = onOpenSyncStatus,
                     modifier = Modifier.fillMaxSize(),
@@ -136,7 +135,7 @@ private fun WeekHabitRow(
     WeekHabitCard(
         name = period.habit.name,
         description =
-            stringResource(R.string.week_card_summary, period.completedCount, period.cells.size),
+            stringResource(R.string.habit_card_summary, period.completedCount, period.cells.size),
         emoji = period.habit.emoji,
         habitColor = period.habit.color.resolve(),
         days = period.cells.map { cell -> cell.toDayStatus() },
@@ -214,61 +213,6 @@ private fun HabitPeriod.spokenLabels(locale: Locale): List<String> {
     }
 }
 
-/**
- * No active habits at all — **not "nothing this week"**, which cannot happen (see [WeekUiState]).
- *
- * ⚠ **The copy is UNDESIGNED and goes to the user at M6.11** (M2.8). What is settled is the
- * *shape*: two sentences, and no "add a habit" button in either — ADR-010 removed habit creation,
- * so there is no `+` this app could ever honour.
- *
- * ### Why the failed case gets a button and the pending one does not
- *
- * A held or running sync asks nothing of the user, and offering a control for it would be the
- * nagging `CLAUDE.md` §1 rules out by treating offline as normal rather than as an error. A failed
- * one is the opposite: it is the **only** notice the user will get, because the wizard that would
- * have reported a failed first import is off screen by the time the failure arrives (ADR-072).
- *
- * It goes *to* sync status rather than retrying here. That screen already owns the sentence for
- * every `SyncFailure` and the "Sync now" button `CLAUDE.md` §3.5 asks for, and a retry on this
- * screen would be a second control to keep in step with `SyncStatusUiState.canRetry` — which is
- * disabled exactly when a run is already owed (ADR-060).
- */
-@Composable
-private fun WeekEmpty(
-    reason: WeekEmptyReason,
-    onOpenSyncStatus: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // ⚠ Centred, and `EmptyState` is left to size itself. Handing it `fillMaxSize` is what the
-    // first build did, and on a real screen — rather than the 400dp preview — that pins three lines
-    // to the very top with most of a phone of black under them, which reads as a load that stopped
-    // halfway rather than as a finished screen. Seen on the emulator, fixed in the same turn
-    // (`CLAUDE.md` §7).
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        when (reason) {
-            WeekEmptyReason.SyncPending -> {
-                EmptyState(
-                    // A ticked box, because that is literally what a habit is upstream: a checkbox
-                    // property on a Notion page (`docs/notion-schema.md`).
-                    emoji = stringResource(R.string.week_empty_pending_emoji),
-                    title = stringResource(R.string.week_empty_pending_title),
-                    body = stringResource(R.string.week_empty_pending_body),
-                )
-            }
-
-            WeekEmptyReason.SyncFailed -> {
-                EmptyState(
-                    emoji = stringResource(R.string.week_empty_failed_emoji),
-                    title = stringResource(R.string.week_empty_failed_title),
-                    body = stringResource(R.string.week_empty_failed_body),
-                    actionLabel = stringResource(R.string.week_empty_failed_action),
-                    onAction = onOpenSyncStatus,
-                )
-            }
-        }
-    }
-}
-
 // --- previews ---------------------------------------------------------------------------------
 
 @Preview(name = "Week", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)
@@ -299,7 +243,7 @@ private fun WeekContentPreview() {
 @Composable
 private fun WeekContentEmptyPendingPreview() {
     HabitsTheme {
-        WeekContent(state = WeekUiState.Empty(WeekEmptyReason.SyncPending), onEvent = {}, onOpenSyncStatus = {})
+        WeekContent(state = WeekUiState.Empty(HabitsEmptyReason.SyncPending), onEvent = {}, onOpenSyncStatus = {})
     }
 }
 
@@ -313,6 +257,6 @@ private fun WeekContentEmptyPendingPreview() {
 @Composable
 private fun WeekContentEmptyFailedPreview() {
     HabitsTheme {
-        WeekContent(state = WeekUiState.Empty(WeekEmptyReason.SyncFailed), onEvent = {}, onOpenSyncStatus = {})
+        WeekContent(state = WeekUiState.Empty(HabitsEmptyReason.SyncFailed), onEvent = {}, onOpenSyncStatus = {})
     }
 }
