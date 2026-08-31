@@ -40,7 +40,7 @@ class GetHabitsForYear
             val window = trailingYearWindow(today)
             val span = requireNotNull(window.dateSpan()) { "The year window always has days" }
             return combine(
-                habits.observeHabits(includeInactive = false),
+                habits.observeHabits(),
                 habits.observeCompletions(from = span.start, to = span.endInclusive),
             ) { habitList, completions ->
                 val byHabit = completions.byHabit()

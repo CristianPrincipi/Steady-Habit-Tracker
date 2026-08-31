@@ -90,7 +90,6 @@ class HabitMapperTest {
         assertEquals("🥕", habit.emoji)
         assertEquals(HabitColor.ORANGE, habit.color)
         assertEquals(LocalDate.of(2026, 8, 19), habit.startDate)
-        assertEquals(true, habit.isActive)
     }
 
     @Test

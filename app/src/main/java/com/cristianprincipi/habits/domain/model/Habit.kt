@@ -15,6 +15,11 @@ import java.time.LocalDate
  * - **No colour.** [color] is app-local presentation metadata, assigned by us and never pushed.
  * - **No start date.** [startDate] is *inferred* from the earliest day synced from Notion, which is
  *   the closest thing the data has to "when this began". M4 computes it; nothing here does.
+ * - **No active flag.** A habit whose property has left the mapped set is *hidden* — the
+ *   user's decision, 2026-08-31 (ADR-081) — so it never reaches this class. `HabitEntity.isActive`
+ *   and `HabitDao.deactivateAllExcept` still keep the row and its history; nothing above the
+ *   repository can see it, which is what makes "invisible" a property of the code rather than a
+ *   rule every new screen has to remember.
  *
  * Pure Kotlin, `java.time` only (ADR-015). No Android import and no Compose `Color` reaches this
  * package — [HabitColor] is an enum precisely so that it cannot.
@@ -28,15 +33,6 @@ data class Habit(
     val color: HabitColor,
     /** The earliest day this habit is known to have existed. Inferred, never read from Notion. */
     val startDate: LocalDate,
-    /**
-     * Whether the habit is still a checkbox property in the Notion schema.
-     *
-     * Deliberately not called "archived": nobody archives a habit in this app (ADR-010 removed
-     * every write path to the schema). A habit goes inactive because its property disappeared from
-     * Notion, and its history stays exactly where it was — a deleted Notion property destroys the
-     * column upstream, so the local copy may be the only record left.
-     */
-    val isActive: Boolean,
 )
 
 /**

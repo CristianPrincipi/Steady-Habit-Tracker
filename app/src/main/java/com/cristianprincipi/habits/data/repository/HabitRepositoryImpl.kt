@@ -44,10 +44,7 @@ class HabitRepositoryImpl
         private val transactionRunner: TransactionRunner,
         private val clock: Clock,
     ) : HabitRepository {
-        override fun observeHabits(includeInactive: Boolean): Flow<List<Habit>> {
-            val habits = if (includeInactive) habitDao.observeAll() else habitDao.observeActive()
-            return habits.map { it.toDomain() }
-        }
+        override fun observeHabits(): Flow<List<Habit>> = habitDao.observeActive().map { it.toDomain() }
 
         override fun observeCompletions(
             from: LocalDate,

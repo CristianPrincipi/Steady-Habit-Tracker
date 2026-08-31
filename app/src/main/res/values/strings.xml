@@ -260,7 +260,6 @@
     <string name="habits_colour_body">Tap a colour to change how a habit looks in this app. Colours stay on this phone — Notion never sees them.</string>
     <string name="habits_open_in_notion">Open in Notion</string>
     <string name="habits_notion_pending">Available after the next sync.</string>
-    <string name="habits_inactive">Its column was removed from Notion. The history here is kept.</string>
     <string name="habits_empty">No habits yet. They arrive from Notion with the first sync.</string>
     <string name="habits_colour_blue">Blue</string>
     <string name="habits_colour_green">Green</string>

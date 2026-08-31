@@ -108,7 +108,7 @@ class SyncEngineTest {
         }
 
     @Test
-    fun aHabitTheMappingNoLongerNamesGoesInactiveAndKeepsItsHistory() =
+    fun aHabitTheMappingNoLongerNamesIsHiddenAndKeepsItsHistory() =
         runTest {
             // Deleting a Notion property destroys its column and every value in it (§4.1), so these
             // rows may be the only copy left. Never a delete.
@@ -127,6 +127,15 @@ class SyncEngineTest {
                     .isActive,
             )
             assertTrue(world.completions.current.any { it.habitId == journal.id })
+            // ⭐ **Inactive means invisible** (ADR-081 — the user's decision). The row is still
+            // there, holding history that may be the only copy left, and it stops reaching every
+            // screen at once because `observeActive` is the only list they have.
+            assertTrue(
+                world.habits
+                    .observeActive()
+                    .first()
+                    .none { it.id == journal.id },
+            )
         }
 
     @Test
@@ -167,6 +176,14 @@ class SyncEngineTest {
             assertEquals(1, world.completions.current.count { it.habitId == after.id })
             // The local colour is app-only and survives the round trip out of the mapping and back.
             assertEquals("PURPLE", after.color)
+            // …and it is on the list again, which is the second half of the user's rule: the
+            // invisible row becomes visible in place rather than as a habit that started today.
+            assertTrue(
+                world.habits
+                    .observeActive()
+                    .first()
+                    .any { it.id == after.id },
+            )
         }
 
     // ---- start dates ---------------------------------------------------------------------------

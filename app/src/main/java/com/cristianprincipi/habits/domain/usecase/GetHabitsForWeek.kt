@@ -29,7 +29,7 @@ class GetHabitsForWeek
             val window = weekWindow(dateInWeek)
             val span = requireNotNull(window.dateSpan()) { "A week always has seven days" }
             return combine(
-                habits.observeHabits(includeInactive = false),
+                habits.observeHabits(),
                 habits.observeCompletions(from = span.start, to = span.endInclusive),
             ) { habitList, completions ->
                 val today = LocalDate.now(clock)

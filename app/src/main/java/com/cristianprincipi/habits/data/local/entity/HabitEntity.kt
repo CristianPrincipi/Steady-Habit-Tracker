@@ -46,7 +46,14 @@ data class HabitEntity(
     val color: String,
     /** Inferred from the earliest day synced from Notion; there is no start date upstream. */
     val startDateEpochDay: Long,
-    /** False once the checkbox property is gone from the Notion schema. History stays. */
+    /**
+     * False once the checkbox property has left the mapped set.
+     *
+     * **History stays, and the habit is hidden** (ADR-081): `HabitDao.observeActive` is the only
+     * read the UI has, so a false here removes the habit from every screen without removing a
+     * single completion. Set it true again — which a returning property does — and the habit comes
+     * back whole, same row, same id, same history.
+     */
     val isActive: Boolean,
     /**
      * Display order, assigned at import.

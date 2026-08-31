@@ -134,7 +134,6 @@ object SampleHabits {
             emoji = emoji,
             color = color,
             startDate = startDate,
-            isActive = true,
         )
     }
 

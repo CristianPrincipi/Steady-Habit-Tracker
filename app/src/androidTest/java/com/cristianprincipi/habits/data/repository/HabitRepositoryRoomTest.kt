@@ -139,7 +139,7 @@ class HabitRepositoryRoomTest {
             // written in different files and nothing but this makes them agree.
             repository.setColor(habitId = read, color = HabitColor.PURPLE)
 
-            val habits = repository.observeHabits(includeInactive = false).first()
+            val habits = repository.observeHabits().first()
 
             assertEquals(HabitColor.PURPLE, habits.single().color)
         }

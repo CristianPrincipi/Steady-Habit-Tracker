@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
-import com.cristianprincipi.habits.domain.usecase.GetAllHabits
+import com.cristianprincipi.habits.domain.usecase.GetHabits
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,12 +45,12 @@ sealed interface ManageHabitsEvent {
 class ManageHabitsViewModel
     @Inject
     constructor(
-        getAllHabits: GetAllHabits,
+        getHabits: GetHabits,
         getNotionDatabaseUrl: GetNotionDatabaseUrl,
         private val setHabitColor: SetHabitColor,
     ) : ViewModel() {
         val uiState: StateFlow<ManageHabitsUiState> =
-            combine(getAllHabits(), getNotionDatabaseUrl()) { habits, url ->
+            combine(getHabits(), getNotionDatabaseUrl()) { habits, url ->
                 ManageHabitsUiState.Content(habits = habits, notionUrl = url)
             }.stateIn(
                 scope = viewModelScope,

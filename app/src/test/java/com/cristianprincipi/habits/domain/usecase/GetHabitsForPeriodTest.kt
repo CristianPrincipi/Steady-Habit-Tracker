@@ -140,19 +140,6 @@ class GetHabitsForPeriodTest {
         }
 
     @Test
-    fun inactiveHabitsAreLeftOutOfTheGrids() =
-        runTest {
-            val repository =
-                FakeHabitRepository(
-                    habits = listOf(testHabit(id = "read"), testHabit(id = "gone", isActive = false)),
-                )
-
-            val periods = GetHabitsForWeek(repository, clock)(today).first()
-
-            assertEquals(listOf(read), periods.map { it.habit.id })
-        }
-
-    @Test
     fun aMonthCoversEveryDayOfThatMonth() =
         runTest {
             val repository =

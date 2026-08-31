@@ -24,8 +24,9 @@ sealed interface ManageHabitsUiState {
     data object Loading : ManageHabitsUiState
 
     /**
-     * @param habits every habit, **inactive ones included** (`GetAllHabits`). A habit whose Notion
-     *   column was deleted still has local history, and this is the only screen that shows it.
+     * @param habits the habit set as every other screen sees it (`GetHabits`). A habit whose
+     *   property has left the mapped set is **not here** (ADR-081) — its row and history are kept,
+     *   hidden, and come back with it.
      * @param notionUrl where the database lives, or `null` while the app has not learned it — a
      *   connection from an older build, or one whose first sync has not landed. The control is
      *   disabled in place rather than hidden (ADR-060).

@@ -64,8 +64,12 @@ class HabitRepositoryImplTest {
     )
 
     @Test
-    fun observeHabitsHidesInactiveOnesAndOrdersThemForDisplay() =
+    fun observeHabitsHidesOneWhoseColumnHasGoneAndOrdersTheRestForDisplay() =
         runTest {
+            // ⭐ **The user's rule, at the layer that enforces it** (ADR-081): a habit whose property
+            // has left the mapped set is invisible, and there is no second read that would show it.
+            // The ordering is the other half — `sortOrder` is the order the user chose in Notion,
+            // and the gap the hidden row leaves must not reshuffle what is left.
             val habitDao =
                 FakeHabitDao(
                     listOf(
@@ -75,17 +79,18 @@ class HabitRepositoryImplTest {
                     ),
                 )
 
-            repository(habitDao = habitDao).observeHabits(includeInactive = false).test {
+            repository(habitDao = habitDao).observeHabits().test {
                 assertEquals(listOf("Read", "Water"), awaitItem().map { it.name })
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun observeHabitsCanIncludeOnesWhoseNotionPropertyIsGone() =
+    fun aHiddenHabitReappearsInPlaceWhenItsPropertyComesBack() =
         runTest {
-            // M7.5's manage-habits list: the local rows may be the only surviving record of a
-            // column Notion has destroyed, so it shows them rather than hiding them.
+            // The other half of the same rule: invisible *while* it is gone. The row was never
+            // deleted, so it comes back carrying its own id — the id every completion in the
+            // database points at — rather than arriving as a habit that started today.
             val habitDao =
                 FakeHabitDao(
                     listOf(
@@ -94,8 +99,12 @@ class HabitRepositoryImplTest {
                     ),
                 )
 
-            repository(habitDao = habitDao).observeHabits(includeInactive = true).test {
-                assertEquals(listOf("Read", "Journal"), awaitItem().map { it.name })
+            repository(habitDao = habitDao).observeHabits().test {
+                assertEquals(listOf("Read"), awaitItem().map { it.name })
+
+                habitDao.upsert(listOf(habit(id = "gone", name = "Journal", sortOrder = 0)))
+
+                assertEquals(listOf(HabitId("gone"), HabitId("a")), awaitItem().map { it.id })
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -106,7 +115,7 @@ class HabitRepositoryImplTest {
             val bookEmoji = "📖"
             val habitDao = FakeHabitDao(listOf(habit(id = "a", name = "$bookEmoji Read", sortOrder = 0)))
 
-            repository(habitDao = habitDao).observeHabits(includeInactive = false).test {
+            repository(habitDao = habitDao).observeHabits().test {
                 val habit = awaitItem().single()
 
                 assertEquals("Read", habit.name)
@@ -241,7 +250,7 @@ class HabitRepositoryImplTest {
             val habitDao = FakeHabitDao(listOf(habit(id = "a", name = "Read", sortOrder = 0)))
             val repository = repository(habitDao = habitDao)
 
-            repository.observeHabits(includeInactive = false).test {
+            repository.observeHabits().test {
                 assertEquals(HabitColor.BLUE, awaitItem().single().color)
 
                 repository.setColor(habitId = HabitId("a"), color = HabitColor.PURPLE)

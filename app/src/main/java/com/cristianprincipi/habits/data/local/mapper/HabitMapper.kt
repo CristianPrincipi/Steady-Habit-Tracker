@@ -23,7 +23,6 @@ fun HabitEntity.toDomain(): Habit {
         emoji = emoji,
         color = color.toHabitColor(),
         startDate = LocalDate.ofEpochDay(startDateEpochDay),
-        isActive = isActive,
     )
 }
 

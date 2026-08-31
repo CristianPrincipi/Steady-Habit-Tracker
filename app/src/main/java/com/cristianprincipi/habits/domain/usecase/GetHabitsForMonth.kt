@@ -26,7 +26,7 @@ class GetHabitsForMonth
             val window = monthWindow(month)
             val span = requireNotNull(window.dateSpan()) { "A month always has days" }
             return combine(
-                habits.observeHabits(includeInactive = false),
+                habits.observeHabits(),
                 habits.observeCompletions(from = span.start, to = span.endInclusive),
             ) { habitList, completions ->
                 val today = LocalDate.now(clock)

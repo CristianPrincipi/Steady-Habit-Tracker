@@ -41,7 +41,6 @@ import com.cristianprincipi.habits.feature.managehabits.ManageHabitsUiState
  * ```
  * adb shell am start -n …/….gallery.ManageHabitsPreviewActivity                 # five habits, link known
  * adb shell am start -n …/….gallery.ManageHabitsPreviewActivity --es state nolink
- * adb shell am start -n …/….gallery.ManageHabitsPreviewActivity --es state inactive
  * adb shell am start -n …/….gallery.ManageHabitsPreviewActivity --es state empty
  * ```
  *
@@ -119,12 +118,6 @@ private fun habitsFor(variant: String?): List<Habit> =
     when (variant) {
         "empty" -> {
             emptyList()
-        }
-
-        // The middle habit's Notion column is gone: the row stays, carrying history that may be the
-        // only copy left (`docs/notion-schema.md` §4.1).
-        "inactive" -> {
-            SampleHabits.habits().mapIndexed { index, habit -> habit.copy(isActive = index != 2) }
         }
 
         else -> {

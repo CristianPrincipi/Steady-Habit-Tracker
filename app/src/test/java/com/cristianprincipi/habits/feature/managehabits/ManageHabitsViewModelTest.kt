@@ -7,7 +7,7 @@ import com.cristianprincipi.habits.core.testing.MainDispatcherRule
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
-import com.cristianprincipi.habits.domain.usecase.GetAllHabits
+import com.cristianprincipi.habits.domain.usecase.GetHabits
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
 import kotlinx.coroutines.test.runTest
@@ -22,6 +22,11 @@ import org.junit.Test
  *
  * The fakes are the point of the shape here: the ViewModel takes three use cases, so a test wires
  * three one-line classes over two fakes and never has to arrange a Notion connection.
+ *
+ * ⚠ **Nothing here tests a hidden habit, and nothing can** (ADR-081). A habit whose property has
+ * left the mapped set is filtered out by `HabitDao.observeActive`, and no use case above it can ask
+ * for one — so the rule is pinned where it is enforced: `HabitRepositoryImplTest` for the read, and
+ * `SyncEngineTest` for a habit leaving the set and coming back with its history.
  */
 class ManageHabitsViewModelTest {
     @get:Rule
@@ -31,27 +36,10 @@ class ManageHabitsViewModelTest {
 
     private fun viewModel(habits: FakeHabitRepository) =
         ManageHabitsViewModel(
-            getAllHabits = GetAllHabits(habits),
+            getHabits = GetHabits(habits),
             getNotionDatabaseUrl = GetNotionDatabaseUrl(connection),
             setHabitColor = SetHabitColor(habits),
         )
-
-    @Test
-    fun aHabitWhoseNotionColumnIsGoneIsStillListed() =
-        runTest {
-            // ⭐ The reason this screen asks for the inactive ones and every other screen does not.
-            // A deleted Notion column destroys the history upstream, so this phone may hold the only
-            // copy — a list that quietly dropped the row would be hiding the last of it.
-            val habits =
-                FakeHabitRepository(
-                    habits = listOf(testHabit(id = "read"), testHabit(id = "gone", isActive = false)),
-                )
-
-            viewModel(habits).uiState.test {
-                val state = awaitItem() as ManageHabitsUiState.Content
-                assertEquals(listOf("read", "gone"), state.habits.map { it.id.value })
-            }
-        }
 
     @Test
     fun theLinkOutToNotionArrivesWhenTheAppHasLearnedIt() =

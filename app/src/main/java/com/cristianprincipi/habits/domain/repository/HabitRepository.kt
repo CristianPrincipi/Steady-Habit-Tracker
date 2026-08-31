@@ -24,11 +24,13 @@ interface HabitRepository {
     /**
      * The habit set, ordered as the UI should show it.
      *
-     * @param includeInactive whether to include habits whose checkbox property has disappeared from
-     *   the Notion schema. The habit screens pass `false`; M7.5's manage-habits list passes `true`,
-     *   because a habit that vanished upstream still has local history worth seeing.
+     * **Only the habits still in the mapped Notion set.** A habit whose property has left that set
+     * keeps its row and its whole history in Room — nothing in this app deletes one — but it is
+     * hidden everywhere, by the user's decision on 2026-08-31 (ADR-081), and comes back the moment
+     * the property does. There is deliberately no way to ask for the hidden ones: this interface is
+     * the only door to the habit set, so a screen cannot show one by accident.
      */
-    fun observeHabits(includeInactive: Boolean): Flow<List<Habit>>
+    fun observeHabits(): Flow<List<Habit>>
 
     /**
      * Every completion in `[from, to]`, **both bounds inclusive**, across all habits.

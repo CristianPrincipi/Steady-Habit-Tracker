@@ -13,9 +13,13 @@ import java.time.LocalDate
 /**
  * A [HabitRepository] backed by two lists, for testing the use cases above it.
  *
- * It reproduces the two behaviours the real one promises and the use cases lean on: `observeHabits`
- * hides inactive habits unless asked for them, and `observeCompletions` is **inclusive at both
- * ends**. An off-by-one there would let a use case pass its own boundary test wrongly.
+ * It reproduces the behaviour the real one promises and the use cases lean on: `observeCompletions`
+ * is **inclusive at both ends**. An off-by-one there would let a use case pass its own boundary
+ * test wrongly.
+ *
+ * ⚠ **It cannot express a hidden habit, and no longer needs to** (ADR-081). Hiding is a `WHERE` in
+ * `HabitDao.observeActive`, one layer below this; `HabitRepositoryImplTest` and `SyncEngineTest`
+ * are where a habit leaves the list and comes back.
  */
 class FakeHabitRepository(
     habits: List<Habit> = emptyList(),
@@ -36,16 +40,7 @@ class FakeHabitRepository(
         val completed: Boolean,
     )
 
-    override fun observeHabits(includeInactive: Boolean): Flow<List<Habit>> =
-        habitRows.map { rows ->
-            if (includeInactive) {
-                rows
-            } else {
-                rows.filter {
-                    it.isActive
-                }
-            }
-        }
+    override fun observeHabits(): Flow<List<Habit>> = habitRows
 
     override fun observeCompletions(
         from: LocalDate,
@@ -85,7 +80,6 @@ fun testHabit(
     name: String = "Read",
     color: HabitColor = HabitColor.BLUE,
     startDate: LocalDate = LocalDate.of(2020, 1, 1),
-    isActive: Boolean = true,
 ): Habit =
     Habit(
         id = HabitId(id),
@@ -93,5 +87,4 @@ fun testHabit(
         emoji = "",
         color = color,
         startDate = startDate,
-        isActive = isActive,
     )

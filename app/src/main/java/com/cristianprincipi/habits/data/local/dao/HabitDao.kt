@@ -14,16 +14,28 @@ import kotlinx.coroutines.flow.Flow
  */
 @Dao
 interface HabitDao {
-    /** Habits still present in the Notion schema, in display order. */
+    /**
+     * Habits still present in the mapped Notion set, in display order — **every screen's only
+     * source**.
+     *
+     * The `WHERE` is what hides a habit whose property has gone (ADR-081), and no query beside it
+     * returns the hidden ones as a list. [observeAll] and [findAll] do see them, one layer lower and
+     * for two jobs that are not lists: naming a discarded edit, and finding the row to bring back.
+     */
     @Query("SELECT * FROM habits WHERE isActive = 1 ORDER BY sortOrder ASC")
     fun observeActive(): Flow<List<HabitEntity>>
 
     /**
-     * Every habit, active first.
+     * Every habit including the hidden ones — **a name lookup, not a habit list**.
      *
-     * For M7.5, which lists habits whose Notion property has since disappeared: their history is
-     * still here and may be the only copy left, since deleting a property destroys the column
-     * upstream.
+     * The one caller is `SyncStatusRepositoryImpl.observeDiscardedEdits`, which turns stored habit
+     * ids into the name each habit carries *now*. A discarded edit outlives the habit going hidden,
+     * and a notice that cannot name the habit it is about is not worth showing — so this read
+     * deliberately ignores `isActive`.
+     *
+     * ⚠ **Never wire a screen to this** (ADR-081). A habit whose property has left the mapped set is
+     * invisible, and [observeActive] is the only list. This returns entities, one layer below the
+     * domain, which is the fence that keeps the distinction from being an accident.
      */
     @Query("SELECT * FROM habits ORDER BY isActive DESC, sortOrder ASC")
     fun observeAll(): Flow<List<HabitEntity>>
@@ -60,9 +72,11 @@ interface HabitDao {
     suspend fun upsert(habits: List<HabitEntity>)
 
     /**
-     * Mark habits inactive by id, for properties that have left the Notion schema.
+     * Mark habits inactive by id, for properties that have left the mapped Notion set.
      *
      * Never a delete: the local rows are the only surviving record of a column Notion has destroyed.
+     * **Inactive means invisible** (ADR-081) — the row stops reaching every screen through
+     * [observeActive] while keeping its completions, and reappears whole if the property returns.
      */
     @Query("UPDATE habits SET isActive = 0 WHERE id NOT IN (:activeIds)")
     suspend fun deactivateAllExcept(activeIds: List<String>)

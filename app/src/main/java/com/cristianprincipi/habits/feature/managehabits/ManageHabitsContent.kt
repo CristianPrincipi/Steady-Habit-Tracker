@@ -44,6 +44,14 @@ import com.cristianprincipi.habits.domain.model.HabitColor
  * saved mapping decides which columns are habits (ADR-079), because `Weight`, `Sleep`, `Area` and
  * `Progress` live in the same database. **M7.8 builds the route that adopts a new column**, and owns
  * the sentence describing it — it links from this screen.
+ *
+ * ### ⭐ A habit that has left the mapped set is not on this list — the user's call (ADR-081)
+ *
+ * It was, until 2026-08-31, carrying a note that said its column was gone. **The list is the
+ * current habit set and nothing else** now: the row and its history stay in Room, invisible, and
+ * return in place if the property does. Nothing here announces the absence, and nothing needs to —
+ * a column deleted in Notion *pauses* sync (`NotionMappingProblem.HabitMissing`) rather than
+ * quietly thinning this list, and sync status is where a paused sync says so.
  */
 @Composable
 fun ManageHabitsContent(
@@ -144,7 +152,7 @@ private fun WhereHabitsLiveCard(
 }
 
 /**
- * One habit: its icon and name, the note if its column is gone, and its four colours.
+ * One habit: its icon and name, and its four colours.
  *
  * The swatches sit **under** the name rather than beside it. Four 48dp targets, a 40dp icon and a
  * name do not share one row on a narrow phone without the name truncating, and the name is the part
@@ -163,23 +171,11 @@ private fun HabitRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HabitIcon(emoji = habit.emoji, name = habit.name, habitColor = habit.color.resolve())
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.headerBottom)) {
-                Text(
-                    text = habit.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = HabitsTheme.colors.text.primary,
-                )
-                // ⚠ Shown, never acted on. A habit goes inactive because its column disappeared
-                // upstream; nothing here can bring it back, and the history it is holding may be
-                // the only copy left in existence (`docs/notion-schema.md` §4.1).
-                if (!habit.isActive) {
-                    Text(
-                        text = stringResource(R.string.habits_inactive),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = HabitsTheme.colors.text.secondary,
-                    )
-                }
-            }
+            Text(
+                text = habit.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = HabitsTheme.colors.text.primary,
+            )
         }
         ColorSwatchRow(
             colors = palette.map { color -> color.resolve() },
@@ -213,28 +209,6 @@ private fun ManageHabitsPreview() {
                 ManageHabitsUiState.Content(
                     habits = SampleHabits.habits(),
                     notionUrl = "https://www.notion.so/0123456789abcdef0123456789abcdef",
-                ),
-            onEvent = {},
-            onOpenInNotion = {},
-        )
-    }
-}
-
-@Preview(name = "A habit deleted in Notion", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360)
-@Composable
-private fun ManageHabitsInactivePreview() {
-    HabitsTheme {
-        ManageHabitsContent(
-            state =
-                ManageHabitsUiState.Content(
-                    // The state this screen exists to make visible: the habit is gone from the
-                    // schema and its history is still here.
-                    habits =
-                        SampleHabits
-                            .habits()
-                            .take(2)
-                            .mapIndexed { index, habit -> habit.copy(isActive = index != 1) },
-                    notionUrl = null,
                 ),
             onEvent = {},
             onOpenInNotion = {},
