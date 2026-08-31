@@ -1,5 +1,7 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -11,8 +13,10 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -197,6 +201,39 @@ class MonthDotGridTest {
         composeTestRule
             .onNodeWithTag(GRID)
             .assertHeightIsEqualTo(cell * AUGUST_ROWS + GRID_GAP * (AUGUST_ROWS - 1))
+    }
+
+    // --- read-only, and not by way of semantics (M8.5) ------------------------------------------
+
+    @Test
+    fun aTapOnTheGridReachesWhateverIsBehindItRatherThanBeingSwallowed() {
+        // ⭐⭐ **The assertion M8.5 turned out to need, and the screen-level clickable counts do not
+        // give it.** `hasClickAction()` reads SEMANTICS, and this component deletes its own on
+        // purpose — so a `Modifier.clickable` placed after `clearAndSetSemantics` in the chain is
+        // invisible to every count in the suite while still swallowing a real finger. Measured:
+        // before the clear, `MonthRenderTest` catches it; after the clear, all nine tests pass.
+        //
+        // So this asserts the behaviour instead of the metadata. An inert child does not consume a
+        // pointer event, so the tap must arrive at the clickable behind it. A grid that has grown a
+        // handler consumes it, and the count below stays at zero.
+        var behind = 0
+        composeTestRule.setContent {
+            HabitsTheme {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Box(modifier = Modifier.width(GRID_WIDTH).clickable { behind++ }) {
+                        MonthDotGrid(
+                            days = oneOfEach,
+                            habitColor = HabitsTheme.colors.habit.blue,
+                            modifier = Modifier.testTag(GRID),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag(GRID, useUnmergedTree = true).performTouchInput { click() }
+
+        assertEquals("a tap on a read-only grid belongs to whatever is behind it", 1, behind)
     }
 
     private companion object {

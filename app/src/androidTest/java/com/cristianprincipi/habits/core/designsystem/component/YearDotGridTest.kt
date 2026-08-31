@@ -1,5 +1,7 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -11,8 +13,10 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -261,6 +265,39 @@ class YearDotGridTest {
             brightestDistance(image()),
             EXACT,
         )
+    }
+
+    // --- read-only, and not by way of semantics (M8.5) ------------------------------------------
+
+    @Test
+    fun aTapOnTheGridReachesWhateverIsBehindItRatherThanBeingSwallowed() {
+        // ⭐⭐ The same assertion `MonthDotGridTest` carries, and for the same measured reason: a
+        // `Modifier.clickable` placed after `clearAndSetSemantics` is invisible to every
+        // `hasClickAction()` count in the suite and still swallows a finger. An inert child does not
+        // consume a pointer event, so the tap must arrive at the clickable behind it.
+        //
+        // ⚠ Worth having twice rather than once. This grid is the one three screens share
+        // (`docs/design-spec.md` §4, §5.2), so a handler added here would be tappable in Stats as
+        // well — and at 4dp a cell is a quarter of a usable target wherever it is drawn.
+        var behind = 0
+        composeTestRule.setContent {
+            HabitsTheme {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Box(modifier = Modifier.width(WIDE).clickable { behind++ }) {
+                        YearDotGrid(
+                            days = oneOfEach,
+                            habitColor = HabitsTheme.colors.habit.blue,
+                            modifier = Modifier.testTag(GRID),
+                            dotSize = DOT,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag(GRID, useUnmergedTree = true).performTouchInput { click() }
+
+        assertEquals("a tap on a read-only grid belongs to whatever is behind it", 1, behind)
     }
 
     private companion object {
