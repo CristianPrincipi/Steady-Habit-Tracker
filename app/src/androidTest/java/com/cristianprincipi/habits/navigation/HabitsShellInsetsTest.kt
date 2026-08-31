@@ -190,6 +190,38 @@ class HabitsShellInsetsTest {
     }
 
     @Test
+    fun theMappingScreenIsPaddedOnceEvenThoughItsTwinIsNot() {
+        // ⭐⭐ **The one place in the app where the same composable is drawn under two inset rules**,
+        // and therefore the one most likely to get it wrong. `MapPropertiesStep` is rendered by the
+        // setup wizard, which sits *outside* this graph and pads itself with `safeDrawing`; M7.8
+        // renders it here, *inside* the shell, which pads for it. Copying the wizard's modifier
+        // across would have looked entirely reasonable and put the content a second status bar down.
+        //
+        // Three destinations deep — a tab, then the habit list, then this — which nothing before
+        // M7.8 exercised.
+        val barTop = systemBarTop()
+        assertTrue("expected a non-zero top inset to test against, got $barTop", barTop > 0)
+
+        tab(R.string.tab_settings).performClick()
+        composeTestRule
+            .onAllNodesWithText(string(R.string.settings_habits))
+            .filterToOne(hasClickAction())
+            .performClick()
+        composeTestRule.onNodeWithText(string(R.string.mapping_edit_action)).performClick()
+        composeTestRule.waitForIdle()
+
+        // Nothing is connected in an instrumented run, so the banner is the screen's first content —
+        // and it is the only node here with no click action, which is what makes it measurable.
+        val top = headingTop(R.string.notion_failure_not_connected)
+        assertTrue("the mapping screen starts at $top, above the $barTop status bar", top >= barTop)
+        assertTrue(
+            "the mapping screen starts at $top — a whole extra status bar below the $barTop inset, " +
+                "which is what rendering it with the wizard's own insets looks like",
+            top < barTop * 2,
+        )
+    }
+
+    @Test
     fun stubsAllStartAtTheSameHeight() {
         // ⭐ The assertion that would have caught M5.2's double-padded sync status, and it needs no
         // tolerance to do it: every `StubScreen` uses the same modifier chain, so their titles must

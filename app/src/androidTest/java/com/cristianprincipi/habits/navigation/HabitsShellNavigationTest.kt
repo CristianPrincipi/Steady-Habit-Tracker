@@ -137,6 +137,27 @@ class HabitsShellNavigationTest {
     }
 
     @Test
+    fun theHabitListReachesTheMappingAndBackReturnsToIt() {
+        // ⭐⭐ M7.8's route in, and the whole reason the step exists (ADR-079): until this, a column
+        // added in Notion could never be adopted and a column deleted in Notion halted sync with no
+        // way out but disconnect → reconnect, which costs the user a paste of their token.
+        tab(R.string.tab_settings).performClick()
+        habitsRow().performClick()
+        composeTestRule.onNodeWithText(string(R.string.mapping_edit_action)).performClick()
+
+        // Nothing is connected in an instrumented run (`FreshInstallRule`), so the screen reports
+        // that and offers to ask again — which is the shape M7.8 chose for a schema it could not
+        // read, and it is what proves the destination rendered rather than crashed.
+        composeTestRule.onNodeWithText(string(R.string.setup_mapping_reload)).assertIsDisplayed()
+
+        Espresso.pressBack()
+
+        // Back goes to the habit list, not out of the shell: two destinations deep, both outside
+        // the tab bar, which nothing before M7.8 exercised.
+        heading(R.string.screen_title_habits).assertIsDisplayed()
+    }
+
+    @Test
     fun theBarIsHiddenOnADestinationThatIsNotATab() {
         // A bar with nothing selected would be a bar lying about where the user is.
         tab(R.string.tab_settings).performClick()

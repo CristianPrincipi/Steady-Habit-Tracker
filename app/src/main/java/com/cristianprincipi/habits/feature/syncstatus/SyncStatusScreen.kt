@@ -33,6 +33,7 @@ import com.cristianprincipi.habits.core.datetime.Elapsed
 import com.cristianprincipi.habits.core.designsystem.component.DestructiveButton
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
+import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -53,12 +54,18 @@ import java.time.format.FormatStyle
  */
 @Composable
 fun SyncStatusScreen(
+    onEditMapping: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SyncStatusViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    SyncStatusContent(state = state, onEvent = viewModel::onEvent, modifier = modifier)
+    SyncStatusContent(
+        state = state,
+        onEvent = viewModel::onEvent,
+        onEditMapping = onEditMapping,
+        modifier = modifier,
+    )
 }
 
 /**
@@ -73,6 +80,7 @@ fun SyncStatusScreen(
 fun SyncStatusContent(
     state: SyncStatusUiState,
     onEvent: (SyncStatusEvent) -> Unit,
+    onEditMapping: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -97,6 +105,17 @@ fun SyncStatusContent(
         ConnectionCard(state = state)
 
         state.failure?.let { failure -> NotionFailureBanner(failure = failure) }
+
+        // ⭐ Directly under the banner that diagnosed it, and above Sync now — because when the
+        // mapping is broken, Sync now is the button that provably will not work (ADR-079). Shown
+        // only for that failure: every other one is either waiting on the network or waiting on a
+        // person, and neither is fixed here.
+        if (state.isMappingBroken) {
+            PrimaryButton(
+                text = stringResource(R.string.mapping_edit_action),
+                onClick = onEditMapping,
+            )
+        }
 
         // Shown for the whole of a connection and only ever disabled, so that neither a held sync
         // nor a running one can move the destructive button below it. ADR-060.
@@ -357,6 +376,7 @@ private fun SyncStatusHealthyPreview() {
                     lastSynced = Elapsed.Minutes(3),
                 ),
             onEvent = {},
+            onEditMapping = {},
         )
     }
 }
@@ -392,6 +412,7 @@ private fun SyncStatusFailedPreview() {
                     discardedEdits = previewNotices,
                 ),
             onEvent = {},
+            onEditMapping = {},
         )
     }
 }
@@ -413,6 +434,7 @@ private fun SyncStatusWaitingForNetworkPreview() {
                     lastSynced = Elapsed.Hours(2),
                 ),
             onEvent = {},
+            onEditMapping = {},
         )
     }
 }
@@ -430,6 +452,7 @@ private fun SyncStatusDisconnectPreview() {
                     willDeleteLocalData = true,
                 ),
             onEvent = {},
+            onEditMapping = {},
         )
     }
 }

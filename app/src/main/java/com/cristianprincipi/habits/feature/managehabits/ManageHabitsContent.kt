@@ -58,6 +58,7 @@ fun ManageHabitsContent(
     state: ManageHabitsUiState,
     onEvent: (ManageHabitsEvent) -> Unit,
     onOpenInNotion: () -> Unit,
+    onEditMapping: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // A `LazyColumn` rather than a scrolling `Column`: this list's length is the user's Notion
@@ -76,7 +77,11 @@ fun ManageHabitsContent(
                     color = HabitsTheme.colors.text.primary,
                 )
                 if (state is ManageHabitsUiState.Content) {
-                    WhereHabitsLiveCard(notionUrl = state.notionUrl, onOpenInNotion = onOpenInNotion)
+                    WhereHabitsLiveCard(
+                        notionUrl = state.notionUrl,
+                        onOpenInNotion = onOpenInNotion,
+                        onEditMapping = onEditMapping,
+                    )
                 }
             }
         }
@@ -128,6 +133,7 @@ fun ManageHabitsContent(
 private fun WhereHabitsLiveCard(
     notionUrl: String?,
     onOpenInNotion: () -> Unit,
+    onEditMapping: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HabitsCard(modifier = modifier) {
@@ -148,6 +154,18 @@ private fun WhereHabitsLiveCard(
                 color = HabitsTheme.colors.text.helper,
             )
         }
+        // ⭐ M7.8's sentence and its route, which ADR-079 said this screen owed and could not yet
+        // say. It is below the Notion link on purpose: the order is what habits are, then where to
+        // change them in Notion, then what to do here once you have.
+        Text(
+            text = stringResource(R.string.habits_mapping_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = HabitsTheme.colors.text.secondary,
+        )
+        SecondaryButton(
+            text = stringResource(R.string.mapping_edit_action),
+            onClick = onEditMapping,
+        )
     }
 }
 
@@ -212,6 +230,7 @@ private fun ManageHabitsPreview() {
                 ),
             onEvent = {},
             onOpenInNotion = {},
+            onEditMapping = {},
         )
     }
 }
@@ -224,6 +243,7 @@ private fun ManageHabitsEmptyPreview() {
             state = ManageHabitsUiState.Content(habits = emptyList(), notionUrl = null),
             onEvent = {},
             onOpenInNotion = {},
+            onEditMapping = {},
         )
     }
 }

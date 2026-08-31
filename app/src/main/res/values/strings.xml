@@ -54,6 +54,19 @@
     <string name="setup_mapping_unavailable_body">These aren\'t dates or checkboxes, so they can\'t be a day or a habit. Sync leaves them exactly as they are.</string>
     <string name="setup_mapping_submit">Save and import</string>
     <string name="setup_mapping_needs_habit">Pick at least one habit.</string>
+    <!--
+      M7.8, and the user's decision on 2026-08-31: named, and shown only when the current selection
+      actually drops a habit that is mapped now. Silent on a first map and silent while you are only
+      adding — it never warns about a habit you did not just untick. %1$s is the habit or habits,
+      already joined.
+    -->
+    <plurals name="setup_mapping_dropping">
+        <item quantity="one">%1$s will stop syncing and leave your habit list. Its history stays on this phone and comes back if you tick it again.</item>
+        <item quantity="other">%1$s will stop syncing and leave your habit list. Their history stays on this phone and comes back if you tick them again.</item>
+    </plurals>
+    <string name="setup_mapping_dropping_join">%1$s and %2$s</string>
+    <string name="setup_mapping_dropping_join_more">%1$s, %2$s</string>
+    <string name="setup_mapping_reload">Try again</string>
 
     <!-- Done -->
     <string name="setup_done_title">Connected</string>
@@ -261,6 +274,13 @@
     <string name="habits_open_in_notion">Open in Notion</string>
     <string name="habits_notion_pending">Available after the next sync.</string>
     <string name="habits_empty">No habits yet. They arrive from Notion with the first sync.</string>
+    <!--
+      M7.8's sentence, which ADR-079 said this screen owed and could not yet say: a new checkbox
+      column is not a habit until the mapping names it, because Weight, Sleep, Area and Progress
+      live in the same database (docs/notion-schema.md §4.3).
+    -->
+    <string name="habits_mapping_body">Added a column in Notion? It becomes a habit once you pick it here. Columns like Weight and Sleep stay out of the way.</string>
+    <string name="mapping_edit_action">Choose which columns are habits</string>
     <string name="habits_colour_blue">Blue</string>
     <string name="habits_colour_green">Green</string>
     <string name="habits_colour_orange">Orange</string>

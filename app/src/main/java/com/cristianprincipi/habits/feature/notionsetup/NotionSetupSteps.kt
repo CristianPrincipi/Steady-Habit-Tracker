@@ -17,6 +17,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -212,6 +213,14 @@ fun MapPropertiesStep(
             )
         }
 
+        // ⭐ Directly under the habits, not down by the button — where the emulator put it on
+        // 2026-08-31, a scroll below the "not available" columns and well away from the checkbox
+        // that caused it. It belongs beside its cause: the user has just tapped one of the rows
+        // above, and this is the next thing under their finger.
+        if (state.habitsBeingDropped.isNotEmpty()) {
+            item(key = "dropping") { DroppingHabitsNote(dropped = state.habitsBeingDropped) }
+        }
+
         if (state.unavailableProperties.isNotEmpty()) {
             item(key = "unavailable-eyebrow") {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
@@ -271,6 +280,72 @@ fun DoneStep(
                     pluralStringResource(R.plurals.setup_done_body, state.importedDays, state.importedDays)
                 },
         )
+    }
+}
+
+/**
+ * ⭐ **What unticking a habit actually does** — the one consequential thing this screen can do, and
+ * the sentence M7.8 owes the user.
+ *
+ * **Named, and only when it applies** — the user's decision on 2026-08-31, over a dialog on save and
+ * over a permanent line. A first map drops nothing and says nothing; adding habits says nothing;
+ * this appears the moment a habit that is mapped *now* is unticked, and names it.
+ *
+ * A card rather than [NotionFailureBanner]'s warning colours, deliberately: nothing has gone wrong
+ * and nothing is destroyed. The history is kept and the habit comes back whole if it is ticked again
+ * (ADR-081), so the note is prominent without being alarming — it sits directly above the button
+ * that would apply it.
+ */
+@Composable
+private fun DroppingHabitsNote(
+    dropped: List<NotionProperty>,
+    modifier: Modifier = Modifier,
+) {
+    HabitsCard(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text =
+                pluralStringResource(
+                    R.plurals.setup_mapping_dropping,
+                    dropped.size,
+                    dropped.asSentenceList(),
+                ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = HabitsTheme.colors.text.primary,
+        )
+    }
+}
+
+/**
+ * `"Read"`, `"Read and Journal"`, `"Read, Journal and Diet"`.
+ *
+ * ⚠ **English word order, assembled from two strings rather than translated as one.** v1 is English
+ * only (`CLAUDE.md` §9.8), and this is the piece a translation would have to *replace* rather than
+ * translate: a language whose separator or conjunction sits elsewhere needs a different rule, not
+ * different words. It lives here, beside its only caller, so it is found on the day that matters.
+ */
+@Composable
+private fun List<NotionProperty>.asSentenceList(): String {
+    // Read as templates and formatted here rather than through `stringResource(id, args)`: the list
+    // is folded, and a composable call cannot happen inside `reduce`'s lambda. Reading them with
+    // `stringResource` keeps this configuration-aware, which `LocalContext.getString` is not — Lint
+    // rejected exactly that on 2026-08-31.
+    val separator = stringResource(R.string.setup_mapping_dropping_join_more)
+    val conjunction = stringResource(R.string.setup_mapping_dropping_join)
+    val names = map(NotionProperty::name)
+
+    return when {
+        names.isEmpty() -> {
+            ""
+        }
+
+        names.size == 1 -> {
+            names.single()
+        }
+
+        else -> {
+            val head = names.dropLast(1).reduce { joined, name -> separator.format(joined, name) }
+            conjunction.format(head, names.last())
+        }
     }
 }
 

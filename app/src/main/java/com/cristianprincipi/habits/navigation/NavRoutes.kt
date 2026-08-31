@@ -76,6 +76,19 @@ data object Settings : TopLevelRoute
 data object ManageHabits : NavRoute
 
 /**
+ * The mapping, editable without disconnecting — `feature/notionsetup`, M7.8.
+ *
+ * Not a tab, and reached from two places for two different reasons: from [ManageHabits], where a
+ * user goes to adopt a column they just added in Notion; and from [SyncStatus], where a **deleted**
+ * column has halted the sync and this is the only thing that will restart it (ADR-079).
+ *
+ * It carries no argument. There is one mapping, and the screen reads it — a route that took a data
+ * source id would let a caller open the mapping for a database the app is not connected to.
+ */
+@Serializable
+data object EditMapping : NavRoute
+
+/**
  * Notion connection health, last sync, manual retry and disconnect — `feature/syncstatus`.
  *
  * **A destination, not a tab.** The design has five tabs and this is not one of them; it hangs off

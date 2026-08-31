@@ -57,4 +57,14 @@ data class SyncStatusUiState(
     val canRetry: Boolean get() = isConnected && !isSyncing && !isWaitingForNetwork
 
     val hasDiscardedEdits: Boolean get() = discardedEdits.isNotEmpty()
+
+    /**
+     * ⭐ **The one failure a retry cannot fix, so the one that needs its own way out** (M7.8).
+     *
+     * A mapped column has been deleted or retyped in Notion, so every run halts before reading or
+     * writing anything (`CLAUDE.md` §3.4). Until M7.8 this screen answered that with a retry that
+     * would fail identically and a disconnect that would cost the user their token — ADR-079's
+     * *"the diagnosis is good and the recovery is missing"*. The recovery is editing the mapping.
+     */
+    val isMappingBroken: Boolean get() = failure is SyncFailure.MappingBroken
 }

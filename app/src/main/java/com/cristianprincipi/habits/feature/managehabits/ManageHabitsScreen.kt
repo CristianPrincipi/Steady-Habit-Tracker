@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  */
 @Composable
 fun ManageHabitsScreen(
+    onEditMapping: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ManageHabitsViewModel = hiltViewModel(),
 ) {
@@ -43,6 +44,7 @@ fun ManageHabitsScreen(
     ManageHabitsContent(
         state = state,
         onEvent = viewModel::onEvent,
+        onEditMapping = onEditMapping,
         // Nothing happens with no URL, and nothing needs to: the button that calls this is disabled
         // in exactly that case, so this null-check is the belt to that screen's braces.
         onOpenInNotion = {

@@ -66,6 +66,20 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+            M7.8's mapping screen. It reads the live schema on open, so without a connection the real
+            screen can only show its "could not read the schema" state — and it carries the note the
+            user designed from prose, which has to be looked at.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.EditMappingPreviewActivity
+            (add the extra `state` with value `dropping`, `added` or `offline`; a double dash cannot
+            appear in an XML comment, so see the activity's KDoc for the whole command)
+        -->
+        <activity
+            android:name=".gallery.EditMappingPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"

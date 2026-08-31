@@ -195,65 +195,24 @@ class NotionSetupViewModel
         }
 
         /**
-         * ⭐ **Pre-tick on the first run only** — the user's decision, 2026-08-23 (ADR-051).
+         * Moves to the mapping step, populated by [withMapping].
          *
-         * A first run, or a run against a *different* database, starts with every checkbox ticked:
-         * in the database this app was built for, every checkbox column is a habit, so that step
-         * becomes one tap. A repeat run starts from exactly what was mapped before, which means a
-         * column added in Notion since then arrives **unticked** — the moment the user wants to be
-         * asked rather than assumed at. Assuming would quietly turn a `Reviewed?` flag into a habit
-         * the app then writes `false` into.
-         *
-         * The saved selection is intersected with what the schema currently offers, so a habit whose
-         * column was deleted upstream does not come back as a tick against nothing.
+         * The rules that populate it are in that function rather than here, because M7.8's
+         * edit-mapping screen is the same step reached without the wizard and has to obey them
+         * identically.
          */
         private suspend fun showMapping(
             sourceId: String,
             properties: List<NotionProperty>,
         ) {
             val saved = repository.savedMapping()?.takeIf { it.sourceId == sourceId }
-            val candidateIds =
-                properties
-                    .filter { it.role == NotionPropertyRole.Habit }
-                    .map(NotionProperty::id)
-
             _uiState.update {
-                it.copy(
-                    step = NotionSetupStep.MapProperties,
-                    properties = properties,
-                    dayKeyPropertyId = saved.dayKeyOrOnlyCandidate(properties),
-                    habitPropertyIds =
-                        if (saved == null) {
-                            candidateIds.toSet()
-                        } else {
-                            saved.habitPropertyIds.filterTo(mutableSetOf()) { id -> id in candidateIds }
-                        },
-                )
+                it.withMapping(properties = properties, saved = saved).copy(step = NotionSetupStep.MapProperties)
             }
-        }
-
-        /**
-         * The previously chosen day key if it is still a date column, else the only date column
-         * there is, else nothing.
-         *
-         * Choosing when there is exactly one candidate is not a guess — it is the only possible
-         * answer, and it is visibly selected for the user to disagree with.
-         */
-        private fun SavedNotionMapping?.dayKeyOrOnlyCandidate(properties: List<NotionProperty>): String? {
-            val candidates = properties.filter { it.role == NotionPropertyRole.DayKey }
-            return this
-                ?.dayKeyPropertyId
-                ?.takeIf { id -> candidates.any { it.id == id } }
-                ?: candidates.singleOrNull()?.id
         }
 
         private fun toggleHabit(propertyId: String) {
-            _uiState.update { state ->
-                val habits = state.habitPropertyIds
-                state.copy(
-                    habitPropertyIds = if (propertyId in habits) habits - propertyId else habits + propertyId,
-                )
-            }
+            _uiState.update { it.withHabitToggled(propertyId) }
         }
 
         // ReturnCount: three guard clauses over state the button is already disabled for. They are
@@ -270,12 +229,7 @@ class NotionSetupViewModel
                 repository.saveMapping(
                     sourceId = sourceId,
                     dayKeyPropertyId = dayKey,
-                    // The candidate order, not the tick order: the user reads the list top to bottom
-                    // and expects their habits in that order, and this becomes HabitEntity.sortOrder.
-                    habitPropertyIds =
-                        state.habitCandidates
-                            .map(NotionProperty::id)
-                            .filter { it in state.habitPropertyIds },
+                    habitPropertyIds = state.habitPropertyIdsInOrder,
                 )
                 when (val result = repository.importNow()) {
                     is NotionSetupResult.Success -> {

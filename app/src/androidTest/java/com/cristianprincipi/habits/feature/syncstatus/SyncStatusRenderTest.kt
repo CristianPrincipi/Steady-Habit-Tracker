@@ -16,8 +16,10 @@ import com.cristianprincipi.habits.core.datetime.Elapsed
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.EditSide
+import com.cristianprincipi.habits.domain.model.MappingIssue
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,9 +53,12 @@ class SyncStatusRenderTest {
     private fun show(
         state: SyncStatusUiState,
         onEvent: (SyncStatusEvent) -> Unit = {},
+        onEditMapping: () -> Unit = {},
     ) {
         composeTestRule.setContent {
-            HabitsTheme { SyncStatusContent(state = state, onEvent = onEvent) }
+            HabitsTheme {
+                SyncStatusContent(state = state, onEvent = onEvent, onEditMapping = onEditMapping)
+            }
         }
     }
 
@@ -105,7 +110,7 @@ class SyncStatusRenderTest {
         // called once, and the point is what the *same* screen does when its state changes under it.
         val state = mutableStateOf(SyncStatusUiState(isConnected = true, lastSynced = Elapsed.Hours(2)))
         composeTestRule.setContent {
-            HabitsTheme { SyncStatusContent(state = state.value, onEvent = {}) }
+            HabitsTheme { SyncStatusContent(state = state.value, onEvent = {}, onEditMapping = {}) }
         }
         val settled = disconnectPosition()
 
@@ -124,6 +129,37 @@ class SyncStatusRenderTest {
         composeTestRule
             .onNodeWithText(string(R.string.notion_failure_database_not_shared))
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun aBrokenMappingOffersTheOneThingThatCanFixIt() {
+        // ⭐⭐ ADR-079's *"the diagnosis is good and the recovery is missing"*, closed by M7.8. This
+        // screen already named the problem correctly and then offered a retry that would fail
+        // identically and a disconnect that would cost the user their token. A mapped column is gone
+        // upstream, and the only thing that helps is changing the mapping.
+        var edited = false
+        show(
+            state =
+                SyncStatusUiState(
+                    isConnected = true,
+                    failure = SyncFailure.MappingBroken(listOf(MappingIssue.HabitMissing("ZI%40W"))),
+                ),
+            onEditMapping = { edited = true },
+        )
+
+        composeTestRule.onNodeWithText(string(R.string.mapping_edit_action)).performClick()
+
+        assertTrue(edited)
+    }
+
+    @Test
+    fun everyOtherFailureLeavesTheMappingAlone() {
+        // The route is offered for one failure, not as a general-purpose button. Offline is fixed by
+        // waiting, and sending the user to re-pick their columns would be advice to break something
+        // that is not broken.
+        show(SyncStatusUiState(isConnected = true, failure = SyncFailure.Offline))
+
+        composeTestRule.onNodeWithText(string(R.string.mapping_edit_action)).assertDoesNotExist()
     }
 
     @Test

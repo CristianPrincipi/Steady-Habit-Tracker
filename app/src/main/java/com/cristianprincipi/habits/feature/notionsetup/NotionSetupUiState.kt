@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.notionsetup
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.model.SyncFailure
 
 /**
@@ -64,6 +65,15 @@ data class NotionSetupUiState(
     val properties: List<NotionProperty> = emptyList(),
     val dayKeyPropertyId: String? = null,
     val habitPropertyIds: Set<String> = emptySet(),
+    /**
+     * What was mapped **before** this screen opened, for [habitsBeingDropped] to compare against.
+     *
+     * Empty on a first run, and empty against a different database — in both cases there is nothing
+     * to stop syncing, so the warning has nothing to say. Already intersected with the current
+     * candidates, exactly as [habitPropertyIds] is, so a habit whose column is gone upstream is not
+     * reported as one the user is about to drop.
+     */
+    val previouslyMappedHabitIds: Set<String> = emptySet(),
     /** A request is in flight. Disables the primary action and swaps its label for a spinner. */
     val isBusy: Boolean = false,
     /** The last failure, as a sentence the screen can render. Cleared when the user tries again. */
@@ -89,6 +99,22 @@ data class NotionSetupUiState(
     val unavailableProperties: List<NotionProperty>
         get() = properties.filter { it.role == NotionPropertyRole.Unavailable }
 
+    /**
+     * ⭐ The habits this selection would take out of the set — **the one destructive-looking thing
+     * either mapping screen can do** (M7.8).
+     *
+     * Unticking a habit stops it syncing and removes it from every screen (ADR-081). Its history is
+     * kept and comes back whole if the property is ticked again, but from the user's side it looks
+     * like deleting a habit and a year with it, so the screen says so — **named, and only when it
+     * applies**, which was the user's call on 2026-08-31.
+     *
+     * In candidate order rather than tick order, so the sentence lists habits in the order they
+     * appear above it.
+     */
+    val habitsBeingDropped: List<NotionProperty>
+        get() =
+            habitCandidates.filter { it.id in previouslyMappedHabitIds && it.id !in habitPropertyIds }
+
     val canContinueFromToken: Boolean get() = token.isNotBlank() && !isBusy
 
     val canLookUpLink: Boolean get() = databaseLink.isNotBlank() && !isBusy
@@ -104,4 +130,69 @@ data class NotionSetupUiState(
      */
     val canSaveMapping: Boolean
         get() = dayKeyPropertyId != null && habitPropertyIds.isNotEmpty() && !isBusy
+
+    /**
+     * The habit ids to save, **in candidate order rather than tick order**.
+     *
+     * The user reads the list top to bottom and expects their habits in that order, and this
+     * becomes `HabitEntity.sortOrder`.
+     */
+    val habitPropertyIdsInOrder: List<String>
+        get() = habitCandidates.map(NotionProperty::id).filter { it in habitPropertyIds }
 }
+
+/**
+ * The mapping step, populated from a schema and whatever was mapped before it.
+ *
+ * ⭐ **Pre-tick on the first run only** — the user's decision, 2026-08-23 (ADR-051).
+ *
+ * A first run, or a run against a *different* database, starts with every checkbox ticked: in the
+ * database this app was built for, every checkbox column is a habit, so that step becomes one tap.
+ * A repeat run starts from exactly what was mapped before, which means a column added in Notion
+ * since then arrives **unticked** — the moment the user wants to be asked rather than assumed at.
+ * Assuming would quietly turn a `Reviewed?` flag into a habit the app then writes `false` into.
+ *
+ * The saved selection is intersected with what the schema currently offers, so a habit whose column
+ * was deleted upstream does not come back as a tick against nothing.
+ *
+ * ⚠ **Here rather than in a ViewModel because there are two of them** (M7.8). The wizard reaches
+ * this step through [NotionSetupViewModel]; the edit-mapping screen reaches the same step through
+ * [EditMappingViewModel], and a second copy of these rules is a second place for them to drift.
+ *
+ * @param saved what is already mapped **for this same database**, or null — a first run, or a
+ *   different database, which is the same thing as far as the ticks are concerned.
+ */
+internal fun NotionSetupUiState.withMapping(
+    properties: List<NotionProperty>,
+    saved: SavedNotionMapping?,
+): NotionSetupUiState {
+    val candidateIds = properties.filter { it.role == NotionPropertyRole.Habit }.map(NotionProperty::id)
+    val previouslyMapped =
+        saved?.habitPropertyIds?.filterTo(mutableSetOf()) { id -> id in candidateIds }.orEmpty()
+    val dayKeyCandidates = properties.filter { it.role == NotionPropertyRole.DayKey }
+
+    return copy(
+        properties = properties,
+        // The previously chosen day key if it is still a date column, else the only date column
+        // there is, else nothing. Choosing when there is exactly one candidate is not a guess — it
+        // is the only possible answer, and it is visibly selected for the user to disagree with.
+        dayKeyPropertyId =
+            saved
+                ?.dayKeyPropertyId
+                ?.takeIf { id -> dayKeyCandidates.any { it.id == id } }
+                ?: dayKeyCandidates.singleOrNull()?.id,
+        habitPropertyIds = if (saved == null) candidateIds.toSet() else previouslyMapped,
+        previouslyMappedHabitIds = previouslyMapped,
+    )
+}
+
+/** Tick or untick one checkbox column. Shared for [withMapping]'s reason. */
+internal fun NotionSetupUiState.withHabitToggled(propertyId: String): NotionSetupUiState =
+    copy(
+        habitPropertyIds =
+            if (propertyId in habitPropertyIds) {
+                habitPropertyIds - propertyId
+            } else {
+                habitPropertyIds + propertyId
+            },
+    )

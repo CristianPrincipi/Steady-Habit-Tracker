@@ -110,6 +110,7 @@ private fun SampleHabitList(
             }
         },
         onOpenInNotion = { },
+        onEditMapping = { },
         modifier = modifier,
     )
 }

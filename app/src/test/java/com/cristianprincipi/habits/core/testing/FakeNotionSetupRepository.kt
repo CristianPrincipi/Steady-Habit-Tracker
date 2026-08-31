@@ -52,7 +52,13 @@ class FakeNotionSetupRepository : NotionSetupRepository {
 
     override suspend fun findSourcesInDatabase(databaseLink: String): NotionSetupResult<List<NotionSource>> = linkResult
 
-    override suspend fun loadProperties(sourceId: String): NotionSetupResult<List<NotionProperty>> = propertiesResult
+    /** Which data source each schema read asked for. M7.8 asserts it is the connected one. */
+    val loadedSources = mutableListOf<String>()
+
+    override suspend fun loadProperties(sourceId: String): NotionSetupResult<List<NotionProperty>> {
+        loadedSources += sourceId
+        return propertiesResult
+    }
 
     override suspend fun savedMapping(): SavedNotionMapping? = existingMapping
 

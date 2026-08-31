@@ -21,6 +21,7 @@ import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import com.cristianprincipi.habits.feature.history.MonthScreen
 import com.cristianprincipi.habits.feature.history.YearScreen
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsScreen
+import com.cristianprincipi.habits.feature.notionsetup.EditMappingScreen
 import com.cristianprincipi.habits.feature.notionsetup.NotionSetupScreen
 import com.cristianprincipi.habits.feature.settings.SettingsScreen
 import com.cristianprincipi.habits.feature.stats.StatsScreen
@@ -114,11 +115,23 @@ fun HabitsShell(
                     onOpenHabits = { navController.navigate(ManageHabits) },
                 )
             }
-            composable<SyncStatus> { SyncStatusScreen() }
+            composable<SyncStatus> {
+                SyncStatusScreen(onEditMapping = { navController.navigate(EditMapping) })
+            }
             // ⭐ Reachable since M7.5, from Settings — the user's choice over a glyph on the Week
             // header. The `+` this once waited on must never exist: ADR-010 makes a habit a column
             // in the user's Notion database, so a create button would be a control that cannot work.
-            composable<ManageHabits> { ManageHabitsScreen() }
+            composable<ManageHabits> {
+                ManageHabitsScreen(onEditMapping = { navController.navigate(EditMapping) })
+            }
+            // ⭐ M7.8, and the last step in M7. Reached from the habit list (adopt a column you just
+            // added in Notion) and from sync status (a deleted column has halted the sync and this
+            // is the only thing that restarts it). Saving pops straight back to whichever it was —
+            // the list behind is already showing the new set, which the user chose over a
+            // confirmation screen.
+            composable<EditMapping> {
+                EditMappingScreen(onSaved = { navController.popBackStack() })
+            }
         }
     }
 }
