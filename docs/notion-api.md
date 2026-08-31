@@ -651,6 +651,60 @@ pasted link fails.
 
 ---
 
+## 17. ⭐ The whole HTTP surface — and why it cannot change a schema (M7.6)
+
+The inspection M7.6 asks for, done on 2026-08-31 and **then turned into a test** so it stops being
+true only on the day it was written: `NotionSchemaIsReadOnlyTest`. ADR-082 records why the step
+became a test rather than a paragraph.
+
+**Every request this app can send.** There are six, one per method on `NotionApi`, and this is the
+complete list — the test above drives all six through the shipped client and asserts exactly these:
+
+| # | Request | Kind | What it is for |
+| --- | --- | --- | --- |
+| 1 | `POST /v1/search` | read | Which data sources the token can see (§4) — and, when empty, the *not shared* diagnosis (§3.1) |
+| 2 | `GET /v1/databases/{id}` | read | A pasted link resolved to the data sources inside it (§1) |
+| 3 | `GET /v1/data_sources/{id}` | read | **The schema — which in this database is the habit list.** Also the mapping validation |
+| 4 | `POST /v1/data_sources/{id}/query` | read | The pull. A POST because the filter and sort travel in a body (§7, §14) |
+| 5 | `POST /v1/pages` | **write** | The page for a day that has none yet (`notion-schema.md` §2.5) |
+| 6 | `PATCH /v1/pages/{id}` | **write** | The check-offs — a *partial* update, which is what leaves `Weight`, `Sleep` and `Area` untouched (§13) |
+
+**The rule the two writes obey.** A schema lives on a database or a data source. Rows 5 and 6 are the
+only writes, and both address a **page**; rows 2, 3 and 4 are the only requests that address a
+database or a data source, and all three read. So there is no request in the app that could create,
+rename, retype or delete a property.
+
+**What is absent, and deliberately.** No `PUT` and no `DELETE`, at any endpoint. No page archive or
+trash call — ADR-036 established that v1 deletes nothing, which is also why §10 can leave
+`in_trash` vs `is_archived` unresolved *for requests*: nothing needs the answer.
+
+**Four things hold that guarantee up**, and the test checks each one:
+
+1. **`data/remote/notion` is the only package that can reach the network** (`CLAUDE.md` §6). Checked
+   by scanning `app/src/main/java` for networking imports outside it. Without this the rest proves
+   nothing — a ViewModel with its own client could send anything.
+2. **`NotionApi` is that package's whole surface**, and has exactly the six calls above. A seventh
+   fails the test — and also fails to compile, since `FakeNotionApi` implements the interface.
+3. **The six send exactly the six requests in the table**, asserted by method and path against the
+   shipped client through Ktor's `MockEngine`.
+4. **The request DTOs are `internal`**, so nothing outside the package can build a request body at
+   all — which is what keeps the throttle and the retry policy on the path of every call.
+
+⚠ **The payload types are not the guarantee, and must not be read as one.** `CreatePageRequest` and
+`UpdatePageRequest` both carry `Map<String, JsonElement>` — arbitrary JSON that *looks* as though it
+could carry anything. It cannot carry a schema, because it is sent to a **page** endpoint. The
+guarantee is about the endpoint, which is why the test asserts on method and path rather than on
+bodies.
+
+**Every property id sent is one the live schema has just confirmed.** `SyncEngine.pushDay` builds its
+keys from the validated mapping's properties plus the day key, and `CLAUDE.md` §3.4's validation runs
+against a fresh `GET /v1/data_sources/{id}` before every sync — so a property that no longer exists
+is a paused sync (§3.4, `NotionMappingProblem.HabitMissing`), never a key in a request body. What
+Notion would do with an unmapped key is therefore not a question this app can ask, and it has not
+been looked up.
+
+---
+
 ## 15. Sources
 
 All read 2026-08-22.
