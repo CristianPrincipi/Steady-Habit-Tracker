@@ -14,15 +14,12 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
-import com.cristianprincipi.habits.core.datetime.monthName
 import com.cristianprincipi.habits.gallery.ShellHarnessActivity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.YearMonth
-import java.util.Locale
 
 /**
  * M5.5 — the insets rule, asserted rather than looked at.
@@ -71,9 +68,11 @@ class HabitsShellInsetsTest {
     private fun headingTop(id: Int): Float = headingTop(string(id))
 
     /**
-     * The same, for a title that is not a resource.
+     * The same, addressed by text rather than by id.
      *
-     * Month's is `monthName()` of whatever month it is (M8.1), so there is nothing to look up.
+     * [everyTabAndItsFirstText] carries strings because M8.1's Month title was computed rather than
+     * looked up. It is a resource again since M8.7, but the shape stays: a screen whose first text
+     * is not a constant is a thing this file should be able to express.
      */
     private fun headingTop(text: String): Float =
         composeTestRule
@@ -113,9 +112,10 @@ class HabitsShellInsetsTest {
      * state instead, and it is deliberately out of [everyBareTitleStartsAtTheSameHeight], because that
      * test's zero-tolerance comparison only means anything between screens that share a layout.
      *
-     * ⚠ **Month left this list for a second reason**: its title is not a string resource at all.
-     * The design takes it from the paged-to month (`monthName`), so it is computed below rather than
-     * looked up — which is also why [everyTabAndItsFirstText] carries text and not ids.
+     * ⚠ **Month is out for the SAME reason Week is, since M8.7**: its title now sits in a `Row`
+     * beside a `TextButton` ("This month", ADR-091), and a `TextButton` has a 40dp minimum height,
+     * so the row centres the title a few dp lower than a bare `Text` does. M8.1 had it out for a
+     * different reason — the title was then not a resource at all — and that reason is gone.
      *
      * ⭐ **Year and Settings are no longer stubs and are still in here on purpose** (M8.3, M7.5).
      * What earns a place is not being a stub — it is opening with a bare title under the same
@@ -153,7 +153,7 @@ class HabitsShellInsetsTest {
         get() =
             tabsOpeningWithABareTitle.map { (tab, heading) -> tab to string(heading) } +
                 (R.string.tab_week to string(R.string.screen_title_week)) +
-                (R.string.tab_month to monthName(YearMonth.now(), Locale.getDefault()))
+                (R.string.tab_month to string(R.string.screen_title_month))
 
     @Test
     fun everyDestinationClearsTheStatusBar() {

@@ -9,13 +9,11 @@ import java.time.YearMonth
  *
  * ### Why [month] is on the interface rather than inside [Content]
  *
- * `WeekUiState` keeps its week inside `Content` and renders no sub-nav without one, because the Week
- * header's title is the constant word "Week". This screen's title **is** the month
- * (`App.tsx` `headerTitles.month`), so a state with no month is a screen with no title.
- *
- * It costs nothing to carry, because the month never came from the repository: it is
- * `anchor ?: today`, which [MonthViewModel] knows synchronously and before any query returns. The
- * *habits* are what have to be waited for.
+ * M8.1 put it there because the title was then the month's own name, so a state without a month was
+ * a screen without a title. ⚠ **M8.7 made the title a constant word** (ADR-091) — and it stays on
+ * the interface anyway, because `MonthHeader` reads it for the sub-nav label and because it costs
+ * nothing: the month never came from the repository. It is `anchor ?: today`, which [MonthViewModel]
+ * knows synchronously and before any query returns. The *habits* are what have to be waited for.
  */
 sealed interface MonthUiState {
     /** The month being shown — the paged-to one, not today's, once the user has stepped away. */
@@ -50,9 +48,14 @@ sealed interface MonthUiState {
      * @param habits one entry per habit, each already holding its cells — leading `Padding` for the
      *   blanks that push the 1st onto its real weekday, then one `Day` per day of the month.
      *   `GetHabitsForMonth` does the work; this state is a courier, exactly as `WeekUiState` is.
+     * @param isCurrentMonth whether [month] is the month containing today, which is the whole of the
+     *   "This month" button's enabled state (M8.7). One of the two fields here that needs a clock,
+     *   which is precisely why it is a field: `CLAUDE.md` §6 keeps `now` out of composables, so the
+     *   ViewModel answers the question and the UI reads a value.
      */
     data class Content(
         override val month: YearMonth,
         val habits: List<HabitPeriod>,
+        val isCurrentMonth: Boolean,
     ) : MonthUiState
 }

@@ -96,26 +96,55 @@ private fun MonthGrid(
 private fun MonthHabitRow(period: HabitPeriod) {
     MonthHabitCard(
         name = period.habit.name,
-        description =
-            stringResource(R.string.habit_card_summary, period.completedCount, period.dayCount),
+        description = period.summary(),
         emoji = period.habit.emoji,
         habitColor = period.habit.color.resolve(),
         days = period.cells.map { cell -> cell.toDayStatus() },
     )
 }
 
+/**
+ * The card's second line — ADR-027's empty slot, filled the way M6 filled Week's.
+ *
+ * ⭐⭐ **The denominator is days the habit could have been kept, not days in the month** — the
+ * user's call at M8.7 (ADR-091). Paging back to before a habit existed printed `0 of 28`, which is
+ * literally true and reads as twenty-eight missed days for a habit that did not exist yet.
+ *
+ * ⚠ **And when there are none of those, the line says so rather than printing `0 of 0`.** That is
+ * the case the whole change is for, so it must not be the case that falls through to arithmetic.
+ */
+@Composable
+private fun HabitPeriod.summary(): String {
+    val eligible = eligibleCount
+    return if (eligible == 0) {
+        stringResource(R.string.habit_card_not_started)
+    } else {
+        stringResource(R.string.habit_card_summary, completedCount, eligible)
+    }
+}
+
 private val HabitPeriod.completedCount: Int
     get() = cells.count { cell -> cell is PeriodCell.Day && cell.state == DayState.COMPLETED }
 
 /**
- * Days in the month, **not** cells in the grid.
+ * Days of the month on or after the habit started — **not** cells in the grid, and not days either.
  *
- * A month window opens with up to six `Padding` cells that push the 1st onto its real weekday, so
- * `cells.size` would print `18 of 36` for a 31-day August. The Week card can use `cells.size`
- * because a week window has no padding at all.
+ * Three counts are wrong here and each is wrong differently. `cells.size` includes the up-to-six
+ * `Padding` cells that push the 1st onto its real weekday, so August would read `21 of 36`. Counting
+ * every `Day` gives the calendar month, which is what printed `0 of 28` for a habit that had not
+ * started. This counts the days the habit was actually answerable for.
+ *
+ * `BEFORE_START` is exactly that distinction, already made: `buildPeriod` assigns it to any day
+ * before `habit.startDate`. ⚠ **A completion outranks it** — a check-off recorded before the start
+ * date is `COMPLETED` and counts — which is the same precedence `HabitPeriods` documents, and the
+ * honest one: a day the user ticked is a day that happened.
+ *
+ * ⚠ Future days **do** count, unlike the Year card's rate, which stops at today. That keeps this
+ * line reading like Week's approved `6 of 7`; the three screens and their three denominators are
+ * laid out in `strings.xml` beside `habit_card_summary`.
  */
-private val HabitPeriod.dayCount: Int
-    get() = cells.count { cell -> cell is PeriodCell.Day }
+private val HabitPeriod.eligibleCount: Int
+    get() = cells.count { cell -> cell is PeriodCell.Day && cell.state != DayState.BEFORE_START }
 
 private const val MONTH_GRID_COLUMNS = 2
 
@@ -128,6 +157,7 @@ private fun MonthContentPreview() {
                 MonthUiState.Content(
                     month = SampleHabits.referenceMonth,
                     habits = SampleHabits.monthPeriods(),
+                    isCurrentMonth = true,
                 ),
             onEvent = {},
             onOpenSyncStatus = {},

@@ -193,10 +193,15 @@
 
     <!--
       Header titles — docs/design-spec.md §1. Deliberately NOT the same strings as the tab labels:
-      the design's header reads "Statistics" where the tab reads "Stats", and the Month header
-      reads the month's NAME rather than "Month" at all - so there is no screen_title_month here.
-      M8.1 built that from App.tsx's headerTitles.month, and it is monthName(), not a resource.
+      the design's header reads "Statistics" where the tab reads "Stats".
+
+      screen_title_month was deleted in M8.1 and is back in M8.7. The prototype's Month header reads
+      the month's NAME ("August") and its sub-nav reads "August 2026", so the name appears twice.
+      Built that way, looked at on a device, then ruled on by the user (ADR-091): the title is the
+      constant word and the month name stays in the sub-nav, where the arrows explain it. It also
+      gives the empty state a title with something to refer to.
     -->
+    <string name="screen_title_month">Month</string>
     <string name="screen_title_week">Week</string>
     <string name="screen_title_year">Year</string>
     <string name="screen_title_stats">Statistics</string>
@@ -224,10 +229,20 @@
       drawn unconditionally, so leaving it blank holds the space and reads like a failed load —
       this puts the most useful fact the card has there instead. UNDESIGNED; see Plan.md M6.11.
 
-      ⚠ It is habit_card_summary rather than week_card_summary because M8's Month card uses the
-      same line for the same reason. Its denominator is the days in the month, not seven.
+      ⚠ It is habit_card_summary rather than week_card_summary because M8's Month and Year cards use
+      the same line for the same reason.
+
+      ⚠⚠ The three screens count DIFFERENT denominators, deliberately, and the user ruled on it at
+      M8.7 (ADR-091):
+        Week  - the whole window, seven days, future days included ("6 of 7").
+        Month - days of the month ON OR AFTER the habit's start date. Paging back to before a habit
+                existed showed "0 of 28", which is true and reads as 28 missed days for a habit that
+                did not exist. habit_card_not_started is what that case says instead.
+        Year  - completedDays of eligibleDays, the two numbers behind the percentage beside them,
+                which additionally stops at today (GetCompletionRate).
     -->
     <string name="habit_card_summary">%1$d of %2$d</string>
+    <string name="habit_card_not_started">Not started yet</string>
     <string name="week_previous">Previous week</string>
     <string name="week_next">Next week</string>
     <string name="week_this_week">This week</string>
@@ -266,13 +281,16 @@
     <!--
       Month view (M8.1) - docs/design-spec.md §2.
 
-      The sub-nav's two arrow labels, and nothing else: the title is the month's own name and the
-      label between the arrows is "August 2026", both formatted from a YearMonth rather than stored
-      as strings. There is no "this month" - the design gives this sub-nav no jump-to-today
-      affordance, unlike week_this_week, which exists because Week is the landing tab.
+      The label between the arrows is "August 2026", formatted from a YearMonth rather than stored
+      as a string. The title is screen_title_month above.
+
+      month_this_month is the user's call at M8.7 (ADR-091), taken AGAINST the design, which gives
+      this sub-nav no jump-to-today affordance at all: six taps back deserves one tap forward. It
+      behaves like week_this_week - disabled in place rather than hidden, the rule chosen at M6.11.
     -->
     <string name="month_previous">Previous month</string>
     <string name="month_next">Next month</string>
+    <string name="month_this_month">This month</string>
 
     <!--
       Year view (M8.3) - docs/design-spec.md §4.

@@ -94,6 +94,7 @@ private fun SampleMonth(empty: HabitsEmptyReason?) {
             ?: MonthUiState.Content(
                 month = month,
                 habits = SampleHabits.monthPeriods(reference, monthOf = month),
+                isCurrentMonth = month == YearMonth.from(reference),
             )
 
     MonthContent(
@@ -103,6 +104,7 @@ private fun SampleMonth(empty: HabitsEmptyReason?) {
                 when (event) {
                     MonthEvent.PreviousMonthPressed -> month.minusMonths(1)
                     MonthEvent.NextMonthPressed -> month.plusMonths(1)
+                    MonthEvent.ThisMonthPressed -> YearMonth.from(reference)
                 }
         },
         // Real navigation is the shell's; here it is the one thing this activity cannot show.

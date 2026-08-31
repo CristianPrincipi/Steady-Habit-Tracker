@@ -80,11 +80,15 @@ private fun YearTitle() {
         text = stringResource(R.string.screen_title_year),
         style = MaterialTheme.typography.headlineSmall,
         color = HabitsTheme.colors.text.primary,
+        // ⚠ Horizontal padding only, and NO bottom padding — matching `WeekHeader` and
+        // `MonthHeader`, whose `Arrangement.spacedBy(headerBottom)` puts that 4dp *between* a title
+        // and a sub-nav and adds nothing when there is no sub-nav to separate from. Adding it here
+        // started this list 20dp below its title where the other two tabs start theirs at 16dp,
+        // which is only visible by switching tabs on a device — seen in M8.7's shell walk.
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.headerHorizontal)
-                .padding(bottom = Spacing.headerBottom),
+                .padding(horizontal = Spacing.headerHorizontal),
     )
 }
 

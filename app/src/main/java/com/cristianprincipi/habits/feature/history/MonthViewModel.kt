@@ -87,8 +87,17 @@ class MonthViewModel
 
         fun onEvent(event: MonthEvent) {
             when (event) {
-                MonthEvent.PreviousMonthPressed -> moveMonths(-1)
-                MonthEvent.NextMonthPressed -> moveMonths(+1)
+                MonthEvent.PreviousMonthPressed -> {
+                    moveMonths(-1)
+                }
+
+                MonthEvent.NextMonthPressed -> {
+                    moveMonths(+1)
+                }
+
+                MonthEvent.ThisMonthPressed -> {
+                    anchor.value = null
+                }
             }
         }
 
@@ -117,7 +126,13 @@ class MonthViewModel
                 // No habits at all rather than none this month — see MonthUiState.Empty.
                 MonthUiState.Empty(month = visible.month, reason = reason)
             } else {
-                MonthUiState.Content(month = visible.month, habits = habits)
+                MonthUiState.Content(
+                    month = visible.month,
+                    habits = habits,
+                    // Against the snapshot's own day, not a second reading of the clock: a value
+                    // built from one answer to "what day is it" must not contain a later one.
+                    isCurrentMonth = visible.month == YearMonth.from(visible.today),
+                )
             }
 
         private companion object {

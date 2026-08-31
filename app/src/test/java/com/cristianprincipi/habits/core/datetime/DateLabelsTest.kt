@@ -155,14 +155,6 @@ class DateLabelsTest {
     }
 
     @Test
-    fun aMonthNameIsTheNameAloneWithNoYear() {
-        val name = monthName(YearMonth.of(2026, 8), Locale.UK)
-
-        assertEquals("August", name)
-        assertTrue("expected no year in $name", !name.contains("2026"))
-    }
-
-    @Test
     fun aMonthLabelFollowsTheLocale() {
         val uk = monthLabel(YearMonth.of(2026, 8), Locale.UK)
         val france = monthLabel(YearMonth.of(2026, 8), Locale.FRANCE)

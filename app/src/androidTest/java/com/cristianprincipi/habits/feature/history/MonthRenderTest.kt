@@ -3,6 +3,8 @@ package com.cristianprincipi.habits.feature.history
 import android.content.Context
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -13,7 +15,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.monthLabel
-import com.cristianprincipi.habits.core.datetime.monthName
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
@@ -65,6 +66,7 @@ class MonthRenderTest {
                         MonthUiState.Content(
                             month = month,
                             habits = SampleHabits.monthPeriods(reference, monthOf = month),
+                            isCurrentMonth = month == august,
                         ),
                     onEvent = { event -> events += event },
                     onOpenSyncStatus = { syncStatusOpened++ },
@@ -99,14 +101,43 @@ class MonthRenderTest {
     }
 
     @Test
-    fun theHeaderNamesTheMonthTwiceOverTheDesignsOwnDoing() {
-        // The title is the month's name and the sub-nav label is the name plus the year, which is
-        // what `App.tsx` does (`headerTitles.month` and the NavArrows label). Asserted rather than
-        // assumed, because it is the pair the user is being asked to rule on at M8.7.
+    fun theTitleIsTheConstantWordAndTheMonthNameIsInTheSubNav() {
+        // ⭐ The user's call at M8.7 (ADR-091), against the prototype, which prints the month name
+        // as the title AND again in the sub-nav. The name reaches the screen once, between the
+        // arrows that explain what stepping does to it.
         showMonth()
 
-        composeTestRule.onNodeWithText(monthName(august, locale())).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.screen_title_month)).assertIsDisplayed()
         composeTestRule.onNodeWithText(monthLabel(august, locale())).assertIsDisplayed()
+    }
+
+    @Test
+    fun thisMonthIsDisabledInPlaceRatherThanHiddenOnTheCurrentMonth() {
+        // ⭐ The user's call at M8.7, and also against the design, which gives this sub-nav no
+        // jump-to-today at all. Disabled **in place** rather than hidden — M6.11's rule for Week's
+        // identical button: a control that vanishes when it cannot act has to be rediscovered.
+        showMonth()
+
+        composeTestRule.onNodeWithText(string(R.string.month_this_month)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.month_this_month)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun thisMonthIsOfferedOnAnyOtherMonth() {
+        showMonth(august.minusMonths(1))
+
+        composeTestRule.onNodeWithText(string(R.string.month_this_month)).assertIsEnabled()
+    }
+
+    @Test
+    fun thisMonthAsksToGoBackRatherThanSteppingOnce() {
+        // ⚠ It must not be `NextMonthPressed` in disguise. From six months back, one tap has to
+        // return to today — which is the entire argument for adding it.
+        showMonth(august.minusMonths(SIX_MONTHS))
+
+        composeTestRule.onNodeWithText(string(R.string.month_this_month)).performClick()
+
+        assertEquals(listOf(MonthEvent.ThisMonthPressed), events.toList())
     }
 
     @Test
@@ -137,6 +168,43 @@ class MonthRenderTest {
             .assertIsDisplayed()
     }
 
+    // --- the denominator (M8.7) ------------------------------------------------------------------
+
+    @Test
+    fun aMonthTheHabitHadNotStartedInSaysSoRatherThanCountingItAsMisses() {
+        // ⭐⭐ The user's call at M8.7 (ADR-091), and the case the whole change is for. `Focus`
+        // starts in May, so February is 28 days it could not have been kept on — and "0 of 28" is
+        // literally true while reading as twenty-eight failures for a habit that did not exist.
+        showMonth(YearMonth.of(2026, 2))
+
+        composeTestRule.onNodeWithText(string(R.string.habit_card_not_started)).assertIsDisplayed()
+        composeTestRule
+            .onAllNodesWithText(string(R.string.habit_card_summary).format(0, DAYS_IN_FEBRUARY))
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun aMonthTheHabitStartedPartWayThroughCountsOnlyTheDaysItCouldBeKept() {
+        // ⚠ The half of the rule a "hide the zero case" shortcut would miss. `Diet` starts on the
+        // 23rd, so February offers it six days, not twenty-eight — and the card has to say six.
+        val diet =
+            SampleHabits.monthPeriods(reference, monthOf = YearMonth.of(2026, 2)).first { period ->
+                period.habit.name == "Diet"
+            }
+        val eligible = diet.cells.count { it is PeriodCell.Day && it.state != DayState.BEFORE_START }
+        val completed = diet.cells.count { it is PeriodCell.Day && it.state == DayState.COMPLETED }
+        assertTrue(
+            "the sample data must start Diet inside February for this to mean anything, got $eligible",
+            eligible in 1 until DAYS_IN_FEBRUARY,
+        )
+
+        showMonth(YearMonth.of(2026, 2))
+
+        composeTestRule
+            .onNodeWithText(string(R.string.habit_card_summary).format(completed, eligible))
+            .assertIsDisplayed()
+    }
+
     @Test
     fun nothingInThisScreenExceptTheTwoArrowsCanBeTapped() {
         // ⭐⭐ `CLAUDE.md` §1's read-only rule, asserted rather than described. At a typical width a
@@ -146,7 +214,7 @@ class MonthRenderTest {
         showMonth()
 
         val clickable = composeTestRule.onAllNodes(hasClickAction())
-        clickable.assertCountEquals(NAV_ARROWS)
+        clickable.assertCountEquals(TAPPABLE_CONTROLS)
 
         composeTestRule.onNodeWithContentDescription(string(R.string.month_previous)).assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription(string(R.string.month_next)).assertIsDisplayed()
@@ -168,8 +236,10 @@ class MonthRenderTest {
             }
         }
 
-        composeTestRule.onNodeWithText(monthName(august, locale())).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.screen_title_month)).assertIsDisplayed()
         composeTestRule.onAllNodesWithText(monthLabel(august, locale())).assertCountEquals(0)
+        // The button goes with the sub-nav: there is no month to go back to that differs from this.
+        composeTestRule.onAllNodesWithText(string(R.string.month_this_month)).assertCountEquals(0)
         composeTestRule
             .onNodeWithText(string(R.string.habits_empty_failed_title))
             .assertIsDisplayed()
@@ -212,7 +282,14 @@ class MonthRenderTest {
         const val DAYS_IN_AUGUST = 31
         const val DAYS_IN_FEBRUARY = 28
 
-        /** The only two things on this screen that accept a tap. */
-        const val NAV_ARROWS = 2
+        /**
+         * The only things on this screen that accept a tap: two arrows and "This month".
+         *
+         * ⚠ The button counts even on the current month, where it is **disabled in place** rather
+         * than hidden — `assertIsNotEnabled` is what separates those two, not this count.
+         */
+        const val TAPPABLE_CONTROLS = 3
+
+        const val SIX_MONTHS = 6L
     }
 }

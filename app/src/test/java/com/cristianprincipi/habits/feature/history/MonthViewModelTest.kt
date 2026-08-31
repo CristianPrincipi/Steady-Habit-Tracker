@@ -26,7 +26,7 @@ import java.time.YearMonth
 import java.time.ZoneOffset
 
 /**
- * Which month the Month screen shows, and what its two arrows do to it.
+ * Which month the Month screen shows, and what its three controls do to it.
  *
  * The clock is fixed to **Wednesday 26 August 2026** — the same day `WeekViewModelTest` uses, and
  * mid-month for the same kind of reason: a 1st or a 31st would let an off-by-one in the window maths
@@ -89,9 +89,9 @@ class MonthViewModelTest {
     @Test
     fun evenLoadingKnowsWhichMonthItIs() =
         runTest {
-            // ⭐ The reason `month` sits on the interface rather than inside Content: this screen's
-            // header title IS the month name, so a state without one is a screen with no title.
-            // Week can start at a titleless Loading because its title is the word "Week".
+            // ⭐ `month` sits on the interface rather than inside Content, and it still earns that
+            // after M8.7 made the title a constant word: `MonthHeader` reads `state.month` for the
+            // sub-nav label, and `Loading` is what `stateIn` emits before any query returns.
             assertEquals(MonthUiState.Loading(thisMonth), viewModel().uiState.value)
         }
 
@@ -220,6 +220,50 @@ class MonthViewModelTest {
             rollOverTo(LocalDate.of(2026, 9, 1))
 
             assertEquals(YearMonth.of(2026, 7), content(viewModel).month)
+        }
+
+    // --- this month (M8.7) --------------------------------------------------------------------
+
+    @Test
+    fun isCurrentMonthIsTrueOnlyOnTheMonthContainingToday() =
+        runTest {
+            val viewModel = viewModel()
+            assertTrue("August is the month containing today", content(viewModel).isCurrentMonth)
+
+            viewModel.onEvent(MonthEvent.PreviousMonthPressed)
+
+            assertEquals(false, content(viewModel).isCurrentMonth)
+        }
+
+    @Test
+    fun thisMonthReturnsFromAnyDistanceInOneStep() =
+        runTest {
+            // ⭐ The entire argument for adding this button (M8.7, ADR-091): six taps back must not
+            // cost six taps forward. It is not `NextMonthPressed` in disguise.
+            val viewModel = viewModel()
+            repeat(MONTHS_TO_FEBRUARY) { viewModel.onEvent(MonthEvent.PreviousMonthPressed) }
+            assertEquals(YearMonth.of(2026, 2), content(viewModel).month)
+
+            viewModel.onEvent(MonthEvent.ThisMonthPressed)
+
+            assertEquals(thisMonth, content(viewModel).month)
+        }
+
+    @Test
+    fun thisMonthClearsTheAnchorRatherThanPinningTheCurrentMonth() =
+        runTest {
+            // ⭐⭐ The mutant: `anchor.value = currentMonth()` instead of `null`. Identical on screen,
+            // and divergent at the next month boundary — a screen returned by the button would sit
+            // on the old month while an untouched one moved on. The control's promise is "put me
+            // back on the current month", not "on this month".
+            val viewModel = viewModel()
+            viewModel.onEvent(MonthEvent.PreviousMonthPressed)
+            viewModel.onEvent(MonthEvent.ThisMonthPressed)
+            assertEquals(thisMonth, content(viewModel).month)
+
+            rollOverTo(LocalDate.of(2026, 9, 1))
+
+            assertEquals(YearMonth.of(2026, 9), content(viewModel).month)
         }
 
     // --- empty --------------------------------------------------------------------------------

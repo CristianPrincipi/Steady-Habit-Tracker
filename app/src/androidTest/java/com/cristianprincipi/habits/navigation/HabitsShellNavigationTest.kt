@@ -16,15 +16,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
-import com.cristianprincipi.habits.core.datetime.monthName
 import com.cristianprincipi.habits.gallery.ShellHarnessActivity
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.time.YearMonth
-import java.util.Locale
 
 /**
  * The shell on a device: the bar switches tabs, and sync status is reachable.
@@ -248,11 +245,7 @@ class HabitsShellNavigationTest {
         weekIsShowing().assertIsDisplayed()
 
         tab(R.string.tab_month).performClick()
-        // Month's header is the month's own NAME, not "Month" — the design takes it from the
-        // paged-to month (M8.1, `docs/design-spec.md` §1), so there is no resource to look up.
-        composeTestRule
-            .onNodeWithText(monthName(YearMonth.now(), Locale.getDefault()))
-            .assertIsDisplayed()
+        heading(R.string.screen_title_month).assertIsDisplayed()
 
         tab(R.string.tab_year).performClick()
         heading(R.string.screen_title_year).assertIsDisplayed()
