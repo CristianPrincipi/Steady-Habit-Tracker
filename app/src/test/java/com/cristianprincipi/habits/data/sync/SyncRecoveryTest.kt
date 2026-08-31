@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.data.sync
 import com.cristianprincipi.habits.core.testing.PropertyIds
 import com.cristianprincipi.habits.core.testing.SyncWorld
 import com.cristianprincipi.habits.core.testing.august19
+import com.cristianprincipi.habits.core.testing.august20
 import com.cristianprincipi.habits.core.testing.connectedWorld
 import com.cristianprincipi.habits.core.testing.dataSourceOf
 import com.cristianprincipi.habits.core.testing.defaultSchema
@@ -207,6 +208,55 @@ class SyncRecoveryTest {
         }
 
     // --- a mapping that went stale between runs -------------------------------------------------
+
+    @Test
+    fun aHabitColumnDeletedInNotionHaltsTheRunAndLeavesEveryHabitExactlyAsItWas() =
+        runTest {
+            // ⭐⭐ **M7.4's "removed" case, on an install that has been working** — which is the only
+            // shape where the behaviour is visible at all.
+            // `SyncEngineTest.aBrokenMappingStopsTheRunBeforeAnythingIsWritten` starts from an empty
+            // world, so its "nothing was written" is true whether the run halted or ran to
+            // completion with nothing to do. Here there are two habits and a history to disturb.
+            //
+            // ⚠ **The habit whose column is gone must NOT be deactivated.** Deactivation belongs to
+            // a different trigger — the *mapping* ceasing to name a habit (ADR-079) — and since
+            // ADR-081 it also means the habit disappears from every screen. Doing it here would
+            // hide a habit because of a problem upstream the user has not been told about yet, in
+            // the same run that is refusing to read or write anything else.
+            val world = connectedWorld()
+            world.api.givePage(
+                page("p1", august19, checks = mapOf(PropertyIds.READ to true, PropertyIds.JOURNAL to true)),
+            )
+            world.engine.sync()
+            val journal = world.habitId(PropertyIds.JOURNAL)
+            world.checkOffLocally(august20, PropertyIds.READ)
+
+            // Journal's column is deleted in Notion. Read's is untouched, and that is the point.
+            world.api.schema =
+                dataSourceOf(
+                    NotionPropertySchemaDto(PropertyIds.READ, "📖 Read", "checkbox"),
+                    NotionPropertySchemaDto(PropertyIds.DATE, "Date", "date"),
+                )
+            val outcome = world.engine.sync()
+
+            assertTrue(outcome is SyncOutcome.MappingBroken)
+            // `CLAUDE.md` §3.4 pauses the whole sync, not the missing habit's part of it: the run
+            // returns before the import, so nothing is deactivated, renamed, re-coloured or dated.
+            assertEquals(
+                listOf(PropertyIds.READ, PropertyIds.JOURNAL),
+                world.habits.current
+                    .sortedBy { it.sortOrder }
+                    .map { it.notionPropertyId },
+            )
+            assertTrue("no habit is hidden by a run that halted", world.habits.current.all { it.isActive })
+            assertEquals(
+                "and the history of the habit whose column is gone is untouched",
+                1,
+                world.completions.current.count { it.habitId == journal },
+            )
+            assertTrue("nothing was written to Notion", world.api.updated.isEmpty())
+            assertEquals("and the edit is still owed", SyncState.PENDING_PUSH, world.dayAt(august20).syncState)
+        }
 
     @Test
     fun aRetypedDayKeyStopsTheRunWithAnEditStillPending() =
