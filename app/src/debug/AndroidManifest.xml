@@ -95,6 +95,21 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+          The Year view against sample data (M8.3). Same reason and same safety as the previews
+          above. The thing worth looking at here is the horizontal scroll: the grid is wider than
+          the card and scrolls itself to today on first composition, which is the opposite of what
+          the web prototype does.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.YearPreviewActivity
+            (add the extra `state` with value `pending` or `failed` for the empty screen; a double
+            dash cannot appear in an XML comment, so see the activity's KDoc for the whole command)
+        -->
+        <activity
+            android:name=".gallery.YearPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"

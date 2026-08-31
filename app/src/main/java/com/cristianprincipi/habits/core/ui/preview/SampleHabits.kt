@@ -1,16 +1,21 @@
 package com.cristianprincipi.habits.core.ui.preview
 
 import com.cristianprincipi.habits.core.datetime.monthWindow
+import com.cristianprincipi.habits.core.datetime.trailingYearWindow
 import com.cristianprincipi.habits.core.datetime.weekWindow
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.usecase.GetCompletionRate
+import com.cristianprincipi.habits.domain.usecase.HabitYear
 import com.cristianprincipi.habits.domain.usecase.buildPeriod
 import com.cristianprincipi.habits.domain.usecase.byHabit
+import java.time.Clock
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneOffset
 
 /**
  * A realistic habit set with realistic history, for `@Preview`s and for tests.
@@ -125,6 +130,30 @@ object SampleHabits {
                 window = window,
                 completedDates = byHabit[habit.id].orEmpty(),
                 today = reference,
+            )
+        }
+    }
+
+    /**
+     * The same five habits over the trailing year ending at [reference], for the Year view.
+     *
+     * Builds its `CompletionRate` through the real `GetCompletionRate` on a clock fixed to
+     * [reference] rather than recomputing the rule here. The rule is not obvious — the window starts
+     * at `max(startDate, 365 days ago)`, which is why a young habit's percentage is over a short
+     * denominator — and a second copy in preview data would be a second place to get it wrong.
+     */
+    fun years(
+        reference: LocalDate = referenceDate,
+        completions: Collection<Completion> = completions(reference),
+    ): List<HabitYear> {
+        val window = trailingYearWindow(reference)
+        val byHabit = completions.toList().byHabit()
+        val rateOf = GetCompletionRate(Clock.fixed(reference.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC))
+        return habits(reference).map { habit ->
+            val dates = byHabit[habit.id].orEmpty()
+            HabitYear(
+                period = buildPeriod(habit, window, dates, reference),
+                rate = rateOf(completedDates = dates, startDate = habit.startDate),
             )
         }
     }

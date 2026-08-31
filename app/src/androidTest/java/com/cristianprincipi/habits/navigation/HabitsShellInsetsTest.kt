@@ -41,7 +41,7 @@ import java.util.Locale
  * The second is not hypothetical: `SyncStatusScreen` did exactly that the moment M5.2 put it in the
  * graph, and it was caught by eye rather than by anything that would fail a build.
  *
- * [everyDestinationClearsTheStatusBar] catches the first. [stubsAllStartAtTheSameHeight] catches
+ * [everyDestinationClearsTheStatusBar] catches the first. [everyBareTitleStartsAtTheSameHeight] catches
  * the second with no tolerance at all — screens sharing a layout must share a top pixel — and
  * [noDestinationIsPaddedTwice] keeps catching it once they stop sharing one, because double-padding
  * has an exact signature: content that begins two status bars down instead of one.
@@ -104,25 +104,30 @@ class HabitsShellInsetsTest {
     }
 
     /**
-     * The tabs still drawn by `StubScreen`, paired with the title each draws.
+     * The tabs whose first text is a bare title on `StubScreen`'s modifier chain, and that title.
      *
-     * ⚠ **Neither Week nor Month is among them any more.** M6.3 replaced Week's stub with the real
+     * ⚠ **Neither Week nor Month is among them.** M6.3 replaced Week's stub with the real
      * `WeekContent` and M8.1 replaced Month's with `MonthContent`, which
      * has no header at all — `docs/design-spec.md` §1 puts the title in the screen header and
      * **M6.4** builds it. Week is covered by [everyDestinationClearsTheStatusBar] through its empty
-     * state instead, and it is deliberately out of [stubsAllStartAtTheSameHeight], because that
+     * state instead, and it is deliberately out of [everyBareTitleStartsAtTheSameHeight], because that
      * test's zero-tolerance comparison only means anything between screens that share a layout.
      *
      * ⚠ **Month left this list for a second reason**: its title is not a string resource at all.
      * The design takes it from the paged-to month (`monthName`), so it is computed below rather than
      * looked up — which is also why [everyTabAndItsFirstText] carries text and not ids.
      *
-     * **This list shrinks as M6–M8 replace the stubs, and that is fine.** What it protects is the
+     * ⭐ **Year and Settings are no longer stubs and are still in here on purpose** (M8.3, M7.5).
+     * What earns a place is not being a stub — it is opening with a bare title under the same
+     * modifier chain, which is what makes a zero-tolerance comparison mean something. A real screen
+     * that keeps that chain is exactly the one worth holding to it.
+     *
+     * **This list shrinks as M6–M9 replace the stubs, and that is fine.** What it protects is the
      * exact regression M5.2 produced — one screen padding itself on top of the shell — and it keeps
      * protecting it for as long as two screens still share `StubScreen`. Stats is "Statistics" in
      * the header and "Stats" on the tab: the design's own asymmetry.
      */
-    private val stubTabsAndHeadings =
+    private val tabsOpeningWithABareTitle =
         listOf(
             R.string.tab_year to R.string.screen_title_year,
             R.string.tab_stats to R.string.screen_title_stats,
@@ -133,7 +138,7 @@ class HabitsShellInsetsTest {
      * The **topmost** piece of text on each destination, whatever kind of screen it is.
      *
      * Week rejoins by its own header title now that M6.4 has built one — but only here, not in
-     * [stubsAllStartAtTheSameHeight]. Its title sits in a `Row` beside the "This week" button, and
+     * [everyBareTitleStartsAtTheSameHeight]. Its title sits in a `Row` beside the "This week" button, and
      * a `TextButton` has a 40dp minimum height, so the row centres the title a few dp lower than a
      * stub's bare `Text`. That is a real cross-tab alignment question — the design puts a control
      * in this row on three views of five and none on the other two — and it is **the user's to
@@ -146,7 +151,7 @@ class HabitsShellInsetsTest {
      */
     private val everyTabAndItsFirstText: List<Pair<Int, String>>
         get() =
-            stubTabsAndHeadings.map { (tab, heading) -> tab to string(heading) } +
+            tabsOpeningWithABareTitle.map { (tab, heading) -> tab to string(heading) } +
                 (R.string.tab_week to string(R.string.screen_title_week)) +
                 (R.string.tab_month to monthName(YearMonth.now(), Locale.getDefault()))
 
@@ -236,13 +241,13 @@ class HabitsShellInsetsTest {
     }
 
     @Test
-    fun stubsAllStartAtTheSameHeight() {
+    fun everyBareTitleStartsAtTheSameHeight() {
         // ⭐ The assertion that would have caught M5.2's double-padded sync status, and it needs no
-        // tolerance to do it: every `StubScreen` uses the same modifier chain, so their titles must
+        // tolerance to do it: these screens share a modifier chain, so their titles must
         // land on exactly the same pixel. A screen that adds `windowInsetsPadding` of its own is
         // the only way for one to drift, and it drifts by a whole status bar.
         val tops =
-            stubTabsAndHeadings.map { (tabLabel, heading) ->
+            tabsOpeningWithABareTitle.map { (tabLabel, heading) ->
                 tab(tabLabel).performClick()
                 composeTestRule.waitForIdle()
                 string(heading) to headingTop(heading)
@@ -261,7 +266,7 @@ class HabitsShellInsetsTest {
 
     @Test
     fun noDestinationIsPaddedTwice() {
-        // ⭐ What [stubsAllStartAtTheSameHeight] cannot say once screens stop sharing a layout, and
+        // ⭐ What [everyBareTitleStartsAtTheSameHeight] cannot say once screens stop sharing a layout, and
         // what will still be true when the last stub is gone.
         //
         // Double-padding has an exact signature: the screen applies the same inset the shell already

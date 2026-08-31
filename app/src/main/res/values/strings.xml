@@ -275,6 +275,23 @@
     <string name="month_next">Next month</string>
 
     <!--
+      Year view (M8.3) - docs/design-spec.md §4.
+
+      Two strings, and the screen has no others: its title is screen_title_year, its card's second
+      line is habit_card_summary, and there is no sub-nav to label because the design gives this
+      view no paging at all.
+
+      year_completion_value is a template rather than a bare "%d%%" concatenation so a locale that
+      writes its percent sign first, or with a space, can say so.
+
+      The eyebrow is uppercase IN THE STRING rather than through a text transform: it is a word a
+      translator may need to case differently, and Turkish alone is reason enough not to let code
+      decide what a capital letter is.
+    -->
+    <string name="year_completion_value">%1$d%%</string>
+    <string name="year_completion_eyebrow">COMPLETION</string>
+
+    <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
 
       Two facts do all the work here, and both are ADR-010's: a habit IS a checkbox column in the

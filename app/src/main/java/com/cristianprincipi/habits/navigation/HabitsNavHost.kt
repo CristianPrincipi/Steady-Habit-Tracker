@@ -109,7 +109,9 @@ fun HabitsShell(
             composable<Week> {
                 WeekScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
-            composable<Year> { YearScreen() }
+            composable<Year> {
+                YearScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
+            }
             composable<Stats> { StatsScreen() }
             composable<Settings> {
                 SettingsScreen(
