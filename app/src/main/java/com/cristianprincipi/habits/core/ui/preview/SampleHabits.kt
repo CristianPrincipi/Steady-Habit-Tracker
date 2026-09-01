@@ -179,10 +179,10 @@ object SampleHabits {
         completions: Collection<Completion> = completions(reference),
     ): HabitStats {
         val habit = habits(reference).first { it.id.value == id }
-        val dates = completions.filter { it.habitId == habit.id }.map { it.date }
+        val dates = completions.filter { it.habitId == habit.id }.map { it.date }.toSet()
         val clock = Clock.fixed(reference.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
         return HabitStats(
-            habit = habit,
+            period = buildPeriod(habit, trailingYearWindow(reference), dates, reference),
             streak = CalculateStreak(clock)(dates),
             rate = GetCompletionRate(clock)(completedDates = dates, startDate = habit.startDate),
         )

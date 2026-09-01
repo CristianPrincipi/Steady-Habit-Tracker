@@ -310,6 +310,19 @@
     <string name="year_completion_eyebrow">COMPLETION</string>
 
     <!--
+      Stats view (M9) - docs/design-spec.md §5.
+
+      The eyebrow is uppercase IN THE STRING, for the reason the Year block above gives: casing is a
+      translator's decision, and Turkish alone is reason enough not to let code decide what a
+      capital letter is.
+
+      There is deliberately no string for the grid itself. YearDotGrid clears its own semantics
+      (ADR-089): a screen reader cannot usefully be read 365 coloured squares, and the four stat
+      tiles beside it say the same thing in words.
+    -->
+    <string name="stats_year_overview_eyebrow">YEAR OVERVIEW</string>
+
+    <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
 
       Two facts do all the work here, and both are ADR-010's: a habit IS a checkbox column in the

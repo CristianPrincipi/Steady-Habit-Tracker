@@ -166,6 +166,26 @@ class StatsRenderTest {
     }
 
     @Test
+    fun theYearOverviewCardIsThereWithItsEyebrow() {
+        // The grid under it cannot be asserted from here: `YearDotGrid` clears its own semantics
+        // (ADR-089), which is deliberate — a screen reader cannot usefully be read 365 coloured
+        // squares. Its pixels are `YearDotGridTest`'s, its window is `StatsViewModelTest`'s, and
+        // what is left for this file is that the section exists at all.
+        showStats()
+
+        composeTestRule.onNodeWithText(string(R.string.stats_year_overview_eyebrow)).assertIsDisplayed()
+    }
+
+    @Test
+    fun theEmptyScreenHasNoYearOverviewEither() {
+        // No habits means no habit to draw a year for. The eyebrow without a grid under it would
+        // be a section heading for nothing.
+        showEmpty(HabitsEmptyReason.SyncPending)
+
+        composeTestRule.onNodeWithText(string(R.string.stats_year_overview_eyebrow)).assertDoesNotExist()
+    }
+
+    @Test
     fun theEmptyScreenHasNoPillsToChooseFrom() {
         // Empty means no habits at all (`StatsUiState.Empty`), so there is nothing to select
         // between — and the selector must not draw an empty row above the message.

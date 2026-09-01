@@ -9,7 +9,9 @@ import com.cristianprincipi.habits.core.testing.MutableClock
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.Completion
+import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.PeriodCell
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.usecase.CalculateStreak
@@ -214,6 +216,54 @@ class StatsViewModelTest {
                 val overnight = (awaitItem() as StatsUiState.Content).selected
                 assertEquals(0, overnight.streak.current)
                 assertEquals(3, overnight.streak.best)
+            }
+        }
+
+    @Test
+    fun theYearCardGetsATrailing365EndingToday() =
+        runTest {
+            // The window the design's year overview draws (`docs/design-spec.md` §5.2), and the same
+            // one the Year tab uses — one grid rendered at two sizes must not be two windows.
+            viewModel(repository()).uiState.test {
+                val cells = (awaitItem() as StatsUiState.Content).selected.period.cells
+                val realDays = cells.filterIsInstance<PeriodCell.Day>()
+
+                assertEquals(365, realDays.size)
+                assertEquals(today, realDays.last().date)
+            }
+        }
+
+    @Test
+    fun daysBeforeTheHabitStartedAreDrawnAsSuch() =
+        runTest {
+            // The Year grid is the one place the design separates "before this habit existed" from
+            // an ordinary miss — a year is long enough for a start date to be a real feature of the
+            // picture (`YearDotGrid.yearDayColor`).
+            val young = testHabit(id = "young", startDate = today.minusDays(9))
+            viewModel(repository(habits = listOf(young))).uiState.test {
+                val cells = (awaitItem() as StatsUiState.Content).selected.period.cells
+                val states = cells.filterIsInstance<PeriodCell.Day>().map { it.state }
+
+                assertEquals(365 - 10, states.count { it == DayState.BEFORE_START })
+                assertEquals(10, states.count { it == DayState.INCOMPLETE })
+            }
+        }
+
+    @Test
+    fun aCompletionOlderThanTheInferredStartDateIsStillDrawnAsKept() =
+        runTest {
+            // ⭐⭐ The mutant: query `startDate..today` instead of reaching back to the window start.
+            // `startDate` is *inferred* from the earliest day synced, not read from Notion, so a
+            // completion older than it is possible — and one the query missed would be drawn
+            // BEFORE_START here while the Year tab, which queries the whole window, drew the same
+            // day COMPLETED. One grid, two screens, two answers.
+            val young = testHabit(id = "young", startDate = today.minusDays(9))
+            val older = Completion(young.id, today.minusDays(100))
+            viewModel(repository(habits = listOf(young), completions = listOf(older))).uiState.test {
+                val cells = (awaitItem() as StatsUiState.Content).selected.period.cells
+                val day = cells.filterIsInstance<PeriodCell.Day>().single { it.date == older.date }
+
+                assertEquals(DayState.COMPLETED, day.state)
             }
         }
 

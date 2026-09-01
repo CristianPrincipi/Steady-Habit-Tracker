@@ -18,24 +18,29 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.HabitChip
+import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
+import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
+import com.cristianprincipi.habits.core.designsystem.component.YearDotGrid
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.core.ui.resolve
+import com.cristianprincipi.habits.core.ui.toDayStatus
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.usecase.HabitStats
 
 /**
  * The Stats view, stateless — `docs/design-spec.md` §5.
  *
- * ⚠ **Still filling: M9.2 added the selector pills.** The three sections below them have their own
- * steps — the year overview card (M9.3), the 2×2 stat tiles (M9.4) and the monthly chart (M9.5) —
- * and both components they need already exist in `core/designsystem` (`YearDotGrid`, `StatTile`).
- * What this file establishes is the one thing every section shares and could otherwise each get
- * differently: the header, the three states, and the 16dp padding and 16dp section spacing the
- * design specifies.
+ * ⚠ **Still filling: M9.2 added the selector pills and M9.3 the year overview.** The two sections
+ * below them have their own steps — the 2×2 stat tiles (M9.4) and the monthly chart (M9.5) — and
+ * `StatTile` already exists in `core/designsystem`. What this file establishes is the one thing
+ * every section shares and could otherwise each get differently: the header, the three states, and
+ * the 16dp padding and 16dp section spacing the design specifies.
  */
 @Composable
 fun StatsContent(
@@ -114,8 +119,9 @@ private fun StatsSections(
             selectedId = state.selectedId,
             onSelect = { id -> onEvent(StatsEvent.HabitSelected(id)) },
         )
-        // M9.3 -> the year overview card, M9.4 -> the stat tiles, M9.5 -> the monthly completions
-        // chart. All three read `state.selected`.
+        YearOverviewCard(stats = state.selected)
+        // M9.4 -> the stat tiles, M9.5 -> the monthly completions chart. Both read
+        // `state.selected` too.
     }
 }
 
@@ -156,6 +162,38 @@ private fun HabitSelector(
                 onClick = { onSelect(habit.id) },
             )
         }
+    }
+}
+
+/**
+ * The "Year overview" card — `docs/design-spec.md` §5.2.
+ *
+ * An eyebrow and a grid, and nothing else: the percentage that sits beside the Year *tab*'s grid
+ * belongs to M9.4's "completion rate" tile here, and printing it twice on one screen would be two
+ * places to keep in step.
+ *
+ * ⭐ **`Sizing.yearDotLarge` (6dp) rather than the Year tab's 4dp**, which is the design's own
+ * figure and the reason this card exists as a separate rendering of the same component: a whole
+ * screen for one habit can afford the room that five stacked cards cannot.
+ *
+ * ⚠ **`toDayStatus()` runs here, at the call site, and ADR-090 wanted it hoisted out.** M9.3
+ * measured the case that note was written for and found it does not arise on this screen — see
+ * `StatsRedrawTest` and ADR-094. The hoist stays unbuilt on purpose: it would make `YearDotGrid`
+ * skippable at the price of allocating 371 entries on every emission, and nothing here recomposes
+ * without the cells changing anyway.
+ */
+@Composable
+private fun YearOverviewCard(
+    stats: HabitStats,
+    modifier: Modifier = Modifier,
+) {
+    HabitsCard(modifier = modifier) {
+        SectionEyebrow(text = stringResource(R.string.stats_year_overview_eyebrow))
+        YearDotGrid(
+            days = stats.period.cells.map { cell -> cell.toDayStatus() },
+            habitColor = stats.habit.color.resolve(),
+            dotSize = Sizing.yearDotLarge,
+        )
     }
 }
 
