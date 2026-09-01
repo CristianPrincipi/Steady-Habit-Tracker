@@ -107,7 +107,7 @@ class YearRenderTest {
                     .format(focus.rate.completedDays, focus.rate.eligibleDays),
             ).assertIsDisplayed()
         composeTestRule
-            .onNodeWithText(string(R.string.year_completion_value).format(focus.rate.percent))
+            .onNodeWithText(string(R.string.percent_value).format(focus.rate.percent))
             .assertIsDisplayed()
     }
 

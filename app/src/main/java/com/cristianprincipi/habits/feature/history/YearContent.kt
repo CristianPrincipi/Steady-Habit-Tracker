@@ -129,7 +129,7 @@ private fun YearHabitRow(year: HabitYear) {
             ),
         emoji = habit.emoji,
         habitColor = habit.color.resolve(),
-        completionLabel = stringResource(R.string.year_completion_value, year.rate.percent),
+        completionLabel = stringResource(R.string.percent_value, year.rate.percent),
         completionEyebrow = stringResource(R.string.year_completion_eyebrow),
         days = year.period.cells.map { cell -> cell.toDayStatus() },
     )

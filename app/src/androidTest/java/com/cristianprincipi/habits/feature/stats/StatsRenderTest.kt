@@ -3,11 +3,13 @@ package com.cristianprincipi.habits.feature.stats
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -20,6 +22,7 @@ import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -183,6 +186,49 @@ class StatsRenderTest {
         showEmpty(HabitsEmptyReason.SyncPending)
 
         composeTestRule.onNodeWithText(string(R.string.stats_year_overview_eyebrow)).assertDoesNotExist()
+    }
+
+    @Test
+    fun theFourTilesShowTheSelectedHabitsFigures() {
+        // ⭐ Every number checked against the use case's own answer rather than a literal, so the
+        // test cannot drift from the arithmetic: a tile wired to the wrong half of `HabitStats` —
+        // best streak where current belongs, say — fails here while still looking plausible.
+        val stats = SampleHabits.stats(id = selected.id.value)
+        showStats()
+
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_completed_days)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_completion_rate)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_current_streak)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_best_streak)).assertIsDisplayed()
+
+        composeTestRule.onNodeWithText(string(R.string.percent_value).format(stats.rate.percent)).assertExists()
+        composeTestRule
+            .onAllNodesWithText(string(R.string.stats_count_value).format(stats.rate.completedDays))
+            .assertCountEquals(1)
+    }
+
+    @Test
+    fun theTilesFollowTheSelection() {
+        // The mutant: draw `habits.first()` rather than `state.selected`. Two habits with different
+        // rates are all it takes, and `SampleHabits` gives every habit its own keep-rate.
+        val other = habits[3]
+        val theirs = SampleHabits.stats(id = other.id.value)
+        val firsts = SampleHabits.stats(id = selected.id.value)
+        assertNotEquals(firsts.rate.percent, theirs.rate.percent)
+
+        showStats(selectedHabit = other)
+
+        composeTestRule.onNodeWithText(string(R.string.percent_value).format(theirs.rate.percent)).assertExists()
+        composeTestRule
+            .onAllNodesWithText(string(R.string.percent_value).format(firsts.rate.percent))
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun theEmptyScreenHasNoTilesEither() {
+        showEmpty(HabitsEmptyReason.SyncPending)
+
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_current_streak)).assertDoesNotExist()
     }
 
     @Test

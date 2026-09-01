@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
@@ -46,6 +47,7 @@ import com.cristianprincipi.habits.feature.stats.StatsUiState
  * adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.StatsPreviewActivity
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state pending
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state failed
+ * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es numerals mono
  * ```
  *
  * ⚠ `-S` matters when the activity is already up: `am start` compares intents with
@@ -67,7 +69,10 @@ class StatsPreviewActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    SampleStats(empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)))
+                    SampleStats(
+                        empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)),
+                        numerals = numeralsFrom(intent.getStringExtra(EXTRA_NUMERALS)),
+                    )
                 }
             }
         }
@@ -75,6 +80,18 @@ class StatsPreviewActivity : ComponentActivity() {
 }
 
 private const val EXTRA_STATE = "state"
+private const val EXTRA_NUMERALS = "numerals"
+
+/**
+ * ⭐ **The whole point of this switch: ADR-021's open question, still open.**
+ *
+ * `NumeralStyle` was built both ways at M2.7 precisely so the choice could be made by eye, and the
+ * stat tiles are the first place a large number appears on a real screen. `mono` renders DM Mono,
+ * whose digits are all 600 units wide so nothing shifts — at Medium 500, because **DM Mono has no
+ * bold** and faking one on a monospaced face looks worse than being honestly lighter. Anything else
+ * renders the design's DM Sans at 700, whose `1` is 342 units against `0` at 656.
+ */
+private fun numeralsFrom(extra: String?): NumeralStyle = if (extra == "mono") NumeralStyle.MONO else NumeralStyle.SANS
 
 /** `null` for the sample habit; a reason to render [StatsUiState.Empty] instead. */
 private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
@@ -99,7 +116,10 @@ private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
  * applies inside the graph; this is outside it).
  */
 @Composable
-private fun SampleStats(empty: HabitsEmptyReason?) {
+private fun SampleStats(
+    empty: HabitsEmptyReason?,
+    numerals: NumeralStyle,
+) {
     val habits = SampleHabits.habits()
     val history = SampleHabits.completions() + SampleHabits.unbrokenRun()
     var selectedId by remember { mutableStateOf(habits.first().id) }
@@ -112,6 +132,7 @@ private fun SampleStats(empty: HabitsEmptyReason?) {
                     selected = SampleHabits.stats(id = selectedId.value, completions = history),
                 ),
         onEvent = { event -> if (event is StatsEvent.HabitSelected) selectedId = event.habitId },
+        numerals = numerals,
         // Real navigation is the shell's; here it is the one thing this activity cannot show.
         onOpenSyncStatus = {},
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),

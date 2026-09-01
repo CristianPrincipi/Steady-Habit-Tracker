@@ -2,6 +2,8 @@ package com.cristianprincipi.habits.feature.stats
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,13 +16,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.HabitChip
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
+import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
+import com.cristianprincipi.habits.core.designsystem.component.StatTile
+import com.cristianprincipi.habits.core.designsystem.component.StatTileIcon
 import com.cristianprincipi.habits.core.designsystem.component.YearDotGrid
+import com.cristianprincipi.habits.core.designsystem.icon.Lucide
+import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -36,11 +44,15 @@ import com.cristianprincipi.habits.domain.usecase.HabitStats
 /**
  * The Stats view, stateless — `docs/design-spec.md` §5.
  *
- * ⚠ **Still filling: M9.2 added the selector pills and M9.3 the year overview.** The two sections
- * below them have their own steps — the 2×2 stat tiles (M9.4) and the monthly chart (M9.5) — and
- * `StatTile` already exists in `core/designsystem`. What this file establishes is the one thing
+ * ⚠ **One section left: M9.5's monthly completions chart.** The pills (M9.2), the year overview
+ * (M9.3) and the four stat tiles (M9.4) are all here. What this file establishes is the one thing
  * every section shares and could otherwise each get differently: the header, the three states, and
  * the 16dp padding and 16dp section spacing the design specifies.
+ *
+ * @param numerals ⚠ **temporary, and it exists to settle ADR-021's open question.** `NumeralStyle`
+ *   was built both ways at M2.7 so the choice could be made by eye, and it has been pending since —
+ *   production always takes the default, and only `StatsPreviewActivity` passes the other. **This
+ *   parameter and the enum are both deleted the day the user chooses** (`Plan.md` M9.8).
  */
 @Composable
 fun StatsContent(
@@ -48,6 +60,7 @@ fun StatsContent(
     onEvent: (StatsEvent) -> Unit,
     onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
+    numerals: NumeralStyle = NumeralStyle.SANS,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         StatsTitle()
@@ -68,7 +81,12 @@ fun StatsContent(
             }
 
             is StatsUiState.Content -> {
-                StatsSections(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+                StatsSections(
+                    state = state,
+                    onEvent = onEvent,
+                    numerals = numerals,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }
@@ -108,6 +126,7 @@ private fun StatsTitle() {
 private fun StatsSections(
     state: StatsUiState.Content,
     onEvent: (StatsEvent) -> Unit,
+    numerals: NumeralStyle,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -120,8 +139,8 @@ private fun StatsSections(
             onSelect = { id -> onEvent(StatsEvent.HabitSelected(id)) },
         )
         YearOverviewCard(stats = state.selected)
-        // M9.4 -> the stat tiles, M9.5 -> the monthly completions chart. Both read
-        // `state.selected` too.
+        StatTiles(stats = state.selected, numerals = numerals)
+        // M9.5 -> the monthly completions chart, which reads `state.selected` too.
     }
 }
 
@@ -195,6 +214,84 @@ private fun YearOverviewCard(
             dotSize = Sizing.yearDotLarge,
         )
     }
+}
+
+/**
+ * The four stat tiles — `docs/design-spec.md` §5.3.
+ *
+ * Four numbers from two values: [HabitStats.rate] is the first row and [HabitStats.streak] the
+ * second. `StatTile` and `StatTileIcon` are M2's and the glyphs are ADR-024's, so this is an
+ * arrangement and nothing more.
+ *
+ * A `Row` of `Row`s rather than a `LazyVerticalGrid`: there are exactly four tiles, always, and a
+ * lazy grid inside a vertically scrolling `Column` needs a fixed height it has no business having.
+ *
+ * ⚠ **These digits jitter, and that is the faithful port.** The design asks for tabular figures and
+ * `sansNumerals.statValue` duly requests `tnum` — but ADR-021 §2 read DM Sans 4.004's tables out of
+ * the bundled binary and the feature **is not in the font**: `1` is 342 units against `0` at 656.
+ * The prototype's own `tabular-nums` is equally inert, so its numbers shift too.
+ */
+@Composable
+private fun StatTiles(
+    stats: HabitStats,
+    numerals: NumeralStyle,
+    modifier: Modifier = Modifier,
+) {
+    val color = stats.habit.color.resolve()
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            Tile(
+                label = R.string.stats_tile_completed_days,
+                glyph = Lucide.Hash,
+                value = stringResource(R.string.stats_count_value, stats.rate.completedDays),
+                color = color,
+                numerals = numerals,
+            )
+            Tile(
+                label = R.string.stats_tile_completion_rate,
+                glyph = Lucide.Percent,
+                value = stringResource(R.string.percent_value, stats.rate.percent),
+                color = color,
+                numerals = numerals,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            Tile(
+                label = R.string.stats_tile_current_streak,
+                glyph = Lucide.Flame,
+                value = stringResource(R.string.stats_count_value, stats.streak.current),
+                color = color,
+                numerals = numerals,
+            )
+            Tile(
+                label = R.string.stats_tile_best_streak,
+                glyph = Lucide.Trophy,
+                value = stringResource(R.string.stats_count_value, stats.streak.best),
+                color = color,
+                numerals = numerals,
+            )
+        }
+    }
+}
+
+/** One tile, at half the row. Split out so the four calls above read as a table. */
+@Composable
+private fun RowScope.Tile(
+    label: Int,
+    glyph: LucideGlyph,
+    value: String,
+    color: Color,
+    numerals: NumeralStyle,
+) {
+    StatTile(
+        label = stringResource(label),
+        value = value,
+        habitColor = color,
+        modifier = Modifier.weight(1f),
+        numeralStyle = numerals,
+        icon = { StatTileIcon(glyph = glyph, habitColor = color) },
+    )
 }
 
 @Preview(name = "Stats — scaffold", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)

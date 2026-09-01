@@ -299,14 +299,15 @@
       line is habit_card_summary, and there is no sub-nav to label because the design gives this
       view no paging at all.
 
-      year_completion_value is a template rather than a bare "%d%%" concatenation so a locale that
-      writes its percent sign first, or with a space, can say so.
+      percent_value is a template rather than a bare "%d%%" concatenation so a locale that writes
+      its percent sign first, or with a space, can say so. It is shared with the Stats screen's
+      "completion rate" tile (M9.4) rather than duplicated: one percentage, one place to fix.
 
       The eyebrow is uppercase IN THE STRING rather than through a text transform: it is a word a
       translator may need to case differently, and Turkish alone is reason enough not to let code
       decide what a capital letter is.
     -->
-    <string name="year_completion_value">%1$d%%</string>
+    <string name="percent_value">%1$d%%</string>
     <string name="year_completion_eyebrow">COMPLETION</string>
 
     <!--
@@ -321,6 +322,26 @@
       tiles beside it say the same thing in words.
     -->
     <string name="stats_year_overview_eyebrow">YEAR OVERVIEW</string>
+
+    <!--
+      The four stat tiles - docs/design-spec.md §5.3. Labels are sentence case, as the design draws
+      them; the tile renders them at 10sp in white/30, which is why they are short.
+
+      stats_count_value looks pointless and is not: routing a bare number through a resource is what
+      makes it render in the locale's own digits. A Kotlin Int.toString() would print ASCII digits
+      beside percentages that had been localised, which is the kind of mismatch nobody spots until a
+      translator does.
+
+      ⚠ The values JITTER, and that is the faithful port. ADR-021 read DM Sans 4.004's tables out of
+      the bundled binary: it has no tnum feature at all, and its 1 is 342 units against 0 at 656. We
+      request tnum anyway so the intent is recorded and it starts working the day the font gains it.
+      The prototype's own tabular-nums is equally inert.
+    -->
+    <string name="stats_tile_completed_days">Completed days</string>
+    <string name="stats_tile_completion_rate">Completion rate</string>
+    <string name="stats_tile_current_streak">Current streak</string>
+    <string name="stats_tile_best_streak">Best streak</string>
+    <string name="stats_count_value">%1$d</string>
 
     <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
