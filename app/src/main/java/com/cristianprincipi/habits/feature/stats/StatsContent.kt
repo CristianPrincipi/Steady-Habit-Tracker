@@ -5,7 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,29 +17,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.designsystem.component.HabitChip
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.core.ui.resolve
+import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitId
 
 /**
  * The Stats view, stateless — `docs/design-spec.md` §5.
  *
- * ⚠ **A scaffold: at M9.1 the content column is deliberately empty.** The four sections that fill
- * it each have their own step — the selector pills (M9.2), the year overview card (M9.3), the 2×2
- * stat tiles (M9.4) and the monthly chart (M9.5) — and every component they need already exists in
- * `core/designsystem` (`HabitChip`, `YearDotGrid`, `StatTile`). What this file establishes is the
- * one thing they share and could otherwise each get differently: the header, the three states, and
- * the 16dp padding and 16dp section spacing the design specifies.
- *
- * It takes no `onEvent` yet for the same reason. The single event is [StatsEvent.HabitSelected] and
- * the pill row is its only sender, so the parameter arrives with the pills in M9.2 rather than
- * sitting here unread.
+ * ⚠ **Still filling: M9.2 added the selector pills.** The three sections below them have their own
+ * steps — the year overview card (M9.3), the 2×2 stat tiles (M9.4) and the monthly chart (M9.5) —
+ * and both components they need already exist in `core/designsystem` (`YearDotGrid`, `StatTile`).
+ * What this file establishes is the one thing every section shares and could otherwise each get
+ * differently: the header, the three states, and the 16dp padding and 16dp section spacing the
+ * design specifies.
  */
 @Composable
 fun StatsContent(
     state: StatsUiState,
+    onEvent: (StatsEvent) -> Unit,
     onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +63,7 @@ fun StatsContent(
             }
 
             is StatsUiState.Content -> {
-                StatsSections(state = state, modifier = Modifier.fillMaxSize())
+                StatsSections(state = state, onEvent = onEvent, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -98,31 +102,61 @@ private fun StatsTitle() {
 @Composable
 private fun StatsSections(
     state: StatsUiState.Content,
+    onEvent: (StatsEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier.verticalScroll(rememberScrollState()).padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardContentGap),
     ) {
-        // M9.2 → the selector pills, M9.3 → the year overview card, M9.4 → the stat tiles,
-        // M9.5 → the monthly completions chart. All four read `state`.
-        StatsPlaceholder(state)
+        HabitSelector(
+            habits = state.habits,
+            selectedId = state.selectedId,
+            onSelect = { id -> onEvent(StatsEvent.HabitSelected(id)) },
+        )
+        // M9.3 -> the year overview card, M9.4 -> the stat tiles, M9.5 -> the monthly completions
+        // chart. All three read `state.selected`.
     }
 }
 
 /**
- * ⚠ **Temporary, and it exists to keep [state] read rather than to draw anything.**
+ * The habit selector - `docs/design-spec.md` §5.1.
  *
- * Deleted by M9.2, which is the first step with a real section to put here. Without it the
- * parameter is unused and the scaffold cannot be told apart from a screen whose query is broken.
+ * ⭐ **`HabitChip` is the pill**, unchanged from M2: solid habit colour when selected, a 12.5% tint
+ * of it when not, `{emoji} {name}`, and a 48dp touch target under a shorter drawn height. This row
+ * only arranges them.
+ *
+ * ⚠ **`selectableGroup()` is the row's own job, and `HabitChip` says so in its KDoc.** Each chip is
+ * `selectable`, which tells a screen reader whether that chip is chosen; only the group tells it
+ * *how many of what* - "2 of 5" - and makes the row one stop in the traversal rather than five. It
+ * is a semantics-only modifier, so nothing on screen moves if it is dropped, which is exactly the
+ * kind of claim M8.5 found nothing was keeping true.
+ *
+ * A `LazyRow`, keyed by habit id: the design has this row scroll horizontally, and five habits at
+ * their full names already exceed a phone's width. It scrolls **within the screen's 16dp padding**
+ * rather than bleeding to the edges, which is what the prototype's padded overflow container does.
  */
 @Composable
-private fun StatsPlaceholder(state: StatsUiState.Content) {
-    Text(
-        text = state.selected.habit.name,
-        style = MaterialTheme.typography.titleMedium,
-        color = HabitsTheme.colors.text.secondary,
-    )
+private fun HabitSelector(
+    habits: List<Habit>,
+    selectedId: HabitId,
+    onSelect: (HabitId) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.chipGap),
+    ) {
+        items(items = habits, key = { habit -> habit.id.value }) { habit ->
+            HabitChip(
+                emoji = habit.emoji,
+                name = habit.name,
+                habitColor = habit.color.resolve(),
+                selected = habit.id == selectedId,
+                onClick = { onSelect(habit.id) },
+            )
+        }
+    }
 }
 
 @Preview(name = "Stats — scaffold", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)
@@ -135,6 +169,7 @@ private fun StatsContentPreview() {
                     habits = SampleHabits.habits(),
                     selected = SampleHabits.stats(),
                 ),
+            onEvent = {},
             onOpenSyncStatus = {},
         )
     }
@@ -152,6 +187,7 @@ private fun StatsContentEmptyPreview() {
     HabitsTheme {
         StatsContent(
             state = StatsUiState.Empty(HabitsEmptyReason.SyncPending),
+            onEvent = {},
             onOpenSyncStatus = {},
         )
     }

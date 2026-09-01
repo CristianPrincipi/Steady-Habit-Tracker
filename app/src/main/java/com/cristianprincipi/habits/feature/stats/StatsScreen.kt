@@ -14,6 +14,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  *
  * ⚠ **The last `StubScreen` in the shell, replaced here** — M5.3 put one on every tab and M9.1 is
  * where the fifth and last of them goes.
+ *
+ * One event reaches the ViewModel and it is the selector's: which habit the rest of the screen is
+ * about. Everything under the pills is read-only (`CLAUDE.md` §1) — check-off lives on the Week
+ * pills and the year grid here is the same read-only canvas the Year tab draws.
  */
 @Composable
 fun StatsScreen(
@@ -23,5 +27,10 @@ fun StatsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    StatsContent(state = state, onOpenSyncStatus = onOpenSyncStatus, modifier = modifier)
+    StatsContent(
+        state = state,
+        onEvent = viewModel::onEvent,
+        onOpenSyncStatus = onOpenSyncStatus,
+        modifier = modifier,
+    )
 }
