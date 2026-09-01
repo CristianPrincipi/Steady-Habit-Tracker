@@ -8,7 +8,9 @@ import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.usecase.CalculateStreak
 import com.cristianprincipi.habits.domain.usecase.GetCompletionRate
+import com.cristianprincipi.habits.domain.usecase.HabitStats
 import com.cristianprincipi.habits.domain.usecase.HabitYear
 import com.cristianprincipi.habits.domain.usecase.buildPeriod
 import com.cristianprincipi.habits.domain.usecase.byHabit
@@ -156,6 +158,34 @@ object SampleHabits {
                 rate = rateOf(completedDates = dates, startDate = habit.startDate),
             )
         }
+    }
+
+    /**
+     * One habit's [HabitStats] — the four numbers the Stats screen prints (`docs/design-spec.md` §5).
+     *
+     * Runs the real [CalculateStreak] and [GetCompletionRate] on a clock fixed to [reference], for
+     * `years()`' reason: both rules have a subtlety worth not re-typing. The streak counts back from
+     * *yesterday* when today is not yet done, and the rate's window starts at
+     * `max(startDate, 365 days ago)` — a preview that hard-coded either would go on looking right
+     * after the real rule changed.
+     *
+     * @param completions the history to measure. Pass `completions(reference) + unbrokenRun(id)` for
+     *   a habit whose current streak is alive; the generated history alone will not reliably have
+     *   one, and a "current streak: 0" tile is the least useful thing that preview can show.
+     */
+    fun stats(
+        id: String = "read",
+        reference: LocalDate = referenceDate,
+        completions: Collection<Completion> = completions(reference),
+    ): HabitStats {
+        val habit = habits(reference).first { it.id.value == id }
+        val dates = completions.filter { it.habitId == habit.id }.map { it.date }
+        val clock = Clock.fixed(reference.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
+        return HabitStats(
+            habit = habit,
+            streak = CalculateStreak(clock)(dates),
+            rate = GetCompletionRate(clock)(completedDates = dates, startDate = habit.startDate),
+        )
     }
 
     /** One habit and its history — for a preview of a single card. */

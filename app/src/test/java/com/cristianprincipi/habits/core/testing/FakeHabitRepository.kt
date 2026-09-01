@@ -17,9 +17,10 @@ import java.time.LocalDate
  * is **inclusive at both ends**. An off-by-one there would let a use case pass its own boundary
  * test wrongly.
  *
- * ⚠ **It cannot express a hidden habit, and no longer needs to** (ADR-081). Hiding is a `WHERE` in
- * `HabitDao.observeActive`, one layer below this; `HabitRepositoryImplTest` and `SyncEngineTest`
- * are where a habit leaves the list and comes back.
+ * ⚠ **It cannot express *why* a habit is hidden, and does not need to** (ADR-081). Hiding is a
+ * `WHERE` in `HabitDao.observeActive`, one layer below this; `HabitRepositoryImplTest` and
+ * `SyncEngineTest` are where the rule itself is tested. What it can express, through [setHabits],
+ * is the only part of hiding anything above the repository can see: **the set changed**.
  */
 class FakeHabitRepository(
     habits: List<Habit> = emptyList(),
@@ -41,6 +42,17 @@ class FakeHabitRepository(
     )
 
     override fun observeHabits(): Flow<List<Habit>> = habitRows
+
+    /**
+     * Replace the habit set, as a sync does when a habit leaves the mapped set or returns.
+     *
+     * The whole of hiding, from above the repository: a habit is simply not in the list any more
+     * (ADR-081). `StatsViewModelTest` uses it for the one screen that holds a *chosen* habit and so
+     * has to survive that habit disappearing.
+     */
+    fun setHabits(habits: List<Habit>) {
+        habitRows.value = habits
+    }
 
     override fun observeCompletions(
         from: LocalDate,

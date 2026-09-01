@@ -99,8 +99,10 @@ fun HabitsShell(
             startDestination = Week,
             modifier = Modifier.padding(contentPadding),
         ) {
-            // ⚠ Every screen below except sync status is an M5.3 stub — a title and a line saying
-            // so. The milestone that builds each one replaces it in place; see each screen's KDoc.
+            // ⭐ Every screen below is now real. M5.3 put a `StubScreen` on all five tabs and each
+            // milestone replaced its own in place; Stats was the last, in M9.1. `StubScreen` itself
+            // stays — it is where the "the shell owns insets, a screen takes the padding it is
+            // handed" rule is written down, and three files cite it by name.
             composable<Month> {
                 MonthScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
@@ -112,7 +114,9 @@ fun HabitsShell(
             composable<Year> {
                 YearScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
-            composable<Stats> { StatsScreen() }
+            composable<Stats> {
+                StatsScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
+            }
             composable<Settings> {
                 SettingsScreen(
                     onOpenSyncStatus = { navController.navigate(SyncStatus) },

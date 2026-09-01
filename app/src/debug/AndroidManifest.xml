@@ -110,6 +110,21 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+          The Stats view against sample data (M9.1). Same reason and same safety as the previews
+          above. At M9.1 there is deliberately almost nothing on it: the header, the three states
+          and an empty content column. It exists now because each of the four sections that fill
+          that column arrives in its own step, and this is what each of them is looked at through.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.StatsPreviewActivity
+            (add the extra `state` with value `pending` or `failed` for the empty screen; a double
+            dash cannot appear in an XML comment, so see the activity's KDoc for the whole command)
+        -->
+        <activity
+            android:name=".gallery.StatsPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"
