@@ -35,6 +35,19 @@ class FakeHabitRepository(
     /** Every `setColor` this received, in order. */
     val colorWrites = mutableListOf<Pair<HabitId, HabitColor>>()
 
+    /**
+     * Every window `observeCompletions` was asked for, in order — one entry per **call**.
+     *
+     * M9.7's counter. The invariant it exists to hold is ADR-094 §1's: one range query answers the
+     * whole Stats screen, and a use case that reached for a second one — a per-habit query, a
+     * separate count for the rate — would be two chances for two sections to disagree about a day.
+     * Nothing else in the project can see that happening.
+     *
+     * Recorded when the flow is **built**, not when it is collected, because that is where a stray
+     * extra query would be written.
+     */
+    val completionQueries = mutableListOf<ClosedRange<LocalDate>>()
+
     data class Write(
         val habitId: HabitId,
         val date: LocalDate,
@@ -57,10 +70,12 @@ class FakeHabitRepository(
     override fun observeCompletions(
         from: LocalDate,
         to: LocalDate,
-    ): Flow<List<Completion>> =
-        completionRows.map { rows ->
+    ): Flow<List<Completion>> {
+        completionQueries += from..to
+        return completionRows.map { rows ->
             rows.filter { it.date >= from && it.date <= to }.sortedBy { it.date }
         }
+    }
 
     override suspend fun setCompleted(
         habitId: HabitId,
