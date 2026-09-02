@@ -57,9 +57,10 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * reserved first** — it is the one the reader came for, and it is `recharts`' own `preserveEnd`
  * behaviour.
  *
- * @param points oldest first. Empty draws nothing at all, height included — a habit whose inferred
- *   start date is in the future has no month it could have been kept in, and `Plan.md` M9.6 is where
- *   that case gets something to say for itself.
+ * @param points oldest first, and **at least [MINIMUM_CHART_POINTS] of them** — fewer draws
+ *   nothing at all, height included. A curve needs two points, and M9.6 established on the device
+ *   that a lone month rendered as a dot reads as a chart that failed rather than as one month of
+ *   history. The caller decides what to show instead; `StatsContent` puts a sentence in the card.
  * @param formatValue renders an axis number in the reader's own digits. Pass a `remember`ed lambda;
  *   the measured text is cached against it.
  */
@@ -71,7 +72,7 @@ fun MonthlyChart(
     formatValue: (Int) -> String = { value -> value.toString() },
     contentDescription: String? = null,
 ) {
-    if (points.isEmpty()) return
+    if (points.size < MINIMUM_CHART_POINTS) return
 
     val measurer = rememberTextMeasurer()
     val labelStyle = HabitsTheme.textStyles.axisLabel.copy(color = HabitsTheme.colors.text.helper)
@@ -87,7 +88,6 @@ fun MonthlyChart(
 
     val density = LocalDensity.current
     val strokePx = with(density) { Sizing.chartStroke.toPx() }
-    val dotPx = with(density) { Sizing.chartDot.toPx() }
     val gapPx = with(density) { Spacing.chartAxisGap.toPx() }
     val description = contentDescription
 
@@ -115,34 +115,25 @@ fun MonthlyChart(
 
         val curve =
             points.mapIndexed { index, point ->
-                val x =
-                    if (points.size == 1) {
-                        plot.center.x
-                    } else {
-                        plot.left + plot.width * index / (points.size - 1)
-                    }
-                Offset(x, plot.bottom - plot.height * point.value / axis.ceiling.toFloat())
+                Offset(
+                    x = plot.left + plot.width * index / (points.size - 1),
+                    y = plot.bottom - plot.height * point.value / axis.ceiling.toFloat(),
+                )
             }
 
-        drawArea(curve, plot, habitColor, strokePx, dotPx)
+        drawArea(curve, plot, habitColor, strokePx)
         drawValueAxis(valueLabels, axis, plot, valueColumn)
         drawMonthAxis(monthLabels, curve, gapPx)
     }
 }
 
-/** The fill, then the curve on top of it — or a single dot, where there is no segment to draw. */
+/** The fill, then the curve on top of it. */
 private fun DrawScope.drawArea(
     curve: List<Offset>,
     plot: Rect,
     habitColor: Color,
     strokePx: Float,
-    dotPx: Float,
 ) {
-    if (curve.size == 1) {
-        drawCircle(color = habitColor, radius = dotPx, center = curve.single())
-        return
-    }
-
     val line =
         Path().apply {
             moveTo(curve.first().x, curve.first().y)
@@ -250,12 +241,12 @@ private fun MonthlyChartPreview() {
     }
 }
 
-@Preview(name = "Monthly chart — one month", backgroundColor = 0xFF1C1C1F, showBackground = true, widthDp = 328)
+@Preview(name = "Monthly chart — two months", backgroundColor = 0xFF1C1C1F, showBackground = true, widthDp = 328)
 @Composable
-private fun MonthlyChartSingleMonthPreview() {
+private fun MonthlyChartTwoMonthsPreview() {
     HabitsTheme {
         MonthlyChart(
-            points = previewMonths().takeLast(1),
+            points = previewMonths().takeLast(MINIMUM_CHART_POINTS),
             habitColor = HabitsTheme.colors.habit.orange,
             modifier = Modifier.padding(Spacing.cardPadding),
         )
@@ -273,6 +264,15 @@ private fun MonthlyChartSingleMonthPreview() {
 internal fun previewMonths(): List<ChartPoint> =
     listOf(18, 22, 26, 19, 9, 4, 11, 20, 24, 28, 25, 21, 14)
         .mapIndexed { index, value -> ChartPoint(label = PREVIEW_MONTHS[index], value = value) }
+
+/**
+ * The fewest buckets [MonthlyChart] can draw, and the rule lives here because it is the curve's.
+ *
+ * Two, because a line between one point and nothing is not a line. M9.6 tried the alternative — a
+ * lone month as a 4dp dot — on a device and found it reads as a chart that failed to render rather
+ * than as one month of history, so the dot is gone and the caller shows words instead.
+ */
+const val MINIMUM_CHART_POINTS = 2
 
 private val PREVIEW_MONTHS =
     listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep")

@@ -362,6 +362,20 @@
     <string name="stats_chart_month_separator">", "</string>
 
     <!--
+      M9.6. Shown INSIDE the chart card, in place of the drawing, for a habit too young to have a
+      curve - a line needs two points, so one month has nothing to draw.
+
+      The card is kept and the sentence goes inside it rather than the card being removed. Two
+      reasons: a section that appears from nowhere a month later is a screen the user cannot learn,
+      and this was measured - M9.6 rendered the alternatives on a device and a lone month drawn as a
+      4dp dot reads as a chart that failed rather than as one month of history.
+
+      It states when the chart arrives rather than what is missing, and it is not a warning: a young
+      habit is a normal condition, and CLAUDE.md §1 rules out nagging about those.
+    -->
+    <string name="stats_chart_not_yet">The chart starts once this habit has two months of history.</string>
+
+    <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
 
       Two facts do all the work here, and both are ADR-010's: a habit IS a checkbox column in the

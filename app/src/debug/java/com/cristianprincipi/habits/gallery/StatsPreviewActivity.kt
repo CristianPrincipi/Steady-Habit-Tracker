@@ -22,6 +22,8 @@ import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.domain.model.Completion
+import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.feature.stats.StatsContent
 import com.cristianprincipi.habits.feature.stats.StatsEvent
 import com.cristianprincipi.habits.feature.stats.StatsUiState
@@ -48,7 +50,16 @@ import com.cristianprincipi.habits.feature.stats.StatsUiState
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state pending
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state failed
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es numerals mono
+ * adb shell am start -S -n …/….gallery.StatsPreviewActivity --ei age 7
  * ```
+ *
+ * ⭐ **`--ei age` is M9.6's, and it exists because the question that step opens is not answerable
+ * from prose.** Every section of this screen is *drawable* for a habit one week old — a year grid
+ * that is almost entirely "before this existed", four zeros, one monthly bucket drawn as a dot —
+ * and `StatsUiState`'s KDoc argues each of those is a true thing to show. Whether the result reads
+ * as a finished screen or as one that failed to load is a question for the emulator. Nothing in
+ * `SampleHabits` could ask it: its habits take their start dates from the reference date, so the
+ * youngest is always 95 days old.
  *
  * ⚠ `-S` matters when the activity is already up: `am start` compares intents with
  * `filterEquals`, which **ignores extras**, so without it a second launch resumes the old instance
@@ -72,6 +83,7 @@ class StatsPreviewActivity : ComponentActivity() {
                     SampleStats(
                         empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)),
                         numerals = numeralsFrom(intent.getStringExtra(EXTRA_NUMERALS)),
+                        ageDays = intent.getIntExtra(EXTRA_AGE, FULL_HISTORY),
                     )
                 }
             }
@@ -81,6 +93,10 @@ class StatsPreviewActivity : ComponentActivity() {
 
 private const val EXTRA_STATE = "state"
 private const val EXTRA_NUMERALS = "numerals"
+private const val EXTRA_AGE = "age"
+
+/** No trimming: every habit keeps the history `SampleHabits` generated for it. */
+private const val FULL_HISTORY = 0
 
 /**
  * ⭐ **The whole point of this switch: ADR-021's open question, still open.**
@@ -119,17 +135,26 @@ private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
 private fun SampleStats(
     empty: HabitsEmptyReason?,
     numerals: NumeralStyle,
+    ageDays: Int,
 ) {
-    val habits = SampleHabits.habits()
-    val history = SampleHabits.completions() + SampleHabits.unbrokenRun()
-    var selectedId by remember { mutableStateOf(habits.first().id) }
+    val full = SampleHabits.habits()
+    val (habits, history) =
+        remember(ageDays) {
+            agedTo(ageDays, full, SampleHabits.completions() + SampleHabits.unbrokenRun())
+        }
+    var selectedId by remember { mutableStateOf(full.first().id) }
 
     StatsContent(
         state =
             empty?.let(StatsUiState::Empty)
                 ?: StatsUiState.Content(
                     habits = habits,
-                    selected = SampleHabits.stats(id = selectedId.value, completions = history),
+                    selected =
+                        SampleHabits.stats(
+                            id = selectedId.value,
+                            completions = history,
+                            habits = habits,
+                        ),
                 ),
         onEvent = { event -> if (event is StatsEvent.HabitSelected) selectedId = event.habitId },
         numerals = numerals,
@@ -137,4 +162,25 @@ private fun SampleStats(
         onOpenSyncStatus = {},
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
     )
+}
+
+/**
+ * The sample set as it would look [ageDays] after the user first connected — M9.6's knob.
+ *
+ * Moves every start date forward to `today − (ageDays − 1)` and drops the completions behind it, so
+ * a habit reads as one that has only just arrived from Notion. `maxOf` rather than a plain
+ * assignment: a habit already younger than that keeps its own date rather than being aged
+ * *backwards* into a history it does not have.
+ *
+ * `FULL_HISTORY` returns the pair untouched, which is what every other launch of this activity gets.
+ */
+private fun agedTo(
+    ageDays: Int,
+    habits: List<Habit>,
+    history: List<Completion>,
+): Pair<List<Habit>, List<Completion>> {
+    if (ageDays <= FULL_HISTORY) return habits to history
+    val start = SampleHabits.referenceDate.minusDays((ageDays - 1).toLong())
+    return habits.map { habit -> habit.copy(startDate = maxOf(habit.startDate, start)) } to
+        history.filter { completion -> completion.date >= start }
 }

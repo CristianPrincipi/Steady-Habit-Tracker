@@ -29,8 +29,16 @@ sealed interface StatsUiState {
      * No habits **at all** — never "no data for this habit".
      *
      * A habit with an empty history is not empty here: it has a streak of zero, a rate of 0% and a
-     * grid of misses, all of which are true things to draw. The insufficient-data case the design
-     * worries about is M9.6's, and it lives inside [Content].
+     * grid of misses, all of which are true things to draw. M9.6 put that claim on a device and it
+     * held for three of the four sections — a habit one week old shows `7 · 100% · 7 · 7` and a
+     * grid with a week in it, which is exactly what happened.
+     *
+     * ⚠ **This KDoc used to say the insufficient-data case was one "the design worries about". It
+     * is not.** `docs/design-spec.md` §8 lists empty states among the things the prototype does not
+     * answer *at all* — there is no worry to inherit, and citing one would have let a future session
+     * look for guidance that was never written. The one case that does need handling is structural
+     * rather than designed: the monthly chart cannot draw a line through a single month, and
+     * `StatsContent` puts a sentence in the card instead.
      */
     data class Empty(
         val reason: HabitsEmptyReason,

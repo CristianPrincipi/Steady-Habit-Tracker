@@ -208,13 +208,13 @@ fun DotGridSection() {
 }
 
 /**
- * The monthly chart at the four shapes its data can actually take.
+ * The monthly chart at the shapes its data can actually take.
  *
- * The single-bucket case earns this section on its own. It is a real branch — a habit added to
- * Notion this month has one month of history, a curve needs two points, and what gets drawn instead
- * is a dot — and no screen can show it: `StatsPreviewActivity` runs on `SampleHabits`, whose
- * youngest habit is already three months old. A `Canvas` has nothing for an instrumented test to
- * assert either, so the gallery is where that branch is looked at.
+ * ⚠ **This section had a fourth entry at M9.5 and M9.6 deleted it.** A single month was drawn as a
+ * 4dp dot; seen here beside a label explaining it, that looked reasonable, and seen on the real
+ * Stats screen with no label it reads as a chart that failed to render. `MonthlyChart` now requires
+ * two points and `StatsContent` puts a sentence in the card instead — which is a fair warning about
+ * what a gallery can and cannot settle.
  */
 @Composable
 fun MonthlyChartSection() {
@@ -227,8 +227,8 @@ fun MonthlyChartSection() {
         GalleryLabel("A habit that started in spring — the months before it are omitted, not zeroed")
         MonthlyChart(points = year.takeLast(FIVE), habitColor = HabitsTheme.colors.habit.green)
 
-        GalleryLabel("One month, which is a dot: a curve needs two points and there is only one")
-        MonthlyChart(points = year.takeLast(1), habitColor = HabitsTheme.colors.habit.orange)
+        GalleryLabel("Two months, the fewest that draw at all — one is a sentence in the card")
+        MonthlyChart(points = year.takeLast(2), habitColor = HabitsTheme.colors.habit.orange)
 
         GalleryLabel("A habit kept on no day at all — a flat line, on an axis that still has height")
         MonthlyChart(

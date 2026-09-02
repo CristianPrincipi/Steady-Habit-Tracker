@@ -25,6 +25,7 @@ import com.cristianprincipi.habits.core.datetime.shortMonthLabel
 import com.cristianprincipi.habits.core.designsystem.component.ChartPoint
 import com.cristianprincipi.habits.core.designsystem.component.HabitChip
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
+import com.cristianprincipi.habits.core.designsystem.component.MINIMUM_CHART_POINTS
 import com.cristianprincipi.habits.core.designsystem.component.MonthlyChart
 import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
@@ -146,12 +147,7 @@ private fun StatsSections(
         )
         YearOverviewCard(stats = state.selected)
         StatTiles(stats = state.selected, numerals = numerals)
-        // ⚠ Hidden rather than drawn empty, and the branch is here rather than inside the card so
-        // that M9.6 has one place to put the message that belongs in it. `months` is empty only for
-        // a habit whose *inferred* start date is in the future — see `monthlyCompletions`.
-        if (state.selected.months.isNotEmpty()) {
-            MonthlyCompletionsCard(stats = state.selected)
-        }
+        MonthlyCompletionsCard(stats = state.selected)
     }
 }
 
@@ -297,6 +293,18 @@ private fun StatTiles(
  * ⭐ **`stats_count_value` formats the axis, the same resource the four tiles above use.** A bare
  * `Int.toString()` would print ASCII digits up the side of a chart whose tiles had been localised —
  * the mismatch `strings.xml` warns about, one card apart.
+ *
+ * ### ⚠ M9.6: the card stays and the sentence goes inside it
+ *
+ * M9.5 hid this card outright when there was nothing to chart, and put the branch in the section
+ * list so that this step would have one place to change it. It is changed. **A section that appears
+ * from nowhere a month later is a screen nobody can learn**, and the card with a line in it is also
+ * what the user's own standing preference asks for — say what happens next, in place, rather than
+ * removing the thing.
+ *
+ * The threshold is [MINIMUM_CHART_POINTS] and it is **structural rather than chosen**: a line needs
+ * two points. It catches both cases at once — a habit in its first calendar month, and the sync
+ * anomaly of an inferred start date in the future, which yields no bucket at all.
  */
 @Composable
 private fun MonthlyCompletionsCard(
@@ -310,18 +318,37 @@ private fun MonthlyCompletionsCard(
                 ChartPoint(label = shortMonthLabel(month.month, locale), value = month.completions)
             }
         }
-    val countPattern = stringResource(R.string.stats_count_value)
-    val formatValue = remember(countPattern, locale) { { value: Int -> countPattern.format(locale, value) } }
 
     HabitsCard(modifier = modifier) {
         SectionEyebrow(text = stringResource(R.string.stats_monthly_eyebrow))
-        MonthlyChart(
-            points = points,
-            habitColor = stats.habit.color.resolve(),
-            formatValue = formatValue,
-            contentDescription = spokenChart(points, locale),
-        )
+        if (points.size < MINIMUM_CHART_POINTS) {
+            Text(
+                text = stringResource(R.string.stats_chart_not_yet),
+                style = MaterialTheme.typography.bodyMedium,
+                color = HabitsTheme.colors.text.secondary,
+            )
+        } else {
+            Chart(points = points, habitColor = stats.habit.color.resolve(), locale = locale)
+        }
     }
+}
+
+/** The drawing itself, split out so the branch above reads as the decision it is. */
+@Composable
+private fun Chart(
+    points: List<ChartPoint>,
+    habitColor: Color,
+    locale: Locale,
+) {
+    val countPattern = stringResource(R.string.stats_count_value)
+    val formatValue = remember(countPattern, locale) { { value: Int -> countPattern.format(locale, value) } }
+
+    MonthlyChart(
+        points = points,
+        habitColor = habitColor,
+        formatValue = formatValue,
+        contentDescription = spokenChart(points, locale),
+    )
 }
 
 /**

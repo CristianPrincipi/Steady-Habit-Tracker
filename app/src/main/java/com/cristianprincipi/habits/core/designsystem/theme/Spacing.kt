@@ -133,16 +133,6 @@ object Sizing {
     /** `w-7 h-7` — the rounded chip holding a stat tile's icon. */
     val statTileIcon: Dp = 28.dp
 
-    /**
-     * `activeDot r={4}` — the radius of a data point drawn as a dot on the monthly chart.
-     *
-     * The design gives this size to the dot that appears **under the cursor** (`§5.4`), which has no
-     * Android counterpart and is not ported. It is reused for the one case a curve cannot express:
-     * a habit young enough to have a single monthly bucket, where a line between two points has no
-     * second point to reach.
-     */
-    val chartDot: Dp = 4.dp
-
     /** `strokeWidth={2}` — the monthly chart's curve. */
     val chartStroke: Dp = 2.dp
 

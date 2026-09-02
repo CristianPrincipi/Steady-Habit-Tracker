@@ -25,6 +25,7 @@ import com.cristianprincipi.habits.domain.model.CompletionRate
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MonthlyCompletions
 import com.cristianprincipi.habits.domain.model.Streak
 import com.cristianprincipi.habits.domain.usecase.HabitStats
 import org.junit.Assert.assertEquals
@@ -32,6 +33,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.YearMonth
 import java.util.Locale
 
 /**
@@ -289,24 +291,49 @@ class StatsRenderTest {
     }
 
     @Test
-    fun aHabitWithNoMonthToShowGetsNoChartCard() {
-        // ⚠ A habit whose *inferred* start date is in the future has no month it could have been
-        // kept in, so there is nothing to chart. The card is hidden rather than drawn empty — an
-        // eyebrow over 130dp of nothing reads as a chart that failed to load. `Plan.md` M9.6 is
-        // where this case gets something to say for itself.
-        composeTestRule.setContent {
-            HabitsTheme {
-                StatsContent(
-                    state = StatsUiState.Content(habits = habits, selected = statsWithNoMonths(selected)),
-                    onEvent = { },
-                    onOpenSyncStatus = { },
-                )
-            }
-        }
+    fun oneMonthOfHistoryKeepsTheCardAndSaysWhenTheChartStarts() {
+        // ⚠⚠ **M9.5 hid this card and M9.6 reversed it, from a device rather than from an opinion.**
+        // A lone month was drawn as a 4dp dot, which in the gallery beside an explanatory label
+        // looked reasonable and on the real screen reads as a chart that failed to render. A section
+        // that vanishes and reappears a month later is also a screen nobody can learn.
+        //
+        // The threshold is structural, not chosen: a line needs two points.
+        showChart(months = 1)
 
-        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.stats_chart_not_yet)).assertIsDisplayed()
+    }
+
+    @Test
+    fun aHabitWithNoMonthAtAllGetsTheSameSentence() {
+        // The other side of the same threshold, and a case only a sync anomaly reaches: an inferred
+        // start date in the future yields no bucket at all. One sentence covers both — it says when
+        // the chart arrives rather than what is missing, so it stays true either way.
+        showChart(months = 0)
+
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.stats_chart_not_yet)).assertIsDisplayed()
         // The tiles above it stay, because zero completions is a true thing to print.
         composeTestRule.onNodeWithText(string(R.string.stats_tile_current_streak)).assertIsDisplayed()
+    }
+
+    @Test
+    fun twoMonthsIsAChartAndNotASentence() {
+        // The mutant this catches is an off-by-one in the threshold: `<= MINIMUM_CHART_POINTS`
+        // instead of `<`, which would put the sentence in front of a habit that has a real curve.
+        showChart(months = 2)
+
+        composeTestRule.onNodeWithText(string(R.string.stats_chart_not_yet)).assertDoesNotExist()
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertIsDisplayed()
+    }
+
+    @Test
+    fun theRealSampleHabitNeverShowsTheNotYetSentence() {
+        // Five habits with months of history behind them. If this fires, the threshold is reading
+        // the wrong thing entirely.
+        showStats()
+
+        composeTestRule.onNodeWithText(string(R.string.stats_chart_not_yet)).assertDoesNotExist()
     }
 
     @Test
@@ -330,12 +357,33 @@ class StatsRenderTest {
             .assertDoesNotExist()
     }
 
-    /** Figures for a habit that has not started yet: nothing to chart, and everything else zero. */
-    private fun statsWithNoMonths(habit: Habit) =
-        HabitStats(
-            period = HabitPeriod(habit = habit, cells = emptyList(), todayIndex = HabitPeriod.TODAY_ABSENT),
-            streak = Streak.None,
-            rate = CompletionRate(completedDays = 0, eligibleDays = 0),
-            months = emptyList(),
-        )
+    /** The screen for a habit with exactly [months] buckets and nothing else worth drawing. */
+    private fun showChart(months: Int) {
+        composeTestRule.setContent {
+            HabitsTheme {
+                StatsContent(
+                    state = StatsUiState.Content(habits = habits, selected = statsWithMonths(selected, months)),
+                    onEvent = { },
+                    onOpenSyncStatus = { },
+                )
+            }
+        }
+    }
+
+    /**
+     * Figures for a habit young enough to have [months] buckets — hand-built rather than aged out of
+     * `SampleHabits`, whose youngest habit is already three months old.
+     */
+    private fun statsWithMonths(
+        habit: Habit,
+        months: Int,
+    ) = HabitStats(
+        period = HabitPeriod(habit = habit, cells = emptyList(), todayIndex = HabitPeriod.TODAY_ABSENT),
+        streak = Streak.None,
+        rate = CompletionRate(completedDays = 0, eligibleDays = 0),
+        months =
+            List(months) { index ->
+                MonthlyCompletions(month = YearMonth.of(2026, index + 1), completions = index)
+            },
+    )
 }

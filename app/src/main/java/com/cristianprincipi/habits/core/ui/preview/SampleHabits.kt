@@ -173,13 +173,18 @@ object SampleHabits {
      * @param completions the history to measure. Pass `completions(reference) + unbrokenRun(id)` for
      *   a habit whose current streak is alive; the generated history alone will not reliably have
      *   one, and a "current streak: 0" tile is the least useful thing that preview can show.
+     * @param habits the set to resolve [id] against, so a caller that has *altered* the sample
+     *   habits gets figures measured against its own version rather than the pristine one. M9.6's
+     *   `--ei age` knob is the case: it moves every start date forward, and a `startDate` read back
+     *   from here would make the rate's denominator disagree with the grid drawn beside it.
      */
     fun stats(
         id: String = "read",
         reference: LocalDate = referenceDate,
         completions: Collection<Completion> = completions(reference),
+        habits: List<Habit> = habits(reference),
     ): HabitStats {
-        val habit = habits(reference).first { it.id.value == id }
+        val habit = habits.first { it.id.value == id }
         val dates = completions.filter { it.habitId == habit.id }.map { it.date }.toSet()
         val clock = Clock.fixed(reference.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
         val period = buildPeriod(habit, trailingYearWindow(reference), dates, reference)
