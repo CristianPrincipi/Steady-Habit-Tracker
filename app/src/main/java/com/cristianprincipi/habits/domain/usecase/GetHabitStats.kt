@@ -2,36 +2,80 @@ package com.cristianprincipi.habits.domain.usecase
 
 import com.cristianprincipi.habits.core.datetime.trailingYearWindow
 import com.cristianprincipi.habits.domain.model.CompletionRate
+import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MonthlyCompletions
+import com.cristianprincipi.habits.domain.model.PeriodCell
 import com.cristianprincipi.habits.domain.model.Streak
 import com.cristianprincipi.habits.domain.repository.HabitRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 
 /**
  * Everything the Stats screen draws for one habit (`docs/design-spec.md` §5).
  *
- * Four numbers and a grid, from three values: the "completed days" and "completion rate" tiles are
- * the two halves of [rate], the "current" and "best" streak tiles are the two halves of [streak],
- * and the year overview card is [period]. They are carried together for [HabitYear]'s reason — one
- * range query answers all of them, and a screen that computed them from separate queries could show
- * a grid and a percentage that disagree about the same day.
+ * Four numbers, a grid and a chart, from four values: the "completed days" and "completion rate"
+ * tiles are the two halves of [rate], the "current" and "best" streak tiles are the two halves of
+ * [streak], the year overview card is [period], and the monthly chart is [months]. They are carried
+ * together for [HabitYear]'s reason — one range query answers all of them, and a screen that
+ * computed them from separate queries could show a grid and a percentage that disagree about the
+ * same day.
  *
  * [habit] is [period]'s rather than a field of its own: `HabitPeriod` already carries the habit it
  * describes, and two copies of it in one object is two things to keep in step.
+ *
+ * @param months one bucket per calendar month the habit could have been kept, oldest first — see
+ *   [monthlyCompletions] for which months those are. Computed once here rather than derived on
+ *   demand: it is a fold over 371 cells, and a `get()` would run it on every recomposition, which
+ *   is the waste `Plan.md` M9.7 exists to rule out.
  */
 data class HabitStats(
     val period: HabitPeriod,
     val streak: Streak,
     val rate: CompletionRate,
+    val months: List<MonthlyCompletions>,
 ) {
     /** The habit these figures are about. */
     val habit: Habit get() = period.habit
 }
+
+/**
+ * The monthly chart's buckets — `docs/design-spec.md` §5.4.
+ *
+ * ### ⭐ It reads [HabitPeriod.cells], not the completions the period was built from
+ *
+ * The Year overview card on this same screen draws those exact cells. Bucketing anything else would
+ * mean two renderings of one habit deciding independently what a given day was, which is the bug
+ * M9.3 widened the query to prevent (see this file's other KDoc). Here it also comes for free:
+ * `buildPeriod` has already applied the precedence rule, so a completion recorded *before* the
+ * inferred start date lands in this chart as a completion, exactly as it lands in the grid as a
+ * filled dot.
+ *
+ * ### ⚠ Months before the habit started are omitted, and that is a deliberate divergence
+ *
+ * The prototype gives **every** month in the window a bucket and increments only the eligible ones,
+ * so a habit that started in March renders a legitimate-looking `0` for January and February —
+ * indistinguishable from a month the user missed entirely. `Plan.md` M9.5 calls that out as a bug
+ * not to reproduce, and `DayState.BEFORE_START` already carries the distinction, so no composable
+ * has to be told a start date to get this right.
+ *
+ * The leading days are dropped rather than the leading *months*, which keeps the result a
+ * contiguous run: the first surviving bucket is the habit's own first month, partial and honestly
+ * counted, and there is never a hole in the middle for the axis to draw across.
+ */
+internal fun monthlyCompletions(period: HabitPeriod): List<MonthlyCompletions> =
+    period.cells
+        .filterIsInstance<PeriodCell.Day>()
+        .dropWhile { day -> day.state == DayState.BEFORE_START }
+        .groupBy { day -> YearMonth.from(day.date) }
+        .map { (month, days) ->
+            MonthlyCompletions(month, days.count { it.state == DayState.COMPLETED })
+        }
 
 /**
  * One habit's whole history, reduced to a [Streak], a [CompletionRate] and a year of cells.
@@ -75,10 +119,12 @@ class GetHabitStats
                     // One range query answers for every habit — the repository has no per-habit
                     // overload, and an unused query is an untested one (HabitRepository KDoc).
                     val dates = completions.filter { it.habitId == habit.id }.map { it.date }
+                    val period = buildPeriod(habit, window, dates.toSet(), today)
                     HabitStats(
-                        period = buildPeriod(habit, window, dates.toSet(), today),
+                        period = period,
                         streak = calculateStreak(dates),
                         rate = completionRate(completedDates = dates, startDate = habit.startDate),
+                        months = monthlyCompletions(period),
                     )
                 }
         }

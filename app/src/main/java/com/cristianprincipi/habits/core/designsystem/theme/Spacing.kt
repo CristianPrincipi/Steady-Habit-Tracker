@@ -80,6 +80,15 @@ object Spacing {
     val chipGap: Dp = 8.dp
 
     /**
+     * Between an axis label on the monthly chart and the plot it labels.
+     *
+     * ⚠ **Inferred, not extracted**, like [tabIndicatorGap]. `recharts` spaces its ticks from the
+     * axis internally and the prototype never names a number; 4px is Tailwind's first step and the
+     * smallest gap that keeps a 10sp digit off a 2dp stroke. Nothing else depends on it.
+     */
+    val chartAxisGap: Dp = 4.dp
+
+    /**
      * Between a bottom-nav label and its active dot.
      *
      * ⚠ **Inferred, not extracted.** `docs/design-spec.md` §1 records the dot as 4px and says it
@@ -125,6 +134,19 @@ object Sizing {
     val statTileIcon: Dp = 28.dp
 
     /**
+     * `activeDot r={4}` — the radius of a data point drawn as a dot on the monthly chart.
+     *
+     * The design gives this size to the dot that appears **under the cursor** (`§5.4`), which has no
+     * Android counterpart and is not ported. It is reused for the one case a curve cannot express:
+     * a habit young enough to have a single monthly bucket, where a line between two points has no
+     * second point to reach.
+     */
+    val chartDot: Dp = 4.dp
+
+    /** `strokeWidth={2}` — the monthly chart's curve. */
+    val chartStroke: Dp = 2.dp
+
+    /**
      * One colour in the habit's colour picker. **Below the touch minimum**; see [minimumTouchTarget].
      *
      * ⚠ **Not from the prototype** — it designs no colour picker at all (`docs/design-spec.md` §7
@@ -151,6 +173,16 @@ object Sizing {
 
     /** `w-10 h-10` — the habit icon on a Week or Year card. */
     val habitIconLarge: Dp = 40.dp
+
+    /**
+     * `height={130}` — the monthly chart, **axis labels included**.
+     *
+     * The prototype's figure is the height of the whole `ResponsiveContainer`, not of the plot, so
+     * the curve gets what is left after the month names along the bottom. Fixed rather than
+     * proportional: the card above it is a fixed 2×2 of tiles, and a chart that grew with the
+     * screen would be the only thing on this view that did.
+     */
+    val chartHeight: Dp = 130.dp
 
     /** `border` — the hairline on every card. Tailwind's default border width. */
     val hairlineBorder: Dp = 1.dp

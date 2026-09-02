@@ -123,6 +123,25 @@ fun monthLabel(
 private const val MONTH_LABEL_PATTERN = "LLLL yyyy"
 
 /**
+ * `Sep` — one tick of the Stats screen's monthly chart (`docs/design-spec.md` §5.4).
+ *
+ * `LLL` rather than `MMM`, for [monthLabel]'s reason: an axis tick is a month standing on its own,
+ * and the locales that inflect their month names spell that differently from the one inside a date.
+ * English cannot tell the two apart, which is exactly why the wrong one survives review.
+ *
+ * ⚠ **The year is deliberately absent, and the axis can therefore repeat a label.** A trailing year
+ * spans thirteen calendar months, so its first and last tick share a name — `Sep … Sep`, which is
+ * what the prototype draws and is honest about the window being a full year. The bucket behind each
+ * tick still knows which September it is; only the label is short.
+ */
+fun shortMonthLabel(
+    month: YearMonth,
+    locale: Locale,
+): String = month.format(DateTimeFormatter.ofPattern(SHORT_MONTH_LABEL_PATTERN, locale))
+
+private const val SHORT_MONTH_LABEL_PATTERN = "LLL"
+
+/**
  * A date as a screen reader should hear it — "Monday, 24 August 2026".
  *
  * [FormatStyle.FULL] rather than a hand-written pattern: it is locale-correct for free, and it

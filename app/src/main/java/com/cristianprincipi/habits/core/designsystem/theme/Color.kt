@@ -250,6 +250,24 @@ object DayOpacity {
     const val WEEK_FUTURE = 0.30f
 }
 
+/**
+ * The monthly chart's vertical fill — `docs/design-spec.md §5.4`.
+ *
+ * A `linearGradient` from the habit colour at 40% down to the same colour at zero, which is the one
+ * place in the app where a colour fades rather than sitting at a fixed tint. Both stops are named
+ * even though the bottom one is transparent: `Brush.verticalGradient` needs two colours, and a
+ * literal `Color.Transparent` there would drop the hue and let some renderers fade towards black.
+ *
+ * A plain object beside [DayOpacity], for the same reason — one theme, nothing for a local to vary.
+ */
+object ChartOpacity {
+    /** The fill directly under the curve. */
+    const val FILL_TOP = 0.40f
+
+    /** The fill at the axis. */
+    const val FILL_BOTTOM = 0.00f
+}
+
 /** Focus affordances — `docs/tokens.md §1.1` (`borderInputFocus`) and `§1.2` (`ring`). */
 @Immutable
 data class FocusColors(

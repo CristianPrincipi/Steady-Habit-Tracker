@@ -15,13 +15,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.shortMonthLabel
+import com.cristianprincipi.habits.core.designsystem.component.ChartPoint
 import com.cristianprincipi.habits.core.designsystem.component.HabitChip
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
+import com.cristianprincipi.habits.core.designsystem.component.MonthlyChart
 import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
@@ -35,19 +39,21 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
 import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.core.ui.toDayStatus
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.usecase.HabitStats
+import java.util.Locale
 
 /**
  * The Stats view, stateless — `docs/design-spec.md` §5.
  *
- * ⚠ **One section left: M9.5's monthly completions chart.** The pills (M9.2), the year overview
- * (M9.3) and the four stat tiles (M9.4) are all here. What this file establishes is the one thing
- * every section shares and could otherwise each get differently: the header, the three states, and
- * the 16dp padding and 16dp section spacing the design specifies.
+ * **Every section the design draws is here**: the pills (M9.2), the year overview (M9.3), the four
+ * stat tiles (M9.4) and the monthly chart (M9.5). What this file establishes is the one thing they
+ * all share and could otherwise each get differently: the header, the three states, and the 16dp
+ * padding and 16dp section spacing the design specifies.
  *
  * @param numerals ⚠ **temporary, and it exists to settle ADR-021's open question.** `NumeralStyle`
  *   was built both ways at M2.7 so the choice could be made by eye, and it has been pending since —
@@ -140,7 +146,12 @@ private fun StatsSections(
         )
         YearOverviewCard(stats = state.selected)
         StatTiles(stats = state.selected, numerals = numerals)
-        // M9.5 -> the monthly completions chart, which reads `state.selected` too.
+        // ⚠ Hidden rather than drawn empty, and the branch is here rather than inside the card so
+        // that M9.6 has one place to put the message that belongs in it. `months` is empty only for
+        // a habit whose *inferred* start date is in the future — see `monthlyCompletions`.
+        if (state.selected.months.isNotEmpty()) {
+            MonthlyCompletionsCard(stats = state.selected)
+        }
     }
 }
 
@@ -272,6 +283,65 @@ private fun StatTiles(
                 numerals = numerals,
             )
         }
+    }
+}
+
+/**
+ * The "Monthly completions" card — `docs/design-spec.md` §5.4.
+ *
+ * The card is three lines; what it owns is the **words**, because [MonthlyChart] has none. Three
+ * things cross the boundary here and all three need a locale the design system does not hold: the
+ * month name under each point, the digits up the axis, and the sentence a screen reader hears in
+ * place of the drawing.
+ *
+ * ⭐ **`stats_count_value` formats the axis, the same resource the four tiles above use.** A bare
+ * `Int.toString()` would print ASCII digits up the side of a chart whose tiles had been localised —
+ * the mismatch `strings.xml` warns about, one card apart.
+ */
+@Composable
+private fun MonthlyCompletionsCard(
+    stats: HabitStats,
+    modifier: Modifier = Modifier,
+) {
+    val locale = rememberCurrentLocale()
+    val points =
+        remember(stats.months, locale) {
+            stats.months.map { month ->
+                ChartPoint(label = shortMonthLabel(month.month, locale), value = month.completions)
+            }
+        }
+    val countPattern = stringResource(R.string.stats_count_value)
+    val formatValue = remember(countPattern, locale) { { value: Int -> countPattern.format(locale, value) } }
+
+    HabitsCard(modifier = modifier) {
+        SectionEyebrow(text = stringResource(R.string.stats_monthly_eyebrow))
+        MonthlyChart(
+            points = points,
+            habitColor = stats.habit.color.resolve(),
+            formatValue = formatValue,
+            contentDescription = spokenChart(points, locale),
+        )
+    }
+}
+
+/**
+ * The chart read aloud — "Monthly completions: Sep 12, Oct 18, …".
+ *
+ * Thirteen short pairs, which is long for a `contentDescription` and still the right call: the
+ * alternative is [MonthlyChart]'s KDoc case for clearing semantics outright, and it does not apply
+ * here because no other element on this screen prints a monthly figure.
+ */
+@Composable
+private fun spokenChart(
+    points: List<ChartPoint>,
+    locale: Locale,
+): String {
+    val pattern = stringResource(R.string.stats_chart_description)
+    val monthPattern = stringResource(R.string.stats_chart_month)
+    val separator = stringResource(R.string.stats_chart_month_separator)
+    return remember(points, locale, pattern, monthPattern, separator) {
+        val months = points.joinToString(separator) { monthPattern.format(locale, it.label, it.value) }
+        pattern.format(locale, months)
     }
 }
 

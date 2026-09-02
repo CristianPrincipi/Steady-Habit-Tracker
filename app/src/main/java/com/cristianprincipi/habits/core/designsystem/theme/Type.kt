@@ -162,6 +162,12 @@ data class HabitsTextStyles(
     val eyebrowSmall: TextStyle,
     /** 10sp/500, `tracking-wide` — the `Mon…Sun` initials above the week pills. */
     val weekdayInitial: TextStyle,
+    /**
+     * 10sp/400 — the monthly chart's axis ticks, and the only 10sp text the design does not
+     * embolden or track. `recharts` sets a `fontSize` on the tick and nothing else, so it inherits
+     * the body weight while every other 10sp label in the app is a deliberate 500 or 600.
+     */
+    val axisLabel: TextStyle,
     /** The design's own numerals: DM Sans at the specified 700, digits that shift. */
     val sansNumerals: NumeralStyles,
     /** The alternative: DM Mono, digits that do not shift, capped at Medium 500. */
@@ -226,6 +232,7 @@ val DefaultHabitsTextStyles: HabitsTextStyles =
         eyebrow = sansStyle(10.sp, 14.sp, FontWeight.SemiBold, TrackingWidest),
         eyebrowSmall = sansStyle(9.sp, 12.sp, FontWeight.SemiBold, TrackingWidest),
         weekdayInitial = sansStyle(10.sp, 14.sp, FontWeight.Medium, TrackingWide),
+        axisLabel = sansStyle(10.sp, 14.sp, FontWeight.Normal),
         sansNumerals =
             NumeralStyles(
                 statValue = statValueStyle().copy(fontFeatureSettings = TABULAR_FIGURES),

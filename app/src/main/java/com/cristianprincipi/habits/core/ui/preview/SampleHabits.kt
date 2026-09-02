@@ -14,6 +14,7 @@ import com.cristianprincipi.habits.domain.usecase.HabitStats
 import com.cristianprincipi.habits.domain.usecase.HabitYear
 import com.cristianprincipi.habits.domain.usecase.buildPeriod
 import com.cristianprincipi.habits.domain.usecase.byHabit
+import com.cristianprincipi.habits.domain.usecase.monthlyCompletions
 import java.time.Clock
 import java.time.LocalDate
 import java.time.YearMonth
@@ -181,10 +182,12 @@ object SampleHabits {
         val habit = habits(reference).first { it.id.value == id }
         val dates = completions.filter { it.habitId == habit.id }.map { it.date }.toSet()
         val clock = Clock.fixed(reference.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC)
+        val period = buildPeriod(habit, trailingYearWindow(reference), dates, reference)
         return HabitStats(
-            period = buildPeriod(habit, trailingYearWindow(reference), dates, reference),
+            period = period,
             streak = CalculateStreak(clock)(dates),
             rate = GetCompletionRate(clock)(completedDates = dates, startDate = habit.startDate),
+            months = monthlyCompletions(period),
         )
     }
 

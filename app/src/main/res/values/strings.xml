@@ -344,6 +344,24 @@
     <string name="stats_count_value">%1$d</string>
 
     <!--
+      The monthly completions chart - docs/design-spec.md §5.4. The eyebrow is uppercase in the
+      string, for the reason the two blocks above give.
+
+      The other three build the chart's contentDescription, and it is worth saying why this canvas
+      speaks when YearDotGrid's does not: a year is thirteen buckets here rather than 365 squares,
+      and no other element on the screen prints a per-month figure at all. Clearing the semantics
+      without replacing them would delete the only place that number appears.
+
+      stats_chart_month_separator is quoted so the XML parser keeps its trailing space. It is
+      punctuation rather than copy, and it is a resource because not every language joins a list
+      with a comma.
+    -->
+    <string name="stats_monthly_eyebrow">MONTHLY COMPLETIONS</string>
+    <string name="stats_chart_description">Monthly completions: %1$s</string>
+    <string name="stats_chart_month">%1$s %2$d</string>
+    <string name="stats_chart_month_separator">", "</string>
+
+    <!--
       The manage-habits screen (M7.5). UNDESIGNED — the prototype has no such screen at all.
 
       Two facts do all the work here, and both are ADR-010's: a habit IS a checkbox column in the

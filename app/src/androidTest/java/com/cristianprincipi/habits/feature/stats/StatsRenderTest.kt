@@ -10,22 +10,29 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTouchHeightIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.datetime.shortMonthLabel
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
+import com.cristianprincipi.habits.domain.model.CompletionRate
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.Streak
+import com.cristianprincipi.habits.domain.usecase.HabitStats
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.Locale
 
 /**
  * The Stats screen on a device, driven through its stateless half.
@@ -70,6 +77,18 @@ class StatsRenderTest {
                 )
             }
         }
+    }
+
+    /** The chart's spoken form, assembled the way `StatsContent` assembles it. */
+    private fun spokenChart(stats: HabitStats): String {
+        val locale = Locale.getDefault()
+        val months =
+            stats.months.joinToString(string(R.string.stats_chart_month_separator)) { month ->
+                string(
+                    R.string.stats_chart_month,
+                ).format(locale, shortMonthLabel(month.month, locale), month.completions)
+            }
+        return string(R.string.stats_chart_description).format(locale, months)
     }
 
     private fun showEmpty(reason: HabitsEmptyReason) {
@@ -232,6 +251,72 @@ class StatsRenderTest {
     }
 
     @Test
+    fun theMonthlyChartIsThereWithItsEyebrow() {
+        showStats()
+
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertIsDisplayed()
+    }
+
+    @Test
+    fun theChartSaysEveryMonthAndItsCountOutLoud() {
+        // ⭐⭐ This is the only assertion that can reach the chart at all, and it is not a
+        // consolation prize. The curve is one `Canvas` with no text nodes in it, so what a test can
+        // check is what a screen reader gets — and `MonthlyChart` speaks precisely *because*
+        // nothing else on this screen prints a monthly figure (ADR-089 is why the year grid beside
+        // it stays silent, and neither half of that reasoning survives here).
+        //
+        // The months and counts come from the use case's own answer, so a chart handed the wrong
+        // habit's buckets, or buckets in the wrong order, fails here.
+        val stats = SampleHabits.stats(id = selected.id.value)
+        showStats()
+
+        composeTestRule.onNodeWithContentDescription(spokenChart(stats)).assertExists()
+    }
+
+    @Test
+    fun theChartFollowsTheSelection() {
+        // The same mutant `theTilesFollowTheSelection` rules out, one card lower: draw
+        // `habits.first()` instead of `state.selected` and every habit charts the same year.
+        val other = habits[3]
+        val theirs = SampleHabits.stats(id = other.id.value)
+        val firsts = SampleHabits.stats(id = selected.id.value)
+        assertNotEquals(spokenChart(firsts), spokenChart(theirs))
+
+        showStats(selectedHabit = other)
+
+        composeTestRule.onNodeWithContentDescription(spokenChart(theirs)).assertExists()
+        composeTestRule.onNodeWithContentDescription(spokenChart(firsts)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aHabitWithNoMonthToShowGetsNoChartCard() {
+        // ⚠ A habit whose *inferred* start date is in the future has no month it could have been
+        // kept in, so there is nothing to chart. The card is hidden rather than drawn empty — an
+        // eyebrow over 130dp of nothing reads as a chart that failed to load. `Plan.md` M9.6 is
+        // where this case gets something to say for itself.
+        composeTestRule.setContent {
+            HabitsTheme {
+                StatsContent(
+                    state = StatsUiState.Content(habits = habits, selected = statsWithNoMonths(selected)),
+                    onEvent = { },
+                    onOpenSyncStatus = { },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertDoesNotExist()
+        // The tiles above it stay, because zero completions is a true thing to print.
+        composeTestRule.onNodeWithText(string(R.string.stats_tile_current_streak)).assertIsDisplayed()
+    }
+
+    @Test
+    fun theEmptyScreenHasNoChartEither() {
+        showEmpty(HabitsEmptyReason.SyncPending)
+
+        composeTestRule.onNodeWithText(string(R.string.stats_monthly_eyebrow)).assertDoesNotExist()
+    }
+
+    @Test
     fun theEmptyScreenHasNoPillsToChooseFrom() {
         // Empty means no habits at all (`StatsUiState.Empty`), so there is nothing to select
         // between — and the selector must not draw an empty row above the message.
@@ -244,4 +329,13 @@ class StatsRenderTest {
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.SelectableGroup))
             .assertDoesNotExist()
     }
+
+    /** Figures for a habit that has not started yet: nothing to chart, and everything else zero. */
+    private fun statsWithNoMonths(habit: Habit) =
+        HabitStats(
+            period = HabitPeriod(habit = habit, cells = emptyList(), todayIndex = HabitPeriod.TODAY_ABSENT),
+            streak = Streak.None,
+            rate = CompletionRate(completedDays = 0, eligibleDays = 0),
+            months = emptyList(),
+        )
 }
