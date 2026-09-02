@@ -22,6 +22,7 @@ import com.cristianprincipi.habits.core.designsystem.component.HabitIcon
 import com.cristianprincipi.habits.core.designsystem.component.HabitIconSize
 import com.cristianprincipi.habits.core.designsystem.component.MonthDotGrid
 import com.cristianprincipi.habits.core.designsystem.component.MonthHabitCard
+import com.cristianprincipi.habits.core.designsystem.component.MonthlyChart
 import com.cristianprincipi.habits.core.designsystem.component.NavArrows
 import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
@@ -30,6 +31,7 @@ import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
 import com.cristianprincipi.habits.core.designsystem.component.WeekPills
 import com.cristianprincipi.habits.core.designsystem.component.YearDotGrid
 import com.cristianprincipi.habits.core.designsystem.component.YearHabitCard
+import com.cristianprincipi.habits.core.designsystem.component.previewMonths
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
@@ -201,6 +203,42 @@ fun DotGridSection() {
         GalleryNote(
             "The faintest band on the left of each year is BEFORE_START at 6% — the Year grid is the " +
                 "only one that separates \"before this habit existed\" from an ordinary missed day.",
+        )
+    }
+}
+
+/**
+ * The monthly chart at the four shapes its data can actually take.
+ *
+ * The single-bucket case earns this section on its own. It is a real branch — a habit added to
+ * Notion this month has one month of history, a curve needs two points, and what gets drawn instead
+ * is a dot — and no screen can show it: `StatsPreviewActivity` runs on `SampleHabits`, whose
+ * youngest habit is already three months old. A `Canvas` has nothing for an instrumented test to
+ * assert either, so the gallery is where that branch is looked at.
+ */
+@Composable
+fun MonthlyChartSection() {
+    val year = previewMonths()
+
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+        GalleryLabel("A full trailing year — thirteen buckets, so the first and last share a name")
+        MonthlyChart(points = year, habitColor = HabitsTheme.colors.habit.blue)
+
+        GalleryLabel("A habit that started in spring — the months before it are omitted, not zeroed")
+        MonthlyChart(points = year.takeLast(FIVE), habitColor = HabitsTheme.colors.habit.green)
+
+        GalleryLabel("One month, which is a dot: a curve needs two points and there is only one")
+        MonthlyChart(points = year.takeLast(1), habitColor = HabitsTheme.colors.habit.orange)
+
+        GalleryLabel("A habit kept on no day at all — a flat line, on an axis that still has height")
+        MonthlyChart(
+            points = year.map { it.copy(value = 0) },
+            habitColor = HabitsTheme.colors.habit.purple,
+        )
+        GalleryNote(
+            "The curve is monotone (Fritsch–Carlson), so it passes through every point and cannot " +
+                "dip below one on its way to the next — which is what keeps the gradient fill off " +
+                "the underside of the axis at a zero month.",
         )
     }
 }

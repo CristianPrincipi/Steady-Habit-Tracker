@@ -119,6 +119,7 @@ private fun gallerySections(): List<GalleryEntry> =
         GalleryEntry("WEEK PILLS") { WeekPillsSection() },
         GalleryEntry("DOT GRIDS") { DotGridSection() },
         GalleryEntry("STAT TILES — NUMERALS") { StatTileSection() },
+        GalleryEntry("MONTHLY CHART") { MonthlyChartSection() },
         GalleryEntry("HABIT CARDS") { HabitCardSection() },
         GalleryEntry("EMPTY STATES") { EmptyStateSection() },
     )
