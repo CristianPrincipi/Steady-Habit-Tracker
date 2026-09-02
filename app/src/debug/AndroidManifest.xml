@@ -125,6 +125,24 @@
             android:exported="true"
             android:theme="@style/Theme.MyHabitApp" />
 
+        <!--
+          M9.8. Seeds SampleHabits into the REAL database and opens the shell on top of it, which is
+          the only way to walk the check-off loop from Week to Stats without a Notion connection -
+          and connecting costs the user a token paste.
+
+          Exported, and safe to be, because the safety is in the activity rather than in this flag:
+          it reads the stored mapping first and REFUSES when anything is connected. That guards the
+          harm the shell's own exported="false" is aimed at, and guards it better - a check-off on a
+          connected build would queue a push against the user's real workspace, which no manifest
+          attribute prevents.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.SeedActivity
+        -->
+        <activity
+            android:name=".gallery.SeedActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"
