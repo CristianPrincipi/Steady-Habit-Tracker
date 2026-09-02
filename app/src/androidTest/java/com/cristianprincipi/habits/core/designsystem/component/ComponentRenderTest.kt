@@ -83,7 +83,6 @@ class ComponentRenderTest {
                         label = "Best streak",
                         value = "111",
                         habitColor = HabitsTheme.colors.habit.purple,
-                        numeralStyle = NumeralStyle.MONO,
                     )
                     MonthHabitCard(
                         name = "Learn Guitar",

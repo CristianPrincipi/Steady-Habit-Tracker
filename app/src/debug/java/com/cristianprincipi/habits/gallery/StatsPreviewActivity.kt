@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
@@ -39,7 +38,9 @@ import com.cristianprincipi.habits.feature.stats.StatsUiState
  * ⭐ **The pills work here** (M9.2). Selection is a `mutableStateOf` and the figures are recomputed
  * from `SampleHabits` under it, which is what makes the one interaction on this screen watchable
  * before there is a ViewModel behind it — the same trade `WeekPreviewActivity` makes for check-off.
- * The three sections below the pills arrive in M9.3, M9.4 and M9.5.
+ *
+ * ⚠ **It had a `--es numerals mono` switch and no longer does.** That existed to settle ADR-021,
+ * which the user closed at M9.8 in favour of the design's DM Sans; the enum went with the answer.
  *
  * The first habit's history is `completions() + unbrokenRun()`, so its current streak is alive. The
  * generated history alone will not reliably contain a run ending today, and a screen whose headline
@@ -49,7 +50,6 @@ import com.cristianprincipi.habits.feature.stats.StatsUiState
  * adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.StatsPreviewActivity
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state pending
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es state failed
- * adb shell am start -S -n …/….gallery.StatsPreviewActivity --es numerals mono
  * adb shell am start -S -n …/….gallery.StatsPreviewActivity --ei age 7
  * ```
  *
@@ -82,7 +82,6 @@ class StatsPreviewActivity : ComponentActivity() {
                 ) {
                     SampleStats(
                         empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)),
-                        numerals = numeralsFrom(intent.getStringExtra(EXTRA_NUMERALS)),
                         ageDays = intent.getIntExtra(EXTRA_AGE, FULL_HISTORY),
                     )
                 }
@@ -92,22 +91,10 @@ class StatsPreviewActivity : ComponentActivity() {
 }
 
 private const val EXTRA_STATE = "state"
-private const val EXTRA_NUMERALS = "numerals"
 private const val EXTRA_AGE = "age"
 
 /** No trimming: every habit keeps the history `SampleHabits` generated for it. */
 private const val FULL_HISTORY = 0
-
-/**
- * ⭐ **The whole point of this switch: ADR-021's open question, still open.**
- *
- * `NumeralStyle` was built both ways at M2.7 precisely so the choice could be made by eye, and the
- * stat tiles are the first place a large number appears on a real screen. `mono` renders DM Mono,
- * whose digits are all 600 units wide so nothing shifts — at Medium 500, because **DM Mono has no
- * bold** and faking one on a monospaced face looks worse than being honestly lighter. Anything else
- * renders the design's DM Sans at 700, whose `1` is 342 units against `0` at 656.
- */
-private fun numeralsFrom(extra: String?): NumeralStyle = if (extra == "mono") NumeralStyle.MONO else NumeralStyle.SANS
 
 /** `null` for the sample habit; a reason to render [StatsUiState.Empty] instead. */
 private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
@@ -134,7 +121,6 @@ private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
 @Composable
 private fun SampleStats(
     empty: HabitsEmptyReason?,
-    numerals: NumeralStyle,
     ageDays: Int,
 ) {
     val full = SampleHabits.habits()
@@ -157,7 +143,6 @@ private fun SampleStats(
                         ),
                 ),
         onEvent = { event -> if (event is StatsEvent.HabitSelected) selectedId = event.habitId },
-        numerals = numerals,
         // Real navigation is the shell's; here it is the one thing this activity cannot show.
         onOpenSyncStatus = {},
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),

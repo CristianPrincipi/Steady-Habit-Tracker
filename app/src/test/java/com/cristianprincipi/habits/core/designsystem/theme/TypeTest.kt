@@ -95,36 +95,34 @@ class TypeTest {
         assertEquals(9.sp, DefaultHabitsTextStyles.eyebrowSmall.fontSize)
         assertEquals(10.sp, DefaultHabitsTextStyles.weekdayInitial.fontSize)
         assertEquals(FontWeight.Medium, DefaultHabitsTextStyles.weekdayInitial.fontWeight)
-        assertEquals(30.sp, DefaultHabitsTextStyles.sansNumerals.statValue.fontSize)
-        assertEquals(24.sp, DefaultHabitsTextStyles.sansNumerals.metricValue.fontSize)
+        assertEquals(30.sp, DefaultHabitsTextStyles.statValue.fontSize)
+        assertEquals(24.sp, DefaultHabitsTextStyles.metricValue.fontSize)
     }
 
     @Test
-    fun `the mono numerals are a stable-width alternative capped below the design's weight`() {
-        // DM Mono has no bold. The design specifies 700 for both numbers, so the tabular option
-        // cannot also be the specified weight — see ADR-021. Medium is the honest maximum, and
-        // FontSynthesis.None stops Compose faking the difference by smearing the glyphs.
-        val mono = DefaultHabitsTextStyles.monoNumerals
+    fun `the two numeric styles are the design's own typeface at its specified weight`() {
+        // ⭐ **ADR-021's question is closed** — the user chose DM Sans at M9.8, and the DM Mono
+        // alternative, the `NumeralStyle` enum and the `NumeralStyles` grouping went with the
+        // answer. What is left is what the design always specified, and this pins it: the family
+        // the body text uses, at 700, at the two sizes `docs/tokens.md` §2.3 gives.
+        val statValue = DefaultHabitsTextStyles.statValue
+        val metricValue = DefaultHabitsTextStyles.metricValue
 
-        assertEquals(FontWeight.Medium, mono.statValue.fontWeight)
-        assertEquals(FontSynthesis.None, mono.statValue.fontSynthesis)
-        assertEquals(DefaultHabitsTextStyles.mono.fontFamily, mono.statValue.fontFamily)
-        assertNotEquals(
-            DefaultHabitsTextStyles.sansNumerals.statValue.fontFamily,
-            mono.statValue.fontFamily,
-        )
-        // Same size in both variants: only the family and weight differ, so the comparison at M2.8
-        // is about the typeface and nothing else.
-        assertEquals(DefaultHabitsTextStyles.sansNumerals.statValue.fontSize, mono.statValue.fontSize)
-        assertEquals(DefaultHabitsTextStyles.sansNumerals.metricValue.fontSize, mono.metricValue.fontSize)
+        assertEquals(FontWeight.Bold, statValue.fontWeight)
+        assertEquals(FontWeight.Bold, metricValue.fontWeight)
+        assertEquals(30.sp, statValue.fontSize)
+        assertEquals(24.sp, metricValue.fontSize)
+        // Not DM Mono: the losing option was a different family, and this is the assertion that
+        // would fail if it ever came back by the side door.
+        assertNotEquals(DefaultHabitsTextStyles.mono.fontFamily, statValue.fontFamily)
     }
 
     @Test
     fun `the numeric styles request tabular figures`() {
         // Requested, and currently inert: DM Sans 4.004 ships no `tnum` feature — see the note on
         // DefaultHabitsTextStyles. This pins the intent so the request is not quietly dropped.
-        assertEquals("tnum", DefaultHabitsTextStyles.sansNumerals.statValue.fontFeatureSettings)
-        assertEquals("tnum", DefaultHabitsTextStyles.sansNumerals.metricValue.fontFeatureSettings)
+        assertEquals("tnum", DefaultHabitsTextStyles.statValue.fontFeatureSettings)
+        assertEquals("tnum", DefaultHabitsTextStyles.metricValue.fontFeatureSettings)
         assertNull(HabitsTypography.bodyMedium.fontFeatureSettings)
     }
 

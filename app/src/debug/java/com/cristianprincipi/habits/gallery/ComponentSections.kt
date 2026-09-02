@@ -24,7 +24,6 @@ import com.cristianprincipi.habits.core.designsystem.component.MonthDotGrid
 import com.cristianprincipi.habits.core.designsystem.component.MonthHabitCard
 import com.cristianprincipi.habits.core.designsystem.component.MonthlyChart
 import com.cristianprincipi.habits.core.designsystem.component.NavArrows
-import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
 import com.cristianprincipi.habits.core.designsystem.component.StatTileIcon
 import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
@@ -243,50 +242,41 @@ fun MonthlyChartSection() {
     }
 }
 
+/**
+ * The four stat tiles.
+ *
+ * ⚠ **This section used to show the same grid twice**, in DM Sans and DM Mono, because ADR-021's
+ * numerals question was open from M2.2 and this was where it was meant to be answered by eye. The
+ * user answered it at M9.8 — DM Sans, the design's own — so there is one grid now and the
+ * alternative is deleted rather than kept "in case".
+ */
 @Composable
 fun StatTileSection() {
     val purple = HabitsTheme.colors.habit.purple
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-        GalleryLabel("A — DM Sans, the design's specified 700 weight")
-        StatGrid(NumeralStyle.SANS, purple)
-
-        GalleryLabel("B — DM Mono, stable digit widths, Medium 500")
-        StatGrid(NumeralStyle.MONO, purple)
-
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            StatTile("Completed days", "111", purple, Modifier.weight(1f)) {
+                StatTileIcon(Lucide.Hash, purple)
+            }
+            StatTile("Completion rate", "84%", purple, Modifier.weight(1f)) {
+                StatTileIcon(Lucide.Percent, purple)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            StatTile("Current streak", "10", purple, Modifier.weight(1f)) {
+                StatTileIcon(Lucide.Flame, purple)
+            }
+            StatTile("Best streak", "108", purple, Modifier.weight(1f)) {
+                StatTileIcon(Lucide.Trophy, purple)
+            }
+        }
         GalleryNote(
-            "Same numbers, same sizes, same tiles — only the typeface and weight differ. A is the " +
-                "design as specified and its digits shift as values change, because DM Sans has no " +
-                "tabular figures and \"1\" is about half the width of \"0\". B holds every digit at the " +
-                "same width, but DM Mono has no bold, so it renders 500 against the design's 700. " +
-                "Both numbers sit in fixed-size tiles either way: what moves is glyphs inside a stable " +
-                "box, never the layout, and they change about once a day.",
+            "The digits shift as a value changes — DM Sans has no tabular figures and \"1\" is " +
+                "about half the width of \"0\". That is the design, chosen over a monospaced " +
+                "alternative that held its widths but had no bold and a slashed zero. The numbers " +
+                "sit in fixed-size tiles either way: what moves is glyphs inside a stable box.",
         )
-    }
-}
-
-@Composable
-private fun StatGrid(
-    numeralStyle: NumeralStyle,
-    colour: androidx.compose.ui.graphics.Color,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-            StatTile("Completed days", "111", colour, Modifier.weight(1f), numeralStyle) {
-                StatTileIcon(Lucide.Hash, colour)
-            }
-            StatTile("Completion rate", "84%", colour, Modifier.weight(1f), numeralStyle) {
-                StatTileIcon(Lucide.Percent, colour)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-            StatTile("Current streak", "10", colour, Modifier.weight(1f), numeralStyle) {
-                StatTileIcon(Lucide.Flame, colour)
-            }
-            StatTile("Best streak", "108", colour, Modifier.weight(1f), numeralStyle) {
-                StatTileIcon(Lucide.Trophy, colour)
-            }
-        }
     }
 }
 
@@ -327,27 +317,18 @@ fun HabitCardSection() {
             modifier = Modifier.fillMaxWidth(),
         )
 
-        GalleryLabel("Year card — numerals A, DM Sans")
-        YearCard(NumeralStyle.SANS)
-
-        GalleryLabel("Year card — numerals B, DM Mono")
-        YearCard(NumeralStyle.MONO)
+        GalleryLabel("Year card — the percentage is the other number ADR-021 was about")
+        YearHabitCard(
+            name = "Morning Yoga",
+            description = "20 min flow",
+            emoji = "🧘",
+            habitColor = HabitsTheme.colors.habit.orange,
+            completionLabel = "84%",
+            completionEyebrow = "COMPLETION",
+            days = GalleryYear,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
-}
-
-@Composable
-private fun YearCard(numeralStyle: NumeralStyle) {
-    YearHabitCard(
-        name = "Morning Yoga",
-        description = "20 min flow",
-        emoji = "🧘",
-        habitColor = HabitsTheme.colors.habit.orange,
-        completionLabel = "84%",
-        completionEyebrow = "COMPLETION",
-        days = GalleryYear,
-        modifier = Modifier.fillMaxWidth(),
-        numeralStyle = numeralStyle,
-    )
 }
 
 @Composable

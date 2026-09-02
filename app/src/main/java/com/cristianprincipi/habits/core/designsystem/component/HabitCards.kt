@@ -117,7 +117,6 @@ fun YearHabitCard(
     completionEyebrow: String,
     days: List<DayStatus>,
     modifier: Modifier = Modifier,
-    numeralStyle: NumeralStyle = NumeralStyle.SANS,
 ) {
     HabitsCard(modifier = modifier) {
         Row(
@@ -138,7 +137,7 @@ fun YearHabitCard(
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = completionLabel,
-                    style = numeralStyle.metricValue(),
+                    style = HabitsTheme.textStyles.metricValue,
                     color = HabitsTheme.colors.text.primary,
                 )
                 Text(

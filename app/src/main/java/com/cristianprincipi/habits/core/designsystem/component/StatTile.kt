@@ -12,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
@@ -28,6 +27,11 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * a 2×2 grid by the caller, which is what makes the tile a fixed-size box: whatever the digits do,
  * the tile does not move.
  *
+ * ⚠ **The digits shift as the value changes, and that is the design.** ADR-021 kept a stable-width
+ * alternative alive for eight milestones so the choice could be made by eye; the user chose DM Sans
+ * at M9.8 and the alternative is gone. `HabitsTextStyles.statValue` asks for `tnum` anyway, inertly,
+ * because DM Sans 4.004 does not have it — see that file.
+ *
  * @param icon supplied by the caller so the icon set can change without touching this signature —
  *   the four are Lucide's `Hash`, `Percent`, `Flame` and `Trophy` (ADR-024). The slot is expected
  *   to draw at [Sizing.iconSmall] in [habitColor]; [StatTileIcon] does exactly that.
@@ -38,7 +42,6 @@ fun StatTile(
     value: String,
     habitColor: Color,
     modifier: Modifier = Modifier,
-    numeralStyle: NumeralStyle = NumeralStyle.SANS,
     icon: @Composable () -> Unit = {},
 ) {
     HabitsCard(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
@@ -60,7 +63,7 @@ fun StatTile(
         )
         Text(
             text = value,
-            style = numeralStyle.statValue(),
+            style = HabitsTheme.textStyles.statValue,
             color = HabitsTheme.colors.text.primary,
         )
     }
@@ -107,7 +110,6 @@ private fun StatTilePreview() {
                     icon = { StatTileIcon(Lucide.Flame, HabitsTheme.colors.habit.purple) },
                     value = "111",
                     habitColor = HabitsTheme.colors.habit.purple,
-                    numeralStyle = NumeralStyle.MONO,
                     modifier = Modifier.weight(1f),
                 )
                 StatTile(
@@ -115,7 +117,6 @@ private fun StatTilePreview() {
                     icon = { StatTileIcon(Lucide.Trophy, HabitsTheme.colors.habit.purple) },
                     value = "84%",
                     habitColor = HabitsTheme.colors.habit.purple,
-                    numeralStyle = NumeralStyle.MONO,
                     modifier = Modifier.weight(1f),
                 )
             }

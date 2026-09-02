@@ -168,29 +168,14 @@ data class HabitsTextStyles(
      * the body weight while every other 10sp label in the app is a deliberate 500 or 600.
      */
     val axisLabel: TextStyle,
-    /** The design's own numerals: DM Sans at the specified 700, digits that shift. */
-    val sansNumerals: NumeralStyles,
-    /** The alternative: DM Mono, digits that do not shift, capped at Medium 500. */
-    val monoNumerals: NumeralStyles,
+    /** 30sp/700 DM Sans — the stat-tile value, the largest text in the app. */
+    val statValue: TextStyle,
+    /** 24sp/700 DM Sans — the Year card's completion percentage. */
+    val metricValue: TextStyle,
     /** 14sp/400 DM Mono — the integration-token and database-ID fields. */
     val mono: TextStyle,
     /** 10sp/400 DM Mono — the Notion schema property chips. */
     val monoSmall: TextStyle,
-)
-
-/**
- * The two numbers the design calls out as tabular: a stat-tile value and a completion percentage.
- *
- * Grouped so both can exist twice over while the choice between them is open — see
- * [DefaultHabitsTextStyles] for what that choice actually is, and `Plan.md` M2.7/M2.8 for where it
- * gets made. Once it is made, one of the two groups is deleted.
- */
-@Immutable
-data class NumeralStyles(
-    /** 30sp — the stat-tile value, the largest text in the app. */
-    val statValue: TextStyle,
-    /** 24sp — the Year card's completion percentage. */
-    val metricValue: TextStyle,
 )
 
 /**
@@ -210,21 +195,20 @@ data class NumeralStyles(
  * So the feature is requested anyway and documented as inert: it costs nothing, it states the
  * intent, and it starts working the day the font gains the feature.
  *
- * **Both numeral sets are built, and the choice is the user's to make by eye (M2.8).** The framing
- * that mattered, and that this file originally got wrong: matching the prototype here reproduces a
- * *font failure*, not a design decision. `App.tsx` asks for `tabular-nums` on both numbers and
- * `docs/tokens.md §2.3` says to carry it over — the request was simply ignored by a font that
- * cannot honour it.
+ * ### ⭐ ADR-021's open question is closed — the user chose DM Sans on 2026-09-02 (M9.8)
  *
- * Neither option is free:
+ * It was open from M2.2 to M9.8, and `NumeralStyle`, a `NumeralStyles` grouping and a whole second
+ * set of styles existed only to keep both answers alive until somebody could see them on glass.
+ * They are all deleted; [statValue] and [metricValue] below are what the design specifies and the
+ * only numerals this app has.
  *
- * - [sansNumerals] keeps the specified 700 weight and the design's own typeface; digits shift as
- *   values change.
- * - [monoNumerals] holds every digit at 600 units so nothing shifts — but **DM Mono has no bold.**
- *   The family tops out at Medium 500 while the design specifies 700, so the hero stat value cannot
- *   be both tabular and bold. The design's "tabular" and its "700" are not jointly satisfiable.
+ * What was given up, recorded because it was a real trade and not a formality: **DM Mono holds every
+ * digit at 600 units so nothing shifts**, and it has **no bold** — it tops out at Medium 500 against
+ * the design's 700. The design's "tabular" and its "700" were never jointly satisfiable. Rendered
+ * side by side at M9.4, the deciding difference turned out not to be width at all but a **slashed
+ * zero**, which reads as a code editor rather than as this design.
  *
- * Worth weighing when judging: both numbers sit in fixed-size containers, so what moves is glyphs
+ * So the digits shift, by choice. Both numbers sit in fixed-size containers, so what moves is glyphs
  * inside a stable box, never the layout around them — and they change about once a day.
  */
 val DefaultHabitsTextStyles: HabitsTextStyles =
@@ -233,16 +217,8 @@ val DefaultHabitsTextStyles: HabitsTextStyles =
         eyebrowSmall = sansStyle(9.sp, 12.sp, FontWeight.SemiBold, TrackingWidest),
         weekdayInitial = sansStyle(10.sp, 14.sp, FontWeight.Medium, TrackingWide),
         axisLabel = sansStyle(10.sp, 14.sp, FontWeight.Normal),
-        sansNumerals =
-            NumeralStyles(
-                statValue = statValueStyle().copy(fontFeatureSettings = TABULAR_FIGURES),
-                metricValue = sansStyle(24.sp, 32.sp, FontWeight.Bold).copy(fontFeatureSettings = TABULAR_FIGURES),
-            ),
-        monoNumerals =
-            NumeralStyles(
-                statValue = monoNumeralStyle(30.sp, 36.sp),
-                metricValue = monoNumeralStyle(24.sp, 32.sp),
-            ),
+        statValue = statValueStyle().copy(fontFeatureSettings = TABULAR_FIGURES),
+        metricValue = sansStyle(24.sp, 32.sp, FontWeight.Bold).copy(fontFeatureSettings = TABULAR_FIGURES),
         mono = TextStyle(fontFamily = DmMono, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
         monoSmall =
             TextStyle(
@@ -252,25 +228,6 @@ val DefaultHabitsTextStyles: HabitsTextStyles =
                 fontWeight = FontWeight.Normal,
             ),
     )
-
-/**
- * A numeric value in DM Mono, at the heaviest weight the family actually has.
- *
- * [FontWeight.Medium], not the design's 700, and deliberately not `Bold`: asking a family for a
- * weight it does not contain lets Compose synthesise one by smearing the glyphs, which on a
- * monospaced face looks worse than simply being lighter than specified. Better to be honestly
- * 500 than fake 700.
- */
-private fun monoNumeralStyle(
-    size: TextUnit,
-    lineHeight: TextUnit,
-) = TextStyle(
-    fontFamily = DmMono,
-    fontSize = size,
-    lineHeight = lineHeight,
-    fontWeight = FontWeight.Medium,
-    fontSynthesis = FontSynthesis.None,
-)
 
 /** The OpenType tag CSS `font-variant-numeric: tabular-nums` resolves to. */
 private const val TABULAR_FIGURES = "tnum"

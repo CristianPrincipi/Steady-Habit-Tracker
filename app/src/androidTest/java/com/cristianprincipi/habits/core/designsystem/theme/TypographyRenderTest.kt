@@ -108,10 +108,8 @@ class TypographyRenderTest {
             DefaultHabitsTextStyles.eyebrow,
             DefaultHabitsTextStyles.eyebrowSmall,
             DefaultHabitsTextStyles.weekdayInitial,
-            DefaultHabitsTextStyles.sansNumerals.statValue,
-            DefaultHabitsTextStyles.sansNumerals.metricValue,
-            DefaultHabitsTextStyles.monoNumerals.statValue,
-            DefaultHabitsTextStyles.monoNumerals.metricValue,
+            DefaultHabitsTextStyles.statValue,
+            DefaultHabitsTextStyles.metricValue,
             DefaultHabitsTextStyles.mono,
             DefaultHabitsTextStyles.monoSmall,
         )

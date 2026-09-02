@@ -27,7 +27,6 @@ import com.cristianprincipi.habits.core.designsystem.component.HabitChip
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.MINIMUM_CHART_POINTS
 import com.cristianprincipi.habits.core.designsystem.component.MonthlyChart
-import com.cristianprincipi.habits.core.designsystem.component.NumeralStyle
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
 import com.cristianprincipi.habits.core.designsystem.component.StatTileIcon
@@ -56,10 +55,9 @@ import java.util.Locale
  * all share and could otherwise each get differently: the header, the three states, and the 16dp
  * padding and 16dp section spacing the design specifies.
  *
- * @param numerals ⚠ **temporary, and it exists to settle ADR-021's open question.** `NumeralStyle`
- *   was built both ways at M2.7 so the choice could be made by eye, and it has been pending since —
- *   production always takes the default, and only `StatsPreviewActivity` passes the other. **This
- *   parameter and the enum are both deleted the day the user chooses** (`Plan.md` M9.8).
+ * ⭐ **This had a `numerals` parameter and no longer does.** It existed only to settle ADR-021's
+ * open question, which the user closed at M9.8 in favour of the design's DM Sans — so the parameter,
+ * the `NumeralStyle` enum and the whole second set of styles went with the answer.
  */
 @Composable
 fun StatsContent(
@@ -67,7 +65,6 @@ fun StatsContent(
     onEvent: (StatsEvent) -> Unit,
     onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
-    numerals: NumeralStyle = NumeralStyle.SANS,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         StatsTitle()
@@ -91,7 +88,6 @@ fun StatsContent(
                 StatsSections(
                     state = state,
                     onEvent = onEvent,
-                    numerals = numerals,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -133,7 +129,6 @@ private fun StatsTitle() {
 private fun StatsSections(
     state: StatsUiState.Content,
     onEvent: (StatsEvent) -> Unit,
-    numerals: NumeralStyle,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -146,7 +141,7 @@ private fun StatsSections(
             onSelect = { id -> onEvent(StatsEvent.HabitSelected(id)) },
         )
         YearOverviewCard(stats = state.selected)
-        StatTiles(stats = state.selected, numerals = numerals)
+        StatTiles(stats = state.selected)
         MonthlyCompletionsCard(stats = state.selected)
     }
 }
@@ -233,15 +228,15 @@ private fun YearOverviewCard(
  * A `Row` of `Row`s rather than a `LazyVerticalGrid`: there are exactly four tiles, always, and a
  * lazy grid inside a vertically scrolling `Column` needs a fixed height it has no business having.
  *
- * ⚠ **These digits jitter, and that is the faithful port.** The design asks for tabular figures and
- * `sansNumerals.statValue` duly requests `tnum` — but ADR-021 §2 read DM Sans 4.004's tables out of
- * the bundled binary and the feature **is not in the font**: `1` is 342 units against `0` at 656.
- * The prototype's own `tabular-nums` is equally inert, so its numbers shift too.
+ * ⚠ **These digits jitter, and the user chose that knowingly at M9.8.** The design asks for tabular
+ * figures and `HabitsTextStyles.statValue` duly requests `tnum` — but ADR-021 §2 read DM Sans
+ * 4.004's tables out of the bundled binary and the feature **is not in the font**: `1` is 342 units
+ * against `0` at 656. The prototype's own `tabular-nums` is equally inert. The stable-width
+ * alternative was built, rendered beside this one, and lost on its slashed zero (ADR-099).
  */
 @Composable
 private fun StatTiles(
     stats: HabitStats,
-    numerals: NumeralStyle,
     modifier: Modifier = Modifier,
 ) {
     val color = stats.habit.color.resolve()
@@ -253,14 +248,12 @@ private fun StatTiles(
                 glyph = Lucide.Hash,
                 value = stringResource(R.string.stats_count_value, stats.rate.completedDays),
                 color = color,
-                numerals = numerals,
             )
             Tile(
                 label = R.string.stats_tile_completion_rate,
                 glyph = Lucide.Percent,
                 value = stringResource(R.string.percent_value, stats.rate.percent),
                 color = color,
-                numerals = numerals,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
@@ -269,14 +262,12 @@ private fun StatTiles(
                 glyph = Lucide.Flame,
                 value = stringResource(R.string.stats_count_value, stats.streak.current),
                 color = color,
-                numerals = numerals,
             )
             Tile(
                 label = R.string.stats_tile_best_streak,
                 glyph = Lucide.Trophy,
                 value = stringResource(R.string.stats_count_value, stats.streak.best),
                 color = color,
-                numerals = numerals,
             )
         }
     }
@@ -379,14 +370,12 @@ private fun RowScope.Tile(
     glyph: LucideGlyph,
     value: String,
     color: Color,
-    numerals: NumeralStyle,
 ) {
     StatTile(
         label = stringResource(label),
         value = value,
         habitColor = color,
         modifier = Modifier.weight(1f),
-        numeralStyle = numerals,
         icon = { StatTileIcon(glyph = glyph, habitColor = color) },
     )
 }
