@@ -110,6 +110,17 @@ fun ChooseDatabaseStep(
             )
         }
 
+        // ⚠ The only empty state in the app that was missing, and the one on the path a first-run
+        // user cannot avoid (M12.3). This step is only ever reached with the search already
+        // returned — NotionSetupViewModel sets `step` and `databases` in the same update — so an
+        // empty list here means zero results rather than a fetch still in flight, and the note
+        // cannot flash during a load.
+        if (state.databases.isEmpty()) {
+            item(key = "database-empty") {
+                StepNote(text = stringResource(R.string.setup_database_empty))
+            }
+        }
+
         items(state.databases, key = { it.id }) { database ->
             SetupChoiceRow(
                 label = database.title.ifBlank { stringResource(R.string.setup_database_untitled) },

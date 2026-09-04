@@ -29,6 +29,19 @@
     <string name="setup_database_title">Pick your habit database</string>
     <string name="setup_database_body">These are the databases your token can reach.</string>
     <string name="setup_database_untitled">Untitled database</string>
+    <!--
+      ⚠⚠ M12.3, and it is CLAUDE.md §3.3's trap said out loud on the screen where a user meets it.
+      A valid token that has been shared with nothing returns a SUCCESSFUL search with zero results
+      — not an error — so no failure banner fires and the picker simply had nothing to draw. The
+      user saw "These are the databases your token can reach" above an empty space, which reads as
+      a broken app rather than as an unfinished step in Notion.
+
+      Continue is already correctly disabled here (canContinueFromDatabase), so this is not a dead
+      end — what was missing was the sentence saying what to do. The second half is the wizard's own
+      documented finding: Notion's search is eventually consistent, so a database shared a moment
+      ago can be absent from this list and perfectly reachable by the link field directly below.
+    -->
+    <string name="setup_database_empty">No databases yet. In Notion: open your habit database → ••• → Connections, and add your integration. One shared a moment ago can take a minute to appear here — its link works straight away.</string>
     <string name="setup_database_continue">Continue</string>
     <string name="setup_database_use_link">Don\'t see it? Paste a link instead</string>
     <string name="setup_link_label">DATABASE LINK</string>
