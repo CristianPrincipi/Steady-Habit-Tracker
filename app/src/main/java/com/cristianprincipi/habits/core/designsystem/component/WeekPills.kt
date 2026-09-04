@@ -21,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
@@ -104,6 +106,7 @@ private fun RowScope.DayPill(
     onToggle: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
     val completed = status == DayStatus.COMPLETED
     val shape = MaterialTheme.shapes.large
     val checkColor = HabitsTheme.colors.text.primary
@@ -125,7 +128,29 @@ private fun RowScope.DayPill(
                     enabled = status.isCheckable,
                     interactionSource = interactionSource,
                     indication = null,
-                    onValueChange = { onToggle() },
+                    // ⭐ M12.6, and the only haptic in the app. The check-off is the one gesture
+                    // `CLAUDE.md` §1 calls the core loop, and it is the one place where the finger
+                    // is somewhere the eye may not be — seven 37dp-wide pills across five stacked
+                    // cards. A pill that flips silently is a tap you have to look up to confirm.
+                    //
+                    // **`ToggleOn`/`ToggleOff` rather than one buzz for both**, because the two
+                    // outcomes are not the same event: one records a day, the other takes it back.
+                    //
+                    // ⚠ **These are safe below API 34 despite the platform constants arriving
+                    // there** — checked in androidx.core's source rather than assumed.
+                    // `HapticFeedbackConstantsCompat.getFeedbackConstantOrFallback` maps `TOGGLE_ON`
+                    // to `CONTEXT_CLICK` and `TOGGLE_OFF` to `CLOCK_TICK` below 34, and Compose calls
+                    // it through `ViewCompat.performHapticFeedback`. Both fallbacks predate
+                    // `minSdk 26`, and the asymmetry survives: on stays firmer than off.
+                    //
+                    // The system setting is honoured by `performHapticFeedback` itself, so a user who
+                    // has turned haptics off is not overridden here.
+                    onValueChange = { nowCompleted ->
+                        haptics.performHapticFeedback(
+                            if (nowCompleted) HapticFeedbackType.ToggleOn else HapticFeedbackType.ToggleOff,
+                        )
+                        onToggle()
+                    },
                 ).semantics {
                     this.contentDescription = contentDescription
                     toggleableState = if (completed) ToggleableState.On else ToggleableState.Off
