@@ -36,6 +36,7 @@ class SettingsRenderTest {
         state: SettingsUiState,
         onOpenSyncStatus: () -> Unit = {},
         onOpenHabits: () -> Unit = {},
+        onOpenAbout: () -> Unit = {},
     ) {
         composeTestRule.setContent {
             HabitsTheme {
@@ -43,6 +44,7 @@ class SettingsRenderTest {
                     state = state,
                     onOpenSyncStatus = onOpenSyncStatus,
                     onOpenHabits = onOpenHabits,
+                    onOpenAbout = onOpenAbout,
                 )
             }
         }
@@ -107,22 +109,29 @@ class SettingsRenderTest {
 
         assertTrue(topOf(R.string.sync_connected) < topOf(R.string.settings_notion_sync))
         assertTrue(topOf(R.string.settings_notion_sync) < topOf(R.string.settings_habits))
+        // ⭐ About is last (M11.8): the two rows above it are where something gets fixed, and
+        // this one is where something gets read.
+        assertTrue(topOf(R.string.settings_habits) < topOf(R.string.settings_about))
     }
 
     @Test
-    fun bothRowsGoWhereTheySay() {
+    fun everyRowGoesWhereItSays() {
         var syncStatusOpened = 0
         var habitsOpened = 0
+        var aboutOpened = 0
         show(
             state = SettingsUiState(connection = ConnectionSummary(isConnected = true)),
             onOpenSyncStatus = { syncStatusOpened++ },
             onOpenHabits = { habitsOpened++ },
+            onOpenAbout = { aboutOpened++ },
         )
 
         composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
         composeTestRule.onNodeWithText(string(R.string.settings_habits)).performClick()
+        composeTestRule.onNodeWithText(string(R.string.settings_about)).performClick()
 
         assertEquals(1, syncStatusOpened)
         assertEquals(1, habitsOpened)
+        assertEquals(1, aboutOpened)
     }
 }

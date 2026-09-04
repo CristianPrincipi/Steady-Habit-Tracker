@@ -97,3 +97,12 @@ data object EditMapping : NavRoute
  */
 @Serializable
 data object SyncStatus : NavRoute
+
+/**
+ * Version, what leaves the device, and the three licences the APK ships — `feature/about`, M11.8.
+ *
+ * **A destination, not a tab**, reached from [Settings] like [SyncStatus] beside it. It takes no
+ * argument and observes nothing: everything on it is fixed at build time.
+ */
+@Serializable
+data object About : NavRoute

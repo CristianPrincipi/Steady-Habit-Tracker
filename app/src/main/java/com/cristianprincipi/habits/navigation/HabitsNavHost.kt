@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
+import com.cristianprincipi.habits.feature.about.AboutScreen
 import com.cristianprincipi.habits.feature.history.MonthScreen
 import com.cristianprincipi.habits.feature.history.YearScreen
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsScreen
@@ -121,10 +122,17 @@ fun HabitsShell(
                 SettingsScreen(
                     onOpenSyncStatus = { navController.navigate(SyncStatus) },
                     onOpenHabits = { navController.navigate(ManageHabits) },
+                    onOpenAbout = { navController.navigate(About) },
                 )
             }
             composable<SyncStatus> {
                 SyncStatusScreen(onEditMapping = { navController.navigate(EditMapping) })
+            }
+            // ⭐ M11.8, and the last live step in M11. A destination rather than a tab, reached
+            // from the Settings hub like the sync screen above it, and it takes nothing: everything
+            // on it is fixed at build time.
+            composable<About> {
+                AboutScreen()
             }
             // ⭐ Reachable since M7.5, from Settings — the user's choice over a glyph on the Week
             // header. The `+` this once waited on must never exist: ADR-010 makes a habit a column

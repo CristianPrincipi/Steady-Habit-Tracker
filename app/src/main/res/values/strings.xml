@@ -192,6 +192,13 @@
     <string name="settings_habits">Your habits</string>
 
     <!--
+      The third row on the Settings hub (M11.8). It sits last because it is the only row on the
+      screen a user never NEEDS: the two above it are where something gets fixed, and this one is
+      where something gets read.
+    -->
+    <string name="settings_about">About</string>
+
+    <!--
       Header titles — docs/design-spec.md §1. Deliberately NOT the same strings as the tab labels:
       the design's header reads "Statistics" where the tab reads "Stats".
 
@@ -212,6 +219,7 @@
       name was theirs to settle rather than inherited from M5.3's stub.
     -->
     <string name="screen_title_habits">Your habits</string>
+    <string name="screen_title_about">About</string>
 
     <!--
       Scaffolding (M5.3). Every screen showing this is replaced by the milestone that builds it, and
@@ -426,4 +434,54 @@
     <string name="week_undo_checked">%1$s checked off for %2$s</string>
     <string name="week_undo_cleared">%1$s cleared for %2$s</string>
     <string name="week_undo_action">Undo</string>
+
+    <!--
+      The About screen (M11.8) — UNDESIGNED. The prototype has no such view at all
+      (docs/design-spec.md), so every word here is ours.
+
+      ⚠⚠ This screen exists to say TRUE things, which is why the copy is specific rather than
+      reassuring. CLAUDE.md §9.12 records that the old "all data stays on your device" line is now
+      FALSE — habit data is transmitted to Notion at the user's instruction — and M14.6's Play
+      Data Safety form inherits whatever is written here. A vague sentence on this screen becomes a
+      wrong declaration on that form.
+    -->
+    <string name="about_version">Version %1$s (%2$d)</string>
+
+    <!--
+      What leaves the device. The order is deliberate: where the data lives, then what a tap
+      actually does, then the one host, then the token, then what disconnecting destroys.
+
+      "Your habits live in your Notion workspace" leads because it is the thing that makes the rest
+      true — this app is a client for a database the user already owns, and the copy on the phone
+      is the mirror, not the original.
+    -->
+    <string name="about_data_eyebrow">YOUR DATA</string>
+    <string name="about_data_home">Your habits live in your Notion workspace. This app keeps a copy on this device so it works with no signal, and syncs changes both ways whenever it can reach Notion.</string>
+    <string name="about_data_offline">Checking a habit off is saved on this device first and sent to Notion afterwards. Nothing you do here waits for the network.</string>
+    <string name="about_data_one_host">api.notion.com is the only server this app ever contacts. There is no account to create, no server of ours, and no analytics or crash reporting of any kind.</string>
+    <string name="about_data_token">Your Notion token is stored encrypted on this device. It leaves only as the authorisation header on a request to Notion, and is never written to a log or a backup.</string>
+    <!--
+      The last line is the one a user is most likely to be looking for, and the second sentence is
+      the reassurance that belongs next to it: this app archives nothing and deletes nothing in
+      Notion (ADR-036 — v1 has no delete at all), so disconnecting can only ever destroy the local
+      mirror.
+    -->
+    <string name="about_data_disconnect">Disconnecting deletes the token from this device, and can delete the local copy with it. Nothing in your Notion workspace is ever deleted by this app.</string>
+
+    <!--
+      The three licences the APK already ships (docs/attributions.md, M2.5). The full texts live in
+      assets/licences/ — in assets rather than res/raw because release builds shrink resources and
+      would have stripped a licence nothing referenced.
+
+      Naming the copyright holder and the licence is what the OFL and the ISC actually require of a
+      redistributor; a licences VIEWER is post-v1, and attributions.md says so.
+    -->
+    <string name="about_licences_eyebrow">LICENCES</string>
+    <string name="about_licences_intro">The full text of each licence ships inside the app.</string>
+    <string name="about_licence_dm_sans">DM Sans</string>
+    <string name="about_licence_dm_sans_terms">SIL Open Font License 1.1 · Copyright 2014 The DM Sans Project Authors</string>
+    <string name="about_licence_dm_mono">DM Mono</string>
+    <string name="about_licence_dm_mono_terms">SIL Open Font License 1.1 · Copyright 2020 The DM Mono Project Authors</string>
+    <string name="about_licence_lucide">Lucide icons</string>
+    <string name="about_licence_lucide_terms">ISC License · Copyright 2026 Lucide Icons and Contributors, with portions by Cole Bemis</string>
 </resources>

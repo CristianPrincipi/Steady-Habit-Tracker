@@ -90,7 +90,7 @@ private fun summaryFrom(extra: String?): ConnectionSummary =
  * The real [SettingsContent] over a fixed summary.
  *
  * It takes its own `safeDrawing` insets because there is no shell around it here (ADR-063's rule
- * applies inside the graph; this is outside it). Both rows lead nowhere on purpose — real
+ * applies inside the graph; this is outside it). All three rows lead nowhere on purpose — real
  * navigation is the shell's, and it is the one thing this activity cannot show.
  */
 @Composable
@@ -99,6 +99,7 @@ private fun SampleSettings(connection: ConnectionSummary) {
         state = SettingsUiState(connection = connection),
         onOpenSyncStatus = {},
         onOpenHabits = {},
+        onOpenAbout = {},
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
     )
 }

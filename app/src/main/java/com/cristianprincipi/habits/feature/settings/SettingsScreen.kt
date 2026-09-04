@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun SettingsScreen(
     onOpenSyncStatus: () -> Unit,
     onOpenHabits: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -30,6 +31,7 @@ fun SettingsScreen(
         state = state,
         onOpenSyncStatus = onOpenSyncStatus,
         onOpenHabits = onOpenHabits,
+        onOpenAbout = onOpenAbout,
         modifier = modifier,
     )
 }

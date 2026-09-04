@@ -39,6 +39,11 @@ android {
 
     buildFeatures {
         compose = true
+
+        // The About screen (M11.8) states the app's version, and the version lives here. The
+        // alternative reads it back out of PackageManager at runtime, which needs a Context on a
+        // screen that otherwise needs nothing at all.
+        buildConfig = true
     }
 
     compileOptions {

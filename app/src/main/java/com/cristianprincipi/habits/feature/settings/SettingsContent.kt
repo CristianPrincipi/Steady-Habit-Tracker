@@ -53,6 +53,7 @@ fun SettingsContent(
     state: SettingsUiState,
     onOpenSyncStatus: () -> Unit,
     onOpenHabits: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -65,6 +66,7 @@ fun SettingsContent(
             state = state,
             onOpenSyncStatus = onOpenSyncStatus,
             onOpenHabits = onOpenHabits,
+            onOpenAbout = onOpenAbout,
         )
     }
 }
@@ -104,6 +106,7 @@ private fun SettingsSections(
     state: SettingsUiState,
     onOpenSyncStatus: () -> Unit,
     onOpenHabits: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -123,6 +126,12 @@ private fun SettingsSections(
                 text = stringResource(R.string.settings_habits),
                 onClick = onOpenHabits,
             )
+            // ⭐ Last, and it is the only row here a user never *needs*: the two above it are
+            // where something gets fixed, and this one is where something gets read (M11.8).
+            SecondaryButton(
+                text = stringResource(R.string.settings_about),
+                onClick = onOpenAbout,
+            )
         }
     }
 }
@@ -138,6 +147,7 @@ private fun SettingsConnectedPreview() {
                 ),
             onOpenSyncStatus = {},
             onOpenHabits = {},
+            onOpenAbout = {},
         )
     }
 }
@@ -158,6 +168,7 @@ private fun SettingsDisconnectedPreview() {
             state = SettingsUiState(),
             onOpenSyncStatus = {},
             onOpenHabits = {},
+            onOpenAbout = {},
         )
     }
 }
