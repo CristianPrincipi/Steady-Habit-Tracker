@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.syncstatus
 
 import com.cristianprincipi.habits.core.datetime.Elapsed
+import com.cristianprincipi.habits.core.designsystem.component.ConnectionSummary
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.SyncFailure
 
@@ -55,6 +56,23 @@ data class SyncStatusUiState(
      * layout still. Seen on the device in M4.18 — the two screenshots differ by one button.
      */
     val canRetry: Boolean get() = isConnected && !isSyncing && !isWaitingForNetwork
+
+    /**
+     * The four fields the shared status card draws, gathered for it.
+     *
+     * ⭐ **Derived rather than stored, which is why M11.1 cost this file one property and no test.**
+     * Moving the four into a nested field would have rewritten every construction site in
+     * `SyncStatusRenderTest` and `SyncStatusViewModelTest` to prove nothing; the card only needs
+     * them handed over together.
+     */
+    val connection: ConnectionSummary
+        get() =
+            ConnectionSummary(
+                isConnected = isConnected,
+                isSyncing = isSyncing,
+                isWaitingForNetwork = isWaitingForNetwork,
+                lastSynced = lastSynced,
+            )
 
     val hasDiscardedEdits: Boolean get() = discardedEdits.isNotEmpty()
 

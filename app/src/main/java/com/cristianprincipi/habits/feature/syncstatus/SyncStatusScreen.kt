@@ -1,17 +1,13 @@
 package com.cristianprincipi.habits.feature.syncstatus
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -30,6 +26,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.Elapsed
+import com.cristianprincipi.habits.core.designsystem.component.ConnectionStatusCard
 import com.cristianprincipi.habits.core.designsystem.component.DestructiveButton
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
@@ -37,7 +34,6 @@ import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
-import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.EditSide
@@ -102,7 +98,7 @@ fun SyncStatusContent(
             color = HabitsTheme.colors.text.primary,
         )
 
-        ConnectionCard(state = state)
+        ConnectionStatusCard(summary = state.connection)
 
         state.failure?.let { failure -> NotionFailureBanner(failure = failure) }
 
@@ -144,84 +140,6 @@ fun SyncStatusContent(
         DisconnectDialog(willDeleteLocalData = state.willDeleteLocalData, onEvent = onEvent)
     }
 }
-
-/**
- * The status card the prototype does design (`docs/design-spec.md` §6.1): a small dot beside two
- * lines of text.
- *
- * Its two states were "Connected / Live sync enabled" and "Not connected / Showing demo data". The
- * first line is kept; the second is replaced, because this app has no demo data and because the
- * useful thing to say under "Connected" is **when the data was last actually correct**.
- */
-@Composable
-private fun ConnectionCard(
-    state: SyncStatusUiState,
-    modifier: Modifier = Modifier,
-) {
-    HabitsCard(modifier = modifier.fillMaxWidth()) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(Sizing.statusDot)
-                        .background(
-                            color =
-                                if (state.isConnected) {
-                                    HabitsTheme.colors.success
-                                } else {
-                                    MaterialTheme.colorScheme.outline
-                                },
-                            shape = CircleShape,
-                        ),
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.yearDotGap)) {
-                Text(
-                    text =
-                        stringResource(
-                            if (state.isConnected) R.string.sync_connected else R.string.sync_not_connected,
-                        ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HabitsTheme.colors.text.primary,
-                )
-                Text(
-                    text = state.secondLine(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HabitsTheme.colors.text.secondary,
-                )
-            }
-        }
-    }
-}
-
-/**
- * "Last synced 3 minutes ago", or what stands in for it.
- *
- * **A sync in progress wins over the timestamp**, because it is the more current fact and the one
- * that explains why the retry button has gone. ⭐ A sync that is *waiting* wins for the same reason
- * (M4.16) and sits directly below it: it is likewise the current fact, it likewise explains the
- * missing button, and it is the only line here that answers a tap the user has already made.
- */
-@Composable
-private fun SyncStatusUiState.secondLine(): String =
-    when {
-        !isConnected -> stringResource(R.string.sync_not_connected_body)
-        isSyncing -> stringResource(R.string.sync_in_progress)
-        isWaitingForNetwork -> stringResource(R.string.sync_waiting_for_network)
-        lastSynced == null -> stringResource(R.string.sync_never)
-        else -> lastSynced.describe()
-    }
-
-@Composable
-private fun Elapsed.describe(): String =
-    when (this) {
-        Elapsed.JustNow -> stringResource(R.string.sync_just_now)
-        is Elapsed.Minutes -> pluralStringResource(R.plurals.sync_minutes_ago, count.toInt(), count)
-        is Elapsed.Hours -> pluralStringResource(R.plurals.sync_hours_ago, count.toInt(), count)
-        is Elapsed.Days -> pluralStringResource(R.plurals.sync_days_ago, count.toInt(), count)
-    }
 
 /**
  * ⭐ **The half of `CLAUDE.md` §3.5 that M4.9 could not deliver on its own.**

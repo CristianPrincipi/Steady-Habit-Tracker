@@ -126,6 +126,25 @@
             android:theme="@style/Theme.MyHabitApp" />
 
         <!--
+          The Settings hub against a made-up connection (M11.1). Same safety as the previews above:
+          it holds one state in memory, touches no repository and can disconnect nothing.
+
+          It exists because Settings is the one tab that cannot be looked at any other way. The
+          shell routes on whether a property mapping is stored, so an unconfigured build shows the
+          setup wizard and never the five tabs, and ShellHarnessActivity - which does render them -
+          is exported="false" because it hosts the real SyncStatusScreen.
+
+            adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.SettingsPreviewActivity
+            (add the extra `state` with value `never`, `syncing`, `waiting` or `off` for the card's
+            other three states; a double dash cannot appear in an XML comment, so see the activity's
+            KDoc for the whole command)
+        -->
+        <activity
+            android:name=".gallery.SettingsPreviewActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp" />
+
+        <!--
           M9.8. Seeds SampleHabits into the REAL database and opens the shell on top of it, which is
           the only way to walk the check-off loop from Week to Stats without a Notion connection -
           and connecting costs the user a token paste.
