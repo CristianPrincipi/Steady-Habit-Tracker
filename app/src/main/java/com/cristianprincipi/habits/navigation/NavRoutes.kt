@@ -106,3 +106,16 @@ data object SyncStatus : NavRoute
  */
 @Serializable
 data object About : NavRoute
+
+/**
+ * Paste a new token without losing the database and mapping — `feature/notionsetup`, M12.7.
+ *
+ * **A destination, not a step of the wizard**, and it exists because the wizard is a *gate*: once a
+ * mapping is stored, `HabitsShell` never shows setup again, so a token rotated in Notion had nowhere
+ * to be re-entered. It is [EditMapping]'s twin — that route repairs the mapping without touching the
+ * token, this one repairs the token without touching the mapping.
+ *
+ * Reached from [SyncStatus], which is the screen that says the token is the problem.
+ */
+@Serializable
+data object ReplaceToken : NavRoute

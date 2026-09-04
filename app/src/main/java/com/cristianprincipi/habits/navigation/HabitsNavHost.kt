@@ -24,6 +24,7 @@ import com.cristianprincipi.habits.feature.history.YearScreen
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsScreen
 import com.cristianprincipi.habits.feature.notionsetup.EditMappingScreen
 import com.cristianprincipi.habits.feature.notionsetup.NotionSetupScreen
+import com.cristianprincipi.habits.feature.notionsetup.ReplaceTokenScreen
 import com.cristianprincipi.habits.feature.settings.SettingsScreen
 import com.cristianprincipi.habits.feature.stats.StatsScreen
 import com.cristianprincipi.habits.feature.syncstatus.SyncStatusScreen
@@ -126,7 +127,16 @@ fun HabitsShell(
                 )
             }
             composable<SyncStatus> {
-                SyncStatusScreen(onEditMapping = { navController.navigate(EditMapping) })
+                SyncStatusScreen(
+                    onEditMapping = { navController.navigate(EditMapping) },
+                    onReplaceToken = { navController.navigate(ReplaceToken) },
+                )
+            }
+            // ⭐ M12.7. `popBackStack` rather than a navigate: the user came here from the sync
+            // screen to fix one thing, and when it is fixed the screen behind them is the one that
+            // told them it was broken - now showing that it is not.
+            composable<ReplaceToken> {
+                ReplaceTokenScreen(onSaved = { navController.popBackStack() })
             }
             // ⭐ M11.8, and the last live step in M11. A destination rather than a tab, reached
             // from the Settings hub like the sync screen above it, and it takes nothing: everything

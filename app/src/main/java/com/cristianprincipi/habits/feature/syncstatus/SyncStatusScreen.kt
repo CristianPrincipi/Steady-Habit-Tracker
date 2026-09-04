@@ -51,6 +51,7 @@ import java.time.format.FormatStyle
 @Composable
 fun SyncStatusScreen(
     onEditMapping: () -> Unit,
+    onReplaceToken: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SyncStatusViewModel = hiltViewModel(),
 ) {
@@ -60,6 +61,7 @@ fun SyncStatusScreen(
         state = state,
         onEvent = viewModel::onEvent,
         onEditMapping = onEditMapping,
+        onReplaceToken = onReplaceToken,
         modifier = modifier,
     )
 }
@@ -77,6 +79,7 @@ fun SyncStatusContent(
     state: SyncStatusUiState,
     onEvent: (SyncStatusEvent) -> Unit,
     onEditMapping: () -> Unit,
+    onReplaceToken: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -110,6 +113,18 @@ fun SyncStatusContent(
             PrimaryButton(
                 text = stringResource(R.string.mapping_edit_action),
                 onClick = onEditMapping,
+            )
+        }
+
+        // ⭐ M12.7, and the mapping button's twin in every respect: directly under the banner that
+        // diagnosed it, above a Sync now that provably will not work, and shown **only** for the
+        // failure it fixes. A permanent "paste a new token" row would invite a working connection to
+        // be overwritten by a typo — see ReplaceTokenViewModel on why the token is saved before it
+        // can be tested.
+        if (state.isTokenBroken) {
+            PrimaryButton(
+                text = stringResource(R.string.token_replace_action),
+                onClick = onReplaceToken,
             )
         }
 
@@ -295,6 +310,7 @@ private fun SyncStatusHealthyPreview() {
                 ),
             onEvent = {},
             onEditMapping = {},
+            onReplaceToken = {},
         )
     }
 }
@@ -331,6 +347,7 @@ private fun SyncStatusFailedPreview() {
                 ),
             onEvent = {},
             onEditMapping = {},
+            onReplaceToken = {},
         )
     }
 }
@@ -353,6 +370,7 @@ private fun SyncStatusWaitingForNetworkPreview() {
                 ),
             onEvent = {},
             onEditMapping = {},
+            onReplaceToken = {},
         )
     }
 }
@@ -371,6 +389,7 @@ private fun SyncStatusDisconnectPreview() {
                 ),
             onEvent = {},
             onEditMapping = {},
+            onReplaceToken = {},
         )
     }
 }

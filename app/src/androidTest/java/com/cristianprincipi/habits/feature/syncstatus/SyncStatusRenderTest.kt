@@ -54,10 +54,16 @@ class SyncStatusRenderTest {
         state: SyncStatusUiState,
         onEvent: (SyncStatusEvent) -> Unit = {},
         onEditMapping: () -> Unit = {},
+        onReplaceToken: () -> Unit = {},
     ) {
         composeTestRule.setContent {
             HabitsTheme {
-                SyncStatusContent(state = state, onEvent = onEvent, onEditMapping = onEditMapping)
+                SyncStatusContent(
+                    state = state,
+                    onEvent = onEvent,
+                    onEditMapping = onEditMapping,
+                    onReplaceToken = onReplaceToken,
+                )
             }
         }
     }
@@ -110,7 +116,14 @@ class SyncStatusRenderTest {
         // called once, and the point is what the *same* screen does when its state changes under it.
         val state = mutableStateOf(SyncStatusUiState(isConnected = true, lastSynced = Elapsed.Hours(2)))
         composeTestRule.setContent {
-            HabitsTheme { SyncStatusContent(state = state.value, onEvent = {}, onEditMapping = {}) }
+            HabitsTheme {
+                SyncStatusContent(
+                    state = state.value,
+                    onEvent = {},
+                    onEditMapping = {},
+                    onReplaceToken = {},
+                )
+            }
         }
         val settled = disconnectPosition()
 
@@ -215,5 +228,47 @@ class SyncStatusRenderTest {
         composeTestRule
             .onNodeWithText(string(R.string.sync_not_connected))
             .assertIsDisplayed()
+    }
+
+    /**
+     * ⭐ M12.7, and the mirror of the mapping button's rule: the way out is offered **only** for the
+     * failure it fixes.
+     *
+     * A permanent "paste a new token" row would invite a working connection to be overwritten by a
+     * typo, because the token has to be saved before it can be tested (`ReplaceTokenViewModel`).
+     */
+    @Test
+    fun aRejectedTokenIsOfferedAWayToReplaceIt() {
+        show(SyncStatusUiState(isConnected = true, failure = SyncFailure.TokenRejected))
+
+        composeTestRule.onNodeWithText(string(R.string.token_replace_action)).assertIsDisplayed()
+    }
+
+    @Test
+    fun aStoredTokenThatIsGoneIsOfferedTheSameWayBack() {
+        show(SyncStatusUiState(isConnected = false, failure = SyncFailure.NotConnected))
+
+        composeTestRule.onNodeWithText(string(R.string.token_replace_action)).assertIsDisplayed()
+    }
+
+    /**
+     * ⚠ A capability failure is not a token failure.
+     *
+     * Notion accepted the token and will not let it do this; the remedy is in the workspace's
+     * permissions, which is what that failure's own sentence says. Offering a new token here would
+     * send the user to fetch a credential that changes nothing.
+     */
+    @Test
+    fun aTokenThatIsMerelyUnderprivilegedIsNotOfferedAReplacement() {
+        show(SyncStatusUiState(isConnected = true, failure = SyncFailure.MissingCapability))
+
+        composeTestRule.onNodeWithText(string(R.string.token_replace_action)).assertDoesNotExist()
+    }
+
+    @Test
+    fun aHealthyConnectionIsNotInvitedToReplaceItsToken() {
+        show(SyncStatusUiState(isConnected = true))
+
+        composeTestRule.onNodeWithText(string(R.string.token_replace_action)).assertDoesNotExist()
     }
 }

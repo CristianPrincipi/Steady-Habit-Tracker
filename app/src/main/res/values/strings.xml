@@ -157,8 +157,14 @@
       shared list prevents. The `when` that picks between them is exhaustive, so adding a way to
       fail makes the compiler point here.
     -->
-    <string name="notion_failure_not_connected">No token is stored. Paste one to continue.</string>
-    <string name="notion_failure_token_rejected">Notion wouldn\'t accept that token. Check you copied all of it, or create a new one.</string>
+    <!--
+      ⚠ These two used to instruct an action the app had no route for - "paste one", "create a new
+      one" - because the setup wizard is a gate that never reappears once a mapping is stored
+      (ADR-032). M12.7 built the route rather than softening the words, so both now name the button
+      that sits directly beneath them.
+    -->
+    <string name="notion_failure_not_connected">No token is stored. Paste a new one below to reconnect.</string>
+    <string name="notion_failure_token_rejected">Notion wouldn\'t accept that token. Check you copied all of it, or create a new one in Notion and paste it below.</string>
     <string name="notion_failure_missing_capability">That token isn\'t allowed to do this. In Notion, give the connection permission to read and update content.</string>
     <!--
       ⭐ CLAUDE.md §3.3 and docs/notion-api.md §3.1. Notion returns the same 404 for "doesn't exist"
@@ -424,6 +430,12 @@
     -->
     <string name="habits_mapping_body">Added a column in Notion? It becomes a habit once you pick it here. Columns like Weight and Sleep stay out of the way.</string>
     <string name="mapping_edit_action">Choose which columns are habits</string>
+
+    <!--
+      M12.7's row on the sync screen, and mapping_edit_action's twin: the way to repair one half of
+      the connection without destroying the other. Shown only when the failure is token-shaped.
+    -->
+    <string name="token_replace_action">Paste a new token</string>
     <string name="habits_colour_blue">Blue</string>
     <string name="habits_colour_green">Green</string>
     <string name="habits_colour_orange">Orange</string>

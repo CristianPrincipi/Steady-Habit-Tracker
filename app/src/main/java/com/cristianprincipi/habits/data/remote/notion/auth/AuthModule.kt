@@ -2,8 +2,10 @@ package com.cristianprincipi.habits.data.remote.notion.auth
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import dagger.Binds
 import dagger.Module
@@ -37,8 +39,27 @@ object AuthDataStoreModule {
     @AuthDataStore
     fun provideAuthDataStore(
         @ApplicationContext context: Context,
-    ): DataStore<Preferences> = PreferenceDataStoreFactory.create { context.preferencesDataStoreFile(FILE_NAME) }
+    ): DataStore<Preferences> = createAuthDataStore { context.preferencesDataStoreFile(FILE_NAME) }
 }
+
+/**
+ * The token store, built the one way the app builds it — M12.7, and `createSettingsDataStore`'s
+ * reasoning applies here too: without a corruption handler a `CorruptionException` comes out of
+ * every read, which is a crash on launch that repeats forever.
+ *
+ * ⭐ **Emptying this file is the cheapest loss in the app.** It holds one thing: the encrypted
+ * token. Losing it is the state `SyncFailure.NotConnected` already describes, and the ciphertext was
+ * useless anyway if the file it lived in was corrupt.
+ *
+ * ⚠ It does **not** invalidate the Keystore key, and it should not: the key is not the corrupt
+ * thing, disconnect is the operation that deliberately destroys both, and doing it here would turn a
+ * recoverable file problem into a destroyed key.
+ */
+internal fun createAuthDataStore(produceFile: () -> java.io.File): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        produceFile = produceFile,
+    )
 
 @Module
 @InstallIn(SingletonComponent::class)

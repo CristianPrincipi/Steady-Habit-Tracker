@@ -85,4 +85,20 @@ data class SyncStatusUiState(
      * *"the diagnosis is good and the recovery is missing"*. The recovery is editing the mapping.
      */
     val isMappingBroken: Boolean get() = failure is SyncFailure.MappingBroken
+
+    /**
+     * ⭐ **The other failure a retry cannot fix** (M12.7), and it is [isMappingBroken]'s twin.
+     *
+     * The token is gone or Notion has stopped accepting it — a rotation or a revocation, which is an
+     * ordinary thing for a person to do to a credential. Both of those failures say so in words that
+     * ask for a new token, and until M12.7 the app had **nowhere to type one**: the setup wizard is a
+     * gate that never reappears once a mapping is stored (ADR-032), so the only way through was
+     * disconnect, which throws away a database choice and a mapping that were never wrong.
+     *
+     * ⚠ **`MissingCapability` is deliberately not in here.** That token is accepted and simply not
+     * allowed to do this; the remedy is in Notion's permissions, which is what its own sentence says.
+     * Offering a new token there would send a user to fetch a credential that changes nothing.
+     */
+    val isTokenBroken: Boolean
+        get() = failure == SyncFailure.NotConnected || failure == SyncFailure.TokenRejected
 }
