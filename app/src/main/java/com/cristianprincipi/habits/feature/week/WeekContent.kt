@@ -118,8 +118,15 @@ private fun WeekList(
         contentPadding = PaddingValues(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
+        // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = state.habits, key = { period -> period.habit.id.value }) { period ->
-            WeekHabitRow(period = period, dayLabels = labels, locale = locale, onEvent = onEvent)
+            WeekHabitRow(
+                period = period,
+                dayLabels = labels,
+                locale = locale,
+                onEvent = onEvent,
+                modifier = Modifier.animateItem(),
+            )
         }
     }
 }
@@ -131,8 +138,10 @@ private fun WeekHabitRow(
     dayLabels: List<String>,
     locale: Locale,
     onEvent: (WeekEvent) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     WeekHabitCard(
+        modifier = modifier,
         name = period.habit.name,
         description =
             stringResource(R.string.habit_card_summary, period.completedCount, period.cells.size),

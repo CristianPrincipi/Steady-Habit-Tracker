@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,6 +18,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +36,7 @@ import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.icon.LucideStroke
 import com.cristianprincipi.habits.core.designsystem.theme.DayOpacity
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Motion
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
@@ -111,6 +114,29 @@ private fun RowScope.DayPill(
     val shape = MaterialTheme.shapes.large
     val checkColor = HabitsTheme.colors.text.primary
 
+    // ⭐ M12.5, and the check-off animation is a **port** rather than an invention: the prototype's
+    // day pill carries `transition-all` (`App.tsx:222`), so its fill and its 30% future dim cross
+    // over 150ms instead of cutting. Ours snapped.
+    //
+    // ⚠ **One `animateColorAsState` covers both** because `pillFill` folds the design's `opacity`
+    // into the fill's alpha — a colour interpolation carries the alpha with it, so a day going
+    // FUTURE → INCOMPLETE brightens on the same curve a day going INCOMPLETE → COMPLETED fills on.
+    // Two animations would be two chances for them to disagree by a frame.
+    val fill by animateColorAsState(
+        targetValue = habitColor.pillFill(status, HabitsTheme.colors.tint.weekPillIncomplete),
+        animationSpec = Motion.colorStateChange,
+        label = "pillFill",
+    )
+    // The ring *changes colour* as the day completes rather than appearing or leaving — see
+    // [todayRing] — so it is the one thing on this pill that a transition was always going to suit.
+    // Computed whether or not this is today: keeping the call unconditional keeps the composition
+    // shape the same for all seven pills, and the border below is what decides if it is drawn.
+    val ring by animateColorAsState(
+        targetValue = todayRing(completed, habitColor, checkColor),
+        animationSpec = Motion.colorStateChange,
+        label = "todayRing",
+    )
+
     // The outer box is the 48dp target; the inner one is the 36dp the design draws. `heightIn`
     // rather than `height`, so the row can still grow if a font scale demands it.
     Box(
@@ -163,20 +189,22 @@ private fun RowScope.DayPill(
                     .fillMaxWidth()
                     .height(Sizing.weekPillHeight)
                     .pressScale(interactionSource, PILL_PRESSED_SCALE)
-                    .background(
-                        color = habitColor.pillFill(status, HabitsTheme.colors.tint.weekPillIncomplete),
-                        shape = shape,
-                    ).then(
+                    .background(color = fill, shape = shape)
+                    .then(
                         // The design rings today whether or not it is complete, so this is not an
                         // `else` on the fill above.
                         if (isToday) {
-                            Modifier.border(Sizing.todayRing, todayRing(completed, habitColor, checkColor), shape)
+                            Modifier.border(Sizing.todayRing, ring, shape)
                         } else {
                             Modifier
                         },
                     ),
             contentAlignment = Alignment.Center,
         ) {
+            // ⚠ **The tick pops; only the fill transitions** — and that is the faithful port, not an
+            // oversight. `transition-all` sits on the pill, and CSS cannot transition a child being
+            // inserted, so the prototype's `{done && <Check/>}` appears at once over a fill that is
+            // still crossing. Fading it in would be a nicer animation than the design has.
             if (completed) {
                 LucideIcon(
                     glyph = Lucide.Check,

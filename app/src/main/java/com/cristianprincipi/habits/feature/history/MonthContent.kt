@@ -86,15 +86,20 @@ private fun MonthGrid(
         horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
+        // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = habits, key = { period -> period.habit.id.value }) { period ->
-            MonthHabitRow(period = period)
+            MonthHabitRow(period = period, modifier = Modifier.animateItem())
         }
     }
 }
 
 @Composable
-private fun MonthHabitRow(period: HabitPeriod) {
+private fun MonthHabitRow(
+    period: HabitPeriod,
+    modifier: Modifier = Modifier,
+) {
     MonthHabitCard(
+        modifier = modifier,
         name = period.habit.name,
         description = period.summary(),
         emoji = period.habit.emoji,

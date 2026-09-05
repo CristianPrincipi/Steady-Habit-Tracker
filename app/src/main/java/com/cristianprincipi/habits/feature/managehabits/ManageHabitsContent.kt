@@ -111,12 +111,14 @@ fun ManageHabitsContent(
             )
         }
 
+        // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = state.habits, key = { habit -> habit.id.value }) { habit ->
             HabitRow(
                 habit = habit,
                 onColorPicked = { color ->
                     onEvent(ManageHabitsEvent.ColorPicked(habitId = habit.id, color = color))
                 },
+                modifier = Modifier.animateItem(),
             )
         }
     }

@@ -1,5 +1,8 @@
 package com.cristianprincipi.habits.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -10,6 +13,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -45,6 +50,10 @@ import javax.inject.Inject
  *
  * **The bar is drawn only on a [TopLevelRoute].** Sync status and the habit list are destinations
  * without tabs, and a bar with nothing selected would be a bar lying about where the user is.
+ *
+ * **The graph moves two ways, and they are told apart by [isLateral]** — M12.5. Switching tabs is
+ * instant; pushing a destination slides. See that function for why the app had a 700ms animation
+ * nobody had chosen.
  */
 @Composable
 fun HabitsNavHost(
@@ -77,10 +86,7 @@ fun HabitsShell(
 
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val selectedTab =
-        backStackEntry?.destination?.let { destination ->
-            HabitsTab.entries.firstOrNull { tab -> destination.hasRoute(tab.route::class) }
-        }
+    val selectedTab = backStackEntry?.destination?.tab()
 
     Scaffold(
         modifier = modifier,
@@ -100,6 +106,12 @@ fun HabitsShell(
             // v1 gets a "today" experience without a sixth tab (`docs/design-spec.md` §1).
             startDestination = Week,
             modifier = Modifier.padding(contentPadding),
+            // ⭐ M12.5. All four are given, because leaving any one out restores the 700ms default
+            // for that direction alone — a back gesture that dissolves where the forward one slid.
+            enterTransition = { if (isLateral()) EnterTransition.None else slideIntoContainer(Forward) },
+            exitTransition = { if (isLateral()) ExitTransition.None else slideOutOfContainer(Forward) },
+            popEnterTransition = { if (isLateral()) EnterTransition.None else slideIntoContainer(Back) },
+            popExitTransition = { if (isLateral()) ExitTransition.None else slideOutOfContainer(Back) },
         ) {
             // ⭐ Every screen below is now real. M5.3 put a `StubScreen` on all five tabs and each
             // milestone replaced its own in place; Stats was the last, in M9.1. `StubScreen` itself
@@ -161,6 +173,45 @@ fun HabitsShell(
         }
     }
 }
+
+/**
+ * Which tab this destination is, or `null` for one of the destinations that has no tab.
+ *
+ * Used twice and for two different jobs — deciding whether to draw the bar, and deciding how the
+ * graph should move — which is the whole reason it is a function rather than an expression written
+ * out at both sites. The two answers must not be able to disagree.
+ */
+private fun NavDestination.tab(): HabitsTab? = HabitsTab.entries.firstOrNull { tab -> hasRoute(tab.route::class) }
+
+/**
+ * Whether this is a move **between tabs** rather than into or out of a pushed destination.
+ *
+ * ### ⚠⚠ The app had a 700ms cross-fade, and nobody had chosen it
+ *
+ * `NavHost`'s own defaults are `fadeIn(tween(700))` and `fadeOut(tween(700))` — read out of
+ * navigation-compose 2.9.8's source, not remembered. So every tab switch dissolved for seven tenths
+ * of a second: **4.7× the 150ms the design gives everything else**, on the control the user taps
+ * most. M12.5's audit had recorded "no screen transition exists", which is how a default hides — it
+ * is not in our code, so a search of our code does not find it.
+ *
+ * ### The two moves are not the same move
+ *
+ * A tab switch is **lateral**: five peers, a bar that says where you are, and a back stack kept one
+ * deep by [switchTab] so it is not a journey to retrace. The prototype agrees — its `setView` is a
+ * plain re-render with no transition at all, and what marks the change is the nav item's own colour.
+ * So: instant, which is both the faithful port and the user's ruling (2026-09-05).
+ *
+ * Everything else — sync status, about, the habit list, the two repair screens — is a **push**: one
+ * screen deeper, reached from a row you tapped, left by going back. Those are undesigned
+ * (`docs/design-spec.md` §8 lists no transitions at all), so `CLAUDE.md` §2's rule applies and they
+ * take the platform's convention: slide in from the end, slide back out the way they came, at
+ * `slideIntoContainer`'s own default spring rather than a duration invented here.
+ */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isLateral(): Boolean =
+    initialState.destination.tab() != null && targetState.destination.tab() != null
+
+private val Forward = AnimatedContentTransitionScope.SlideDirection.Start
+private val Back = AnimatedContentTransitionScope.SlideDirection.End
 
 /**
  * Switches tabs without stacking them.

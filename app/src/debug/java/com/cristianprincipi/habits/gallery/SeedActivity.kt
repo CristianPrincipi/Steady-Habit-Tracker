@@ -81,6 +81,18 @@ import javax.inject.Inject
  * ```
  * adb shell am start -n com.cristianprincipi.habits/com.cristianprincipi.habits.gallery.SeedActivity
  * ```
+ *
+ * ### ⚠⚠ Clear app data afterwards, or the next instrumented run inherits these rows
+ *
+ * What it writes **survives a reinstall** — installing an APK over an existing one does not wipe app
+ * data — and `FreshInstallRule` clears the DataStore and deliberately **not** Room, which is the
+ * opening `StreakOnScreenTest` was built on (ADR-099). So habits seeded here are still there when
+ * the suite next runs, and that test opens Stats on one of *these* habits instead of the one it
+ * seeded itself. It cost a full 5-minute run in M12.5 to work that out (ADR-105 §8).
+ *
+ * ```
+ * adb shell pm clear com.cristianprincipi.habits
+ * ```
  */
 @AndroidEntryPoint
 class SeedActivity : ComponentActivity() {

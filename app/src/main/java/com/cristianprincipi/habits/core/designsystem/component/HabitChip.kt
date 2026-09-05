@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsCorners
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Motion
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
 /**
@@ -40,20 +43,36 @@ fun HabitChip(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
+    // ⭐ M12.5. `transition-all` on the prototype's chip (`App.tsx:358`), and here it is doing more
+    // work than it does on a week pill: selecting a chip **reverses fill and ink at once** — the
+    // habit colour moves from the text to the background while white moves the other way. Snapped,
+    // that is two things swapping in one frame; crossed over 150ms, it reads as one exchange.
+    //
+    // ⚠ And the selection is the whole Stats screen's subject, so this is also the moment the tiles,
+    // the year grid and the chart below all change colour. The chip is what makes that feel caused.
+    val fill by animateColorAsState(
+        targetValue =
+            if (selected) {
+                habitColor
+            } else {
+                habitColor.copy(alpha = HabitsTheme.colors.tint.weekPillIncomplete)
+            },
+        animationSpec = Motion.colorStateChange,
+        label = "chipFill",
+    )
+    val ink by animateColorAsState(
+        targetValue = if (selected) HabitsTheme.colors.text.primary else habitColor,
+        animationSpec = Motion.colorStateChange,
+        label = "chipInk",
+    )
+
     Row(
         modifier =
             modifier
                 .minimumInteractiveComponentSize()
                 .pressScale(interactionSource, CHIP_PRESSED_SCALE)
-                .background(
-                    color =
-                        if (selected) {
-                            habitColor
-                        } else {
-                            habitColor.copy(alpha = HabitsTheme.colors.tint.weekPillIncomplete)
-                        },
-                    shape = HabitsCorners.pill,
-                ).selectable(
+                .background(color = fill, shape = HabitsCorners.pill)
+                .selectable(
                     selected = selected,
                     interactionSource = interactionSource,
                     indication = null,
@@ -66,7 +85,7 @@ fun HabitChip(
             text = habitLabel(emoji, name),
             // Selected reverses the fill and the ink: white on the habit colour, versus the habit
             // colour on a tint of itself.
-            color = if (selected) HabitsTheme.colors.text.primary else habitColor,
+            color = ink,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

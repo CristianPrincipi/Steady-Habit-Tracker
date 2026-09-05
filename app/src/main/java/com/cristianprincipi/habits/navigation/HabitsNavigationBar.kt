@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.navigation
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.icon.LucideStroke
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Motion
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
@@ -100,6 +103,16 @@ fun HabitsNavigationBar(
  * The dot lives in the label slot because `NavigationBarItem` has no slot beneath it. It is drawn as
  * a transparent box when inactive rather than removed, so the row does not change height as the
  * selection moves — the same reason M4.18's "Sync now" is disabled rather than hidden (ADR-060).
+ *
+ * ⭐ **M12.5, and it is a fix for an inconsistency rather than an addition.** Material 3 already
+ * animates this item's icon and label colour — `NavigationBar.kt:214` wraps both in
+ * `animateColorAsState` — so before this the label above the dot *faded* into its tab colour while
+ * the dot beneath it *cut* to the same colour. One tab switch, two speeds, 4dp apart.
+ *
+ * ⚠ **Nothing else here is animated, on purpose.** The active glyph's heavier stroke still snaps,
+ * because the prototype's `transition-all` sits on the `<button>` and its icon takes `strokeWidth`
+ * as a React prop on the child — CSS transitions the element they are written on, so the design does
+ * not cross that either.
  */
 @Composable
 private fun TabLabel(
@@ -107,6 +120,12 @@ private fun TabLabel(
     isSelected: Boolean,
     activeColor: Color,
 ) {
+    val dot by
+        animateColorAsState(
+            targetValue = if (isSelected) activeColor else Color.Transparent,
+            animationSpec = Motion.colorStateChange,
+            label = "navIndicatorDot",
+        )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.tabIndicatorGap),
@@ -120,7 +139,7 @@ private fun TabLabel(
                 Modifier
                     .size(Sizing.navIndicatorDot)
                     .clip(CircleShape)
-                    .background(if (isSelected) activeColor else Color.Transparent),
+                    .background(dot),
         )
     }
 }

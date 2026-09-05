@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,10 +13,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Motion
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
@@ -46,20 +49,22 @@ fun PrimaryButton(
     enabled: Boolean = true,
     isBusy: Boolean = false,
 ) {
-    val dimmedContent =
-        HabitsTheme.colors.text.primary
-            .copy(alpha = DISABLED_ALPHA)
+    val container = fadeOnDisable(MaterialTheme.colorScheme.primary, enabled, "primaryContainer")
+    val content = fadeOnDisable(HabitsTheme.colors.text.primary, enabled, "primaryContent")
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         shape = MaterialTheme.shapes.large,
+        // Both slots take the same animated colour. Material picks one of the pair by `enabled` and
+        // snaps between them (`Button.kt:1085` — it does not animate), so handing it the *already
+        // faded* value on both sides is what turns its cut into the design's transition.
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = HabitsTheme.colors.text.primary,
-                disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = DISABLED_ALPHA),
-                disabledContentColor = dimmedContent,
+                containerColor = container,
+                contentColor = content,
+                disabledContainerColor = container,
+                disabledContentColor = content,
             ),
     ) {
         ButtonBody(text = text, isBusy = isBusy, spinnerColor = HabitsTheme.colors.text.primary)
@@ -79,6 +84,15 @@ fun SecondaryButton(
     enabled: Boolean = true,
     isBusy: Boolean = false,
 ) {
+    // Not [fadeOnDisable]: this one's disabled colour is a *token* rather than the enabled colour at
+    // 35%, so the two ends are named separately and only the crossing between them is shared.
+    val content by
+        animateColorAsState(
+            targetValue =
+                if (enabled) HabitsTheme.colors.text.primary else HabitsTheme.colors.text.tertiary,
+            animationSpec = Motion.colorStateChange,
+            label = "secondaryContent",
+        )
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -86,8 +100,8 @@ fun SecondaryButton(
         shape = MaterialTheme.shapes.large,
         colors =
             ButtonDefaults.outlinedButtonColors(
-                contentColor = HabitsTheme.colors.text.primary,
-                disabledContentColor = HabitsTheme.colors.text.tertiary,
+                contentColor = content,
+                disabledContentColor = content,
             ),
     ) {
         ButtonBody(text = text, isBusy = isBusy, spinnerColor = HabitsTheme.colors.text.primary)
@@ -108,6 +122,7 @@ fun DestructiveButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val content = fadeOnDisable(MaterialTheme.colorScheme.error, enabled, "destructiveContent")
     OutlinedButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -115,12 +130,40 @@ fun DestructiveButton(
         shape = MaterialTheme.shapes.large,
         colors =
             ButtonDefaults.outlinedButtonColors(
-                contentColor = MaterialTheme.colorScheme.error,
-                disabledContentColor = MaterialTheme.colorScheme.error.copy(alpha = DISABLED_ALPHA),
+                contentColor = content,
+                disabledContentColor = content,
             ),
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+/**
+ * [full] when the button is live, [DISABLED_ALPHA] of it when it is not — crossed, not cut.
+ *
+ * ⭐ M12.5, and the third of the design's three `transition-all`s: the Connect button is
+ * `transition-all disabled:opacity-35` (`App.tsx:518`). It is the one the user actually watches —
+ * pasting a token is a screen where the only thing that changes is this button waking up, and a
+ * fade is what says *that paste was the thing that mattered*.
+ *
+ * ⚠ **It matters most where nobody is looking at the button.** ADR-060's rule is that a control the
+ * app cannot honour is disabled **in place** rather than hidden, so "Sync now" dims while a sync
+ * runs and lights again when it lands — a change the user is not waiting for, arriving on a screen
+ * they are reading. Cut, that flickers. At 150ms it settles.
+ */
+@Composable
+private fun fadeOnDisable(
+    full: Color,
+    enabled: Boolean,
+    label: String,
+): Color {
+    val color by
+        animateColorAsState(
+            targetValue = if (enabled) full else full.copy(alpha = DISABLED_ALPHA),
+            animationSpec = Motion.colorStateChange,
+            label = label,
+        )
+    return color
 }
 
 @Composable

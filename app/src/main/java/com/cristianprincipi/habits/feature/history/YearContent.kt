@@ -102,17 +102,22 @@ private fun YearList(
         contentPadding = PaddingValues(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
+        // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = habits, key = { year -> year.period.habit.id.value }) { year ->
-            YearHabitRow(year = year)
+            YearHabitRow(year = year, modifier = Modifier.animateItem())
         }
     }
 }
 
 @Composable
-private fun YearHabitRow(year: HabitYear) {
+private fun YearHabitRow(
+    year: HabitYear,
+    modifier: Modifier = Modifier,
+) {
     val habit = year.period.habit
 
     YearHabitCard(
+        modifier = modifier,
         name = habit.name,
         // ⭐ The two numbers BEHIND the percentage beside it, not a second measurement.
         //

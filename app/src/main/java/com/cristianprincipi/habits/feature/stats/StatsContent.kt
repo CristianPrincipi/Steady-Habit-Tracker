@@ -174,6 +174,7 @@ private fun HabitSelector(
         modifier = modifier.fillMaxWidth().selectableGroup(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.chipGap),
     ) {
+        // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = habits, key = { habit -> habit.id.value }) { habit ->
             HabitChip(
                 emoji = habit.emoji,
@@ -181,6 +182,7 @@ private fun HabitSelector(
                 habitColor = habit.color.resolve(),
                 selected = habit.id == selectedId,
                 onClick = { onSelect(habit.id) },
+                modifier = Modifier.animateItem(),
             )
         }
     }
