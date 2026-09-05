@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -106,7 +108,18 @@ fun SetupTextField(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            // ⭐⭐ M13.1, and it is the one real labelling defect the accessibility sweep found.
+            //
+            // The eyebrow above is a **sibling** `Text`, not this field's name — nothing associates
+            // the two — so the field reached TalkBack with no name at all. A linear pass happens to
+            // read the eyebrow first, but touch exploration and "next edit field" both land here
+            // directly, and what they announced was the *contents*: "•••••, edit box". That tells a
+            // blind user what they typed and never what the box is for.
+            //
+            // ⚠ `contentDescription` rather than Material's `label` parameter: `label` draws a
+            // floating label inside the field, which is not what the design draws (`docs/design-spec.md`
+            // §6.5 puts an eyebrow above it). This names the field without moving a pixel.
+            modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
             textStyle = HabitsTheme.textStyles.mono,
             placeholder = {
                 Text(
