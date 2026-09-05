@@ -12,6 +12,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.model.SyncFailure
@@ -62,6 +63,7 @@ fun ReplaceTokenContent(
         modifier =
             modifier
                 .fillMaxSize()
+                .readingWidth()
                 .padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {

@@ -33,6 +33,7 @@ import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBann
 import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
@@ -92,6 +93,9 @@ fun SyncStatusContent(
                 // page — visible the moment the shell was screenshotted. **The shell owns insets; a
                 // screen inside the graph takes the padding it is handed** (see `StubScreen`).
                 .verticalScroll(rememberScrollState())
+                // ⭐ M12.8 — after the scroll, so the gesture keeps the window's width. See
+                // `readingWidth`.
+                .readingWidth()
                 .padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),
     ) {

@@ -18,6 +18,7 @@ import com.cristianprincipi.habits.core.datetime.Elapsed
 import com.cristianprincipi.habits.core.designsystem.component.ConnectionStatusCard
 import com.cristianprincipi.habits.core.designsystem.component.ConnectionSummary
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
@@ -59,7 +60,7 @@ fun SettingsContent(
     Column(
         // No `windowInsetsPadding`: the shell owns insets and this screen takes the padding it is
         // handed (see `StubScreen`, and the same note on `SyncStatusContent`).
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.readingWidth().fillMaxSize(),
     ) {
         SettingsTitle()
         SettingsSections(

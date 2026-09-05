@@ -197,4 +197,49 @@ object Sizing {
 
     /** Android's minimum interactive size. Not from the prototype — the web mock has no touch. */
     val minimumTouchTarget: Dp = 48.dp
+
+    // --- Adaptive widths, M12.8 ---------------------------------------------------------------
+    //
+    // ⭐ **Not from the prototype, which has no landscape or tablet layout at all**
+    // (`docs/design-spec.md` §8). These three are the only numbers M12.8 adds, and each is derived
+    // from something the design *does* say rather than chosen to hit a device.
+    //
+    // ⚠ **All three are inert on a phone in portrait, by construction** — that is the property that
+    // matters, and `AdaptiveWidthTest` is what holds it. The design is untouched where the design
+    // applies; the extra width of a landscape or tablet window is what these govern.
+
+    /**
+     * The narrowest a **full-width habit card** may be before it gets a column of its own.
+     *
+     * ⭐ **Derived from the week pill, not picked.** A Week card at this width has
+     * `(360 − 28 padding − 6 × 6 gaps) ÷ 7 ≈ 42dp` per pill, which is already at the 44.2dp ADR-069
+     * measured and the user accepted. Anything narrower squeezes the app's primary tap target, so
+     * this is the floor at which the *design* still works — and Year and the habit list share it so
+     * that a habit card is one width across the app.
+     *
+     * At 411dp portrait it yields exactly one column, which is what the design draws.
+     */
+    val habitCardMinWidth: Dp = 360.dp
+
+    /**
+     * The same, for the **Month card**, which the design draws two-up.
+     *
+     * ⚠ **The ceiling here is a small phone, not a tablet.** At 155dp a 360dp-wide phone still gets
+     * the design's two columns; ADR-091 §5's sketched "~160dp" would drop it to one, changing the
+     * design on the narrowest device it has to be right on. Measured against that case, not
+     * against the wide ones it was written for.
+     */
+    val compactCardMinWidth: Dp = 155.dp
+
+    /**
+     * The widest a **single reading column** is allowed to get — Stats, Settings, About, sync
+     * status, the habit list and the wizard.
+     *
+     * ⭐ **Deliberately close to the design's own column**, which is 379dp of content inside a 411dp
+     * phone. A cap a little above that never bites in portrait (it would need a window wider than
+     * 472dp) and stops a settings row becoming a 923dp button with one word in the middle. Widening
+     * it towards the ~600dp a text-first app would choose would make these screens *wider than
+     * designed*, which is a different decision and not this step's.
+     */
+    val readingMaxWidth: Dp = 440.dp
 }

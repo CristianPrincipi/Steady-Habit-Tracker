@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.domain.model.SyncFailure
@@ -85,6 +86,9 @@ fun NotionSetupContent(
             modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
+                // ⭐ M12.8, and **after** the insets: a cutout belongs to the window, not to the
+                // column. Capping first would inset the centred column instead of the screen.
+                .readingWidth()
                 .padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),
     ) {

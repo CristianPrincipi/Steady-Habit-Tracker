@@ -16,6 +16,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 
@@ -59,6 +60,10 @@ fun AboutContent(
             modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                // ⭐ M12.8, and it is placed **after** the scroll on purpose: the gesture stays the
+                // width of the window while the prose is capped, so a landscape reader can flick
+                // anywhere rather than only inside the centred column.
+                .readingWidth()
                 .padding(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.settingsSectionGap),
     ) {

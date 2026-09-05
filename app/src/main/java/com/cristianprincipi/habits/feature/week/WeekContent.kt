@@ -4,8 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -17,6 +18,7 @@ import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.datetime.weekdayLabels
 import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
@@ -100,9 +102,14 @@ fun WeekContent(
 /**
  * The list of habit cards.
  *
- * `LazyColumn` with a stable key per habit (`CLAUDE.md` §6). The key is the habit's id rather than
+ * A lazy grid with a stable key per habit (`CLAUDE.md` §6). The key is the habit's id rather than
  * its position, so paging to another week — which replaces every card's *contents* but not the
  * habits themselves — reuses the rows instead of rebuilding them.
+ *
+ * ⭐ **A grid rather than a column since M12.8**, and on a phone in portrait it is the same thing:
+ * `GridCells.Adaptive` resolves to one column at any width a phone has. What it buys is landscape,
+ * where this screen showed **one card, clipped** (M6.11) with its pills stretched to twice the width
+ * the design draws them at.
  */
 @Composable
 private fun WeekList(
@@ -113,11 +120,17 @@ private fun WeekList(
 ) {
     val labels = remember(locale) { weekdayLabels(locale) }
 
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(Sizing.habitCardMinWidth),
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
+        // ⭐ M12.8. `Adaptive`, not `Fixed(1)`: at 411dp portrait the arithmetic yields exactly
+        // one column, which is what the design draws, and the extra width of a landscape or tablet
+        // window buys a second card rather than a stretched one. See `Sizing.habitCardMinWidth` for
+        // why that floor is the week pill's number.
         // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = state.habits, key = { period -> period.habit.id.value }) { period ->
             WeekHabitRow(

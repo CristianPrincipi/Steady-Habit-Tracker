@@ -20,6 +20,7 @@ import com.cristianprincipi.habits.core.designsystem.component.ColorSwatchRow
 import com.cristianprincipi.habits.core.designsystem.component.HabitIcon
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
@@ -65,7 +66,7 @@ fun ManageHabitsContent(
     // schema, so nothing here bounds it (`CLAUDE.md` §6). The header is an item of its own and
     // scrolls with the list — there is no sub-nav to keep in view, unlike Week and Month.
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.readingWidth().fillMaxSize(),
         contentPadding = PaddingValues(Spacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {

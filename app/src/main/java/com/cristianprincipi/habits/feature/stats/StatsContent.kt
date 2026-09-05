@@ -31,6 +31,7 @@ import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
 import com.cristianprincipi.habits.core.designsystem.component.StatTileIcon
 import com.cristianprincipi.habits.core.designsystem.component.YearDotGrid
+import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -66,7 +67,7 @@ fun StatsContent(
     onOpenSyncStatus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.readingWidth().fillMaxSize()) {
         StatsTitle()
 
         when (state) {

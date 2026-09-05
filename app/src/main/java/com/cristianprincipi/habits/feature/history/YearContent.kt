@@ -6,8 +6,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.YearHabitCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
@@ -97,11 +99,17 @@ private fun YearList(
     habits: List<HabitYear>,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(Sizing.habitCardMinWidth),
         modifier = modifier,
         contentPadding = PaddingValues(Spacing.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
+        // ⭐ M12.8. `Adaptive`, not `Fixed(1)`: at 411dp portrait the arithmetic yields exactly
+        // one column, which is what the design draws, and the extra width of a landscape or tablet
+        // window buys a second card rather than a stretched one. See `Sizing.habitCardMinWidth` for
+        // why that floor is the week pill's number.
         // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
         items(items = habits, key = { year -> year.period.habit.id.value }) { year ->
             YearHabitRow(year = year, modifier = Modifier.animateItem())

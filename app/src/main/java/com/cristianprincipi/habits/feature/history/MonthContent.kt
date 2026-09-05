@@ -14,6 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.MonthHabitCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.HabitsEmpty
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
@@ -80,7 +81,16 @@ private fun MonthGrid(
     modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(MONTH_GRID_COLUMNS),
+        // ⭐ M12.8, and it is ADR-091 §5's own sketched fix with one correction. That note offered
+        // `Adaptive(~160.dp)`; measured against a **360dp phone** rather than against the wide
+        // windows it was written for, 160 drops this screen to a single column — changing the
+        // design on the narrowest device it has to be right on. `compactCardMinWidth` is the
+        // largest value that still yields the design's two columns there.
+        //
+        // ⚠ **What this fixes is not sparseness but ballooning**: the dot cell is `cardWidth / 7`
+        // and square, so a full-width landscape card drew each day at ~120dp against a design that
+        // draws ~13dp. More columns make each card narrower, which makes each cell smaller.
+        columns = GridCells.Adaptive(Sizing.compactCardMinWidth),
         modifier = modifier,
         contentPadding = PaddingValues(Spacing.screenPadding),
         horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
@@ -150,8 +160,6 @@ private val HabitPeriod.completedCount: Int
  */
 private val HabitPeriod.eligibleCount: Int
     get() = cells.count { cell -> cell is PeriodCell.Day && cell.state != DayState.BEFORE_START }
-
-private const val MONTH_GRID_COLUMNS = 2
 
 @Preview(name = "Month", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)
 @Composable
