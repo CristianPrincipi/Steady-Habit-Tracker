@@ -14,13 +14,30 @@
 
     <!-- Step 1 — the token -->
     <string name="setup_token_title">Connect to Notion</string>
-    <string name="setup_token_body">Your habits live in a Notion database. Paste a token so this app can read and update it.</string>
+    <!--
+      ⭐⭐ M12.9, third sentence, and it is the one this screen was missing. CLAUDE.md §3.6 calls the
+      token a password, and this is the only moment the app asks for one — yet it said nothing about
+      where the password goes. The answer already existed and was written well (about_data_token),
+      but About lives INSIDE the graph the setup gate wraps, so a first-run user cannot reach it:
+      the explanation was readable only after the credential had already been handed over.
+
+      Deliberately shorter than about_data_token rather than a copy of it. This is a first screen
+      somebody wants to get past; the full statement — logs, backups, the single host — is still on
+      About for anyone who goes looking.
+    -->
+    <string name="setup_token_body">Your habits live in a Notion database. Paste a token so this app can read and update it. It is stored encrypted on this device and sent only to Notion.</string>
     <string name="setup_token_label">NOTION TOKEN</string>
     <string name="setup_token_placeholder">ntn_…</string>
     <!--
       The wording of this path was confirmed against the live docs in M4.1 (docs/notion-api.md §3).
       Notion renamed "internal integration" to "personal access token" and "integrations" to
       "connections" — sending the user to look for the old names sends them looking for nothing.
+
+      ⚠ M12.9 re-checked this against the live docs and could NOT reproduce the "shown once" quote:
+      two pages do not mention it, and one says an *internal connection* token can be retrieved from
+      the ••• menu. M4.1 captured a direct quote ("You won't be able to see it again") for personal
+      access tokens specifically, which is stronger than two pages being silent — so the line stays.
+      Being over-cautious here costs a user nothing; being wrong the other way loses them a token.
     -->
     <string name="setup_token_helper">In Notion: Developer portal → Personal access tokens → New token. Notion shows it once, so copy it before closing.</string>
     <string name="setup_token_continue">Continue</string>
@@ -41,7 +58,7 @@
       documented finding: Notion's search is eventually consistent, so a database shared a moment
       ago can be absent from this list and perfectly reachable by the link field directly below.
     -->
-    <string name="setup_database_empty">No databases yet. In Notion: open your habit database → ••• → Connections, and add your integration. One shared a moment ago can take a minute to appear here — its link works straight away.</string>
+    <string name="setup_database_empty">No databases yet. In Notion: open your habit database → ••• → Add connections, and add your connection. One shared a moment ago can take a minute to appear here — its link works straight away.</string>
     <string name="setup_database_continue">Continue</string>
     <string name="setup_database_use_link">Don\'t see it? Paste a link instead</string>
     <string name="setup_link_label">DATABASE LINK</string>
@@ -171,7 +188,7 @@
       and "not shared with the connection", and gives no way to tell them apart. Sharing is the fix
       far more often, so that is the instruction — never "not found".
     -->
-    <string name="notion_failure_database_not_shared">No database is shared with this connection yet. In Notion, open your habit database → ••• (top right) → Connections → add your connection, then try again.</string>
+    <string name="notion_failure_database_not_shared">No database is shared with this connection yet. In Notion, open your habit database → ••• (top right) → Add connections, then try again.</string>
     <string name="notion_failure_mapping_broken">Your database has changed since it was set up.</string>
     <string name="notion_failure_offline">Couldn\'t reach Notion. Check your connection and try again.</string>
     <string name="notion_failure_notion_unavailable">Notion is busy or having trouble. Try again in a moment.</string>

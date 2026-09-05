@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.core.testing.FreshInstallRule
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -60,6 +61,33 @@ class MainActivityTest {
         val title = composeTestRule.activity.getString(R.string.setup_token_title)
 
         composeTestRule.onNodeWithText(title).assertIsDisplayed()
+    }
+
+    /**
+     * ⭐⭐ M12.9 — **the app says where the credential goes before it asks for one.**
+     *
+     * `CLAUDE.md` §3.6 calls the token a password, and this is the only screen that asks for it. The
+     * app's answer already existed and was well written — `about_data_token` — but About sits
+     * **inside the graph the setup gate wraps**, so a first-run user cannot reach it: the
+     * explanation was readable only after the credential had already been handed over.
+     *
+     * ⚠ **This asserts two words, and that is deliberate.** No other test can catch the regression
+     * that matters, because every one of them addresses this copy by resource id and therefore
+     * follows it wherever it goes: shorten `setup_token_body` back to its first two sentences and
+     * the whole suite stays green while the screen quietly stops saying anything about storage. The
+     * words rather than the sentence, so the copy can still be rewritten.
+     */
+    @Test
+    fun theFirstScreenSaysWhereTheTokenIsKeptBeforeAskingForIt() {
+        val body = composeTestRule.activity.getString(R.string.setup_token_body)
+
+        listOf("encrypted", "device").forEach { claim ->
+            assertTrue(
+                "the first-run screen asks for a token and never mentions \"$claim\": \"$body\"",
+                body.contains(claim, ignoreCase = true),
+            )
+        }
+        composeTestRule.onNodeWithText(body).assertIsDisplayed()
     }
 
     @Test
