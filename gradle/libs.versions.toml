@@ -20,7 +20,10 @@
 #                         when Kotlin moves, and Kotlin moves as a trio. ADR-039.
 
 [versions]
-agp = "9.3.1"
+# Bumped 9.3.1 → 9.4.0 in M13.9. ⚠ Checked before bumping, not after: AGP 9.4.0's POM depends on
+# kotlin-gradle-plugin **2.2.10**, exactly as 9.3.1 did — so this does NOT drag the constrained trio
+# below. An AGP bump that changed that number would have to move kotlin, ksp and ktor with it.
+agp = "9.4.0"
 kotlin = "2.2.10"
 ksp = "2.2.10-2.0.2"
 
@@ -33,7 +36,11 @@ hilt = "2.60.1"
 androidxHilt = "1.4.0"
 room = "2.8.4"
 datastore = "1.2.1"
-navigation = "2.9.8"
+# Bumped 2.9.8 → 2.10.0 in M13.9. The header above filtered out 2.10.0-rc01 as pre-release; it is
+# stable now (`<latest>` and `<release>` both say so), so the same rule that excluded it takes it.
+# ⚠ M12.5 read `NavHost`'s 700ms fade defaults out of 2.9.8's sources and overrides all four
+# transitions. `HabitsShellMotionTest` is what proves the override still holds across this bump.
+navigation = "2.10.0"
 # Resolved live 2026-08-23 from dl.google.com. Newest overall is 2.12.0-rc01; this
 # catalog pins stable only, and 2.11.2 is the newest stable. See the header.
 work = "2.11.2"

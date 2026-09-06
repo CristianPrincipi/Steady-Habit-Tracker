@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android Lint configuration — M13.9.
+
+  ⚠⚠ EVERY ENTRY HERE IS NARROW ON PURPOSE, AND NONE OF THEM DISABLES A CHECK.
+  Each one silences a specific, named, already-decided instance and leaves the check itself running,
+  so a NEW occurrence of the same rule still fails the gate. If you find yourself wanting to add a
+  bare `<issue id="X" severity="ignore"/>`, that is the thing this file exists not to do.
+
+  ⚠⚠ AND IT IS NOT A BASELINE, DELIBERATELY. `lint { baseline = … }` was the obvious answer and is
+  the wrong one for the version pins below: lint matches a baseline entry on its MESSAGE, and every
+  one of those messages names the version that is available ("than 3.3.3 is available: 3.5.2"). The
+  next Ktor or Kotlin release changes that text, the entry stops matching, and the warning silently
+  returns — a suppression with an expiry date nobody chose. A regexp on the artifact name survives
+  upstream releases, which is exactly as long as the pin itself needs to survive.
+
+  The goal is a lint run at ZERO, so that the eleventh warning is visible the day it appears rather
+  than lost in a standing count of ten that nobody reads.
+-->
+<lint>
+
+    <!--
+      The three deliberate version pins, all documented in gradle/libs.versions.toml's header.
+
+      ⚠ These are NOT "we haven't got round to it". Bumping any of them breaks the build:
+
+        • org.jetbrains.kotlin.plugin.compose / .serialization — ADR-011. KSP's version prefix MUST
+          equal the Kotlin version, and the newest KSP targets Kotlin 2.3.x. Kotlin moves as a trio
+          (kotlin + ksp + ktor) or not at all. AGP 9.4.0 ships kotlin-gradle-plugin 2.2.10, which is
+          why the AGP bump in M13.9 was safe and a Kotlin bump is not.
+        • io.ktor:* — ADR-039. Ktor 3.4.0 moved to kotlin-stdlib 2.3.x, and Gradle resolves the
+          stdlib UP, handing a 2.2.10 compiler metadata it cannot read. 3.3.3 is the last release on
+          Kotlin 2.2.x. All five artifacts share one version by construction; mixing Ktor module
+          versions is unsupported, which is why one regexp covers the family.
+
+      ⭐ The check stays ON. A newly stale dependency that is not one of these still warns — which is
+      how M13.9 learned that navigation-compose 2.10.0 had gone stable and took it.
+    -->
+    <issue id="NewerVersionAvailable">
+        <ignore regexp="org\.jetbrains\.kotlin\.plugin" />
+        <ignore regexp="io\.ktor" />
+    </issue>
+
+    <!--
+      `android:enableOnBackInvokedCallback="true"` is API 33+ against minSdk 26, and that is the
+      documented opt-in for predictive back. Below 33 the platform ignores it, which is the intended
+      behaviour and not a defect.
+
+      ⚠ M1.6 looked at this and deliberately left it unsuppressed, because the instrument to hand was
+      `tools:targetApi` on `<application>` — which would blanket EVERY future API warning on that
+      element. That reasoning is honoured rather than reversed here: this ignores one attribute of
+      one rule, so a different too-new attribute on the same element still warns.
+    -->
+    <issue id="UnusedAttribute">
+        <ignore regexp="enableOnBackInvokedCallback" />
+    </issue>
+
+</lint>
