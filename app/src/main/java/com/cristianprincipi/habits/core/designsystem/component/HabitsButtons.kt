@@ -17,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.designsystem.icon.Lucide
+import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Motion
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
@@ -105,6 +107,52 @@ fun SecondaryButton(
             ),
     ) {
         ButtonBody(text = text, isBusy = isBusy, spinnerColor = HabitsTheme.colors.text.primary)
+    }
+}
+
+/**
+ * A row that goes somewhere — **the Settings hub's three destinations**, and nothing else so far.
+ *
+ * ### ⭐⭐ Why this exists rather than another [SecondaryButton] — M13.10, the user's ruling
+ *
+ * Those three rows *were* `SecondaryButton`s, because `docs/design-spec.md` §6 designs no rows at
+ * all and M2's buttons were the nearest thing that existed. The QA sweep put them on a device and
+ * the user ruled: **a centred label in a full-width pill makes three destinations look like three
+ * equal-weight actions**, when what they are is navigation to three other screens. A chevron says
+ * "this goes somewhere" without spending a word of copy on it, and left-aligning the label is what
+ * makes a list read as a list.
+ *
+ * ⚠ It is still an `OutlinedButton` underneath, and deliberately: the border, the shape, the ripple
+ * and the 48dp touch target are already right, and the change the user asked for is about
+ * *arrangement*, not about inventing a control. Only the content slot differs.
+ *
+ * ⚠ **The chevron takes `contentDescription = null` on purpose.** `OutlinedButton` merges its
+ * descendants, so the row already reaches a screen reader as its label; a described chevron would
+ * add "chevron right" to the end of every one of them — the class of noise M13.2 removed 35 of.
+ */
+@Composable
+fun NavigationRow(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = HabitsTheme.colors.text.primary),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.weight(1f),
+        )
+        LucideIcon(
+            glyph = Lucide.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(Sizing.iconMedium),
+            tint = HabitsTheme.colors.text.tertiary,
+        )
     }
 }
 

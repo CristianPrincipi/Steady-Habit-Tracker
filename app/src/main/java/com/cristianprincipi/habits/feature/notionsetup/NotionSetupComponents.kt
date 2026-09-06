@@ -313,7 +313,7 @@ fun SetupProgressDots(
                                 if (isReached) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.outline
+                                    HabitsTheme.colors.dotInactive
                                 },
                             shape = CircleShape,
                         ),

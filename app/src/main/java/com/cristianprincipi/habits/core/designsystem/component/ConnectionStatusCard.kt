@@ -58,7 +58,7 @@ fun ConnectionStatusCard(
                                 if (summary.isConnected) {
                                     HabitsTheme.colors.success
                                 } else {
-                                    MaterialTheme.colorScheme.outline
+                                    HabitsTheme.colors.dotInactive
                                 },
                             shape = CircleShape,
                         ),

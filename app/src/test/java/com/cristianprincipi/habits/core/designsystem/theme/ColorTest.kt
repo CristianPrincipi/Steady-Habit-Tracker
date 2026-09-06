@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.core.designsystem.theme
 import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -48,11 +49,40 @@ class ColorTest {
         assertEquals(Color.Transparent, HabitsDarkColorScheme.surfaceTint)
     }
 
+    /**
+     * ⚠⚠ **Two of these three no longer carry the prototype's value, and that is deliberate — M13.10.**
+     *
+     * The card hairline is still the design's `white/06`. The other two were `white/08` and
+     * `white/20` and are now **0.35** and **0.70**, because the resting one had to clear WCAG
+     * 1.4.11's 3:1 for a control's boundary (ADR-111 §7 measured it at 1.26:1 and left it for its own
+     * decision; the user made that decision in the QA sweep) — and raising it past the focus value
+     * would have left a focused field drawn *fainter* than an unfocused one.
+     *
+     * The values are pinned here so the divergence is a record rather than a drift; the **ordering**
+     * that actually matters — card < control < focus — is asserted below and in `ContrastTest`, which
+     * measures the ratios rather than the alphas.
+     */
     @Test
     fun `card borders are lighter than input borders`() {
         assertEquals(WHITE_06, HabitsDarkColorScheme.outlineVariant.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_08, HabitsDarkColorScheme.outline.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_20, HabitsDarkColors.focus.border.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_35, HabitsDarkColorScheme.outline.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_70, HabitsDarkColors.focus.border.alpha, ALPHA_TOLERANCE)
+
+        // The property the three numbers exist to hold, independent of what they are.
+        assertTrue(
+            "a card hairline must stay quieter than a control's border",
+            HabitsDarkColorScheme.outlineVariant.alpha < HabitsDarkColorScheme.outline.alpha,
+        )
+        assertTrue(
+            "a focused control must outrank its resting border",
+            HabitsDarkColorScheme.outline.alpha < HabitsDarkColors.focus.border.alpha,
+        )
+    }
+
+    /** The inactive status dot kept the value the borders left behind — see its token KDoc. */
+    @Test
+    fun `an inactive status dot is not dragged up with the control borders`() {
+        assertEquals(WHITE_08, HabitsDarkColors.dotInactive.alpha, ALPHA_TOLERANCE)
     }
 
     @Test
@@ -167,6 +197,7 @@ class ColorTest {
         const val WHITE_52 = 0.5176f
         const val WHITE_46 = 0.4627f
 
+        const val WHITE_35 = 0.35f
         const val WHITE_20 = 0.20f
         const val WHITE_08 = 0.08f
         const val WHITE_06 = 0.06f

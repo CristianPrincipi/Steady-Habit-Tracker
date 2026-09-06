@@ -213,6 +213,51 @@ class ContrastTest {
     }
 
     /**
+     * ⚠⚠ **The three form controls have to be visible as controls too** — WCAG 1.4.11, 3:1.
+     *
+     * ⭐ **M13.10 closed the one failure ADR-111 §7 left open on purpose.** The text field's resting
+     * border was **1.26:1** against its card, which M13.4 measured, named as real, and deliberately
+     * did not fix — a different component from the ramp it was auditing, and one deserving its own
+     * decision. The user made that decision in the QA sweep: raise it, the same way the week pill was
+     * raised, with white rather than a brighter tint.
+     *
+     * They share `outline`, so this asserts the token once and names all three: the setup token and
+     * link fields, the day-key radio, and the habit checkbox. ⚠ **The two status dots are NOT in
+     * here** — they moved to `dotInactive` precisely so this floor could not drag them along, and
+     * 1.4.11 does not reach a decorative dot beside text that says the same thing in words.
+     */
+    @Test
+    fun aRestingFormControlIsVisibleAsAControl() {
+        val r = ratio(scheme.outline, scheme.surfaceContainer)
+        assertTrue(
+            "a control's resting border is %.2f:1, below 1.4.11's %.1f".format(r, AA_NON_TEXT),
+            r >= AA_NON_TEXT,
+        )
+    }
+
+    /**
+     * ⚠⚠ **A focused field must be the stronger of the two, and M13.10 nearly shipped it backwards.**
+     *
+     * Raising the resting border to clear 1.4.11 took it to 0.35 — past the focus border's 0.20,
+     * which had been fine when resting was 0.08. **Focusing a field would have made its outline
+     * fainter**: a defect introduced by the fix, invisible to every assertion that existed, and
+     * exactly the kind a number-by-number audit misses because both numbers are individually
+     * defensible.
+     *
+     * Asserted as a **relationship** rather than a pair of values, so the two cannot cross again
+     * whatever either is set to.
+     */
+    @Test
+    fun aFocusedFieldOutranksItsRestingBorder() {
+        val resting = ratio(scheme.outline, scheme.surfaceContainer)
+        val focused = ratio(colors.focus.border, scheme.surfaceContainer)
+        assertTrue(
+            "focus is %.2f:1 against a resting %.2f:1 — focusing makes the field fainter".format(focused, resting),
+            focused > resting,
+        )
+    }
+
+    /**
      * A **ticked** pill is carried by its fill, in all four habit colours.
      *
      * The state distinction is the fill; the outline above is only about the empty case. Purple is

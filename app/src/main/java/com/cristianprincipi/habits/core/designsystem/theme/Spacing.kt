@@ -160,6 +160,15 @@ object Sizing {
     val chartStroke: Dp = 2.dp
 
     /**
+     * The dash and the gap of the monthly chart's **unfinished** final span — M13.10.
+     *
+     * ⚠ **Not from the prototype**, which draws every month identically and so draws a month that is
+     * six days old the same as one that is over. Twice [chartStroke], so the dash reads as a dash at
+     * the curve's own weight rather than as a dotted line of its own.
+     */
+    val chartDash: Dp = 4.dp
+
+    /**
      * One colour in the habit's colour picker. **Below the touch minimum**; see [minimumTouchTarget].
      *
      * ⚠ **Not from the prototype** — it designs no colour picker at all (`docs/design-spec.md` §7

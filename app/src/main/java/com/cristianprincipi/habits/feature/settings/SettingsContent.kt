@@ -17,7 +17,7 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.Elapsed
 import com.cristianprincipi.habits.core.designsystem.component.ConnectionStatusCard
 import com.cristianprincipi.habits.core.designsystem.component.ConnectionSummary
-import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
+import com.cristianprincipi.habits.core.designsystem.component.NavigationRow
 import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -45,9 +45,11 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * continuation of what the card just said, and putting the habit list between the two would break
  * a sentence in half.
  *
- * ⚠ **Undesigned below the card.** §6 designs no rows, so they are M2's [SecondaryButton]s — the
- * same control the habit list and the sync screen already use. `Plan.md` M2.8 applies: the user
- * judges this on a device, not from this file.
+ * ⚠ **Undesigned below the card** — §6 designs no rows at all — so `Plan.md` M2.8 applied and the
+ * user judged them on a device. ⭐ **M13.10 is that judgement.** They were M2's `SecondaryButton`s,
+ * centred like every other button in the app, and the ruling was that a centred label makes three
+ * *destinations* look like three equal-weight *actions*. They are [NavigationRow]s now: left-aligned
+ * with a chevron, which is what makes a list read as a list.
  */
 @Composable
 fun SettingsContent(
@@ -119,17 +121,17 @@ private fun SettingsSections(
         // The rows are one section, so they sit at the card gap rather than the section gap —
         // 20dp between two adjacent buttons reads as two unrelated things.
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-            SecondaryButton(
+            NavigationRow(
                 text = stringResource(R.string.settings_notion_sync),
                 onClick = onOpenSyncStatus,
             )
-            SecondaryButton(
+            NavigationRow(
                 text = stringResource(R.string.settings_habits),
                 onClick = onOpenHabits,
             )
             // ⭐ Last, and it is the only row here a user never *needs*: the two above it are
             // where something gets fixed, and this one is where something gets read (M11.8).
-            SecondaryButton(
+            NavigationRow(
                 text = stringResource(R.string.settings_about),
                 onClick = onOpenAbout,
             )

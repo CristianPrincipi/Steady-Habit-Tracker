@@ -385,5 +385,8 @@ class StatsRenderTest {
             List(months) { index ->
                 MonthlyCompletions(month = YearMonth.of(2026, index + 1), completions = index)
             },
+        // These assertions are about how many buckets draw a chart at all, not about the tail, so
+        // the finished case keeps them reading as one thing.
+        lastMonthIsUnfinished = false,
     )
 }

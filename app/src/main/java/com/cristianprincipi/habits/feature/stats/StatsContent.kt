@@ -359,7 +359,12 @@ private fun MonthlyCompletionsCard(
                 color = HabitsTheme.colors.text.secondary,
             )
         } else {
-            Chart(points = points, habitColor = stats.habit.color.resolve(), locale = locale)
+            Chart(
+                points = points,
+                habitColor = stats.habit.color.resolve(),
+                locale = locale,
+                lastPointIsPartial = stats.lastMonthIsUnfinished,
+            )
         }
     }
 }
@@ -370,6 +375,7 @@ private fun Chart(
     points: List<ChartPoint>,
     habitColor: Color,
     locale: Locale,
+    lastPointIsPartial: Boolean,
 ) {
     val countPattern = stringResource(R.string.stats_count_value)
     val formatValue = remember(countPattern, locale) { { value: Int -> countPattern.format(locale, value) } }
@@ -379,6 +385,7 @@ private fun Chart(
         habitColor = habitColor,
         formatValue = formatValue,
         contentDescription = spokenChart(points, locale),
+        lastPointIsPartial = lastPointIsPartial,
     )
 }
 

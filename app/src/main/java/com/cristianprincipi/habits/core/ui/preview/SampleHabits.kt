@@ -193,6 +193,9 @@ object SampleHabits {
             streak = CalculateStreak(clock)(dates),
             rate = GetCompletionRate(clock)(completedDates = dates, startDate = habit.startDate),
             months = monthlyCompletions(period),
+            // Sample data is drawn at a fixed reference date, and a preview of a dashed tail is what
+            // M13.10 is for — so the previews show the case rather than the tidy one.
+            lastMonthIsUnfinished = reference != YearMonth.from(reference).atEndOfMonth(),
         )
     }
 

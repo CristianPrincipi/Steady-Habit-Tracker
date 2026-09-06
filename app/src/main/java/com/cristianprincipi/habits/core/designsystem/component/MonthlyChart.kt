@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -63,6 +64,8 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  *   history. The caller decides what to show instead; `StatsContent` puts a sentence in the card.
  * @param formatValue renders an axis number in the reader's own digits. Pass a `remember`ed lambda;
  *   the measured text is cached against it.
+ * @param lastPointIsPartial whether the newest bucket covers a period that has not ended. Draws that
+ *   final span dashed and unshaded — see [drawArea] for what it is for and why only that end.
  */
 @Composable
 fun MonthlyChart(
@@ -71,6 +74,7 @@ fun MonthlyChart(
     modifier: Modifier = Modifier,
     formatValue: (Int) -> String = { value -> value.toString() },
     contentDescription: String? = null,
+    lastPointIsPartial: Boolean = false,
 ) {
     if (points.size < MINIMUM_CHART_POINTS) return
 
@@ -88,6 +92,7 @@ fun MonthlyChart(
 
     val density = LocalDensity.current
     val strokePx = with(density) { Sizing.chartStroke.toPx() }
+    val dashPx = with(density) { Sizing.chartDash.toPx() }
     val gapPx = with(density) { Spacing.chartAxisGap.toPx() }
     val description = contentDescription
 
@@ -121,35 +126,64 @@ fun MonthlyChart(
                 )
             }
 
-        drawArea(curve, plot, habitColor, strokePx)
+        drawArea(curve, plot, habitColor, strokePx, dashPx.takeIf { lastPointIsPartial })
         drawValueAxis(valueLabels, axis, plot, valueColumn)
         drawMonthAxis(monthLabels, curve, gapPx)
     }
 }
 
-/** The fill, then the curve on top of it. */
+/**
+ * The fill, then the curve on top of it.
+ *
+ * ### ⭐⭐ M13.10 — the last span is drawn dashed when its month has not ended
+ *
+ * The window ends **today**, so the newest bucket counts a handful of days against neighbours
+ * counting thirty. On a habit at 87% that drew a near-vertical drop reading as a collapse. The
+ * user's ruling was to keep the bucket and mark it, not to hide it: the final span is dashed and the
+ * fill stops at the last finished month, so the eye reads "this one is still going" rather than
+ * "this one fell off".
+ *
+ * ⚠ **Only the final span, and only when there is one to spare.** With exactly
+ * [MINIMUM_CHART_POINTS] points there is a single segment, and dashing it would leave a chart with
+ * no solid line at all.
+ *
+ * ⚠ **The first bucket is partial too** — the window opens mid-month — and is deliberately *not*
+ * marked. It was measured and left: at the left edge a low opening point reads as "history starts
+ * here", which is what it is. Widening this to both ends is a design change, not a tidy-up.
+ */
 private fun DrawScope.drawArea(
     curve: List<Offset>,
     plot: Rect,
     habitColor: Color,
     strokePx: Float,
+    tailDashPx: Float?,
 ) {
-    val line =
-        Path().apply {
-            moveTo(curve.first().x, curve.first().y)
-            monotoneCurve(curve).chunked(SEGMENT_POINTS).forEach { (first, second, end) ->
-                cubicTo(first.x, first.y, second.x, second.y, end.x, end.y)
-            }
-        }
+    val segments = monotoneCurve(curve).chunked(SEGMENT_POINTS)
+    // Null once the two conditions are folded together: no unfinished month, or nothing to spare.
+    val dash = tailDashPx?.takeIf { segments.size >= MINIMUM_CHART_POINTS }
+    val solidSegments = if (dash != null) segments.size - 1 else segments.size
 
-    val peak = curve.minOf { it.y }
+    fun pathFrom(
+        start: Int,
+        spans: List<List<Offset>>,
+    ) = Path().apply {
+        moveTo(curve[start].x, curve[start].y)
+        spans.forEach { (first, second, end) -> cubicTo(first.x, first.y, second.x, second.y, end.x, end.y) }
+    }
+
+    val line = pathFrom(0, segments.take(solidSegments))
+
+    // The fill belongs to the finished months only, so it closes under the last solid point rather
+    // than under the curve's end.
+    val filledTo = curve[solidSegments]
+    val peak = curve.take(solidSegments + 1).minOf { it.y }
     // A habit with no completions in any month draws its curve flat along the axis, where the fill
     // has no height and a gradient between two identical stops is undefined. Nothing to shade.
     if (peak < plot.bottom) {
         val area =
             Path().apply {
                 addPath(line)
-                lineTo(curve.last().x, plot.bottom)
+                lineTo(filledTo.x, plot.bottom)
                 lineTo(curve.first().x, plot.bottom)
                 close()
             }
@@ -171,6 +205,19 @@ private fun DrawScope.drawArea(
         )
     }
     drawPath(path = line, color = habitColor, style = Stroke(width = strokePx, cap = StrokeCap.Round))
+
+    if (dash != null) {
+        drawPath(
+            path = pathFrom(solidSegments, segments.takeLast(1)),
+            color = habitColor,
+            style =
+                Stroke(
+                    width = strokePx,
+                    cap = StrokeCap.Round,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash)),
+                ),
+        )
+    }
 }
 
 /** The round numbers up the left, each centred on the height it stands for. */

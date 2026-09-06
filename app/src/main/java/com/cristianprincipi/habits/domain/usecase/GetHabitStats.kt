@@ -33,12 +33,21 @@ import javax.inject.Inject
  *   [monthlyCompletions] for which months those are. Computed once here rather than derived on
  *   demand: it is a fold over 371 cells, and a `get()` would run it on every recomposition, which
  *   is the waste `Plan.md` M9.7 exists to rule out.
+ * @param lastMonthIsUnfinished whether the newest bucket covers a month that has not ended — true
+ *   on every day but the last of the month. **M13.10, the user's ruling.** The window ends *today*,
+ *   so that bucket counts a handful of days against neighbours counting thirty, and the chart drew
+ *   a near-vertical drop that reads as a collapse on a habit sitting at 87%. The number is honest;
+ *   the slope was not. `MonthlyChart` draws that final span dashed and leaves it unshaded.
+ *
+ *   ⚠ Carried here rather than derived in the composable because it is a question about **today**,
+ *   and this use case is the only thing in the chain holding a clock (`CLAUDE.md` §6).
  */
 data class HabitStats(
     val period: HabitPeriod,
     val streak: Streak,
     val rate: CompletionRate,
     val months: List<MonthlyCompletions>,
+    val lastMonthIsUnfinished: Boolean,
 ) {
     /** The habit these figures are about. */
     val habit: Habit get() = period.habit
@@ -125,6 +134,9 @@ class GetHabitStats
                         streak = calculateStreak(dates),
                         rate = completionRate(completedDates = dates, startDate = habit.startDate),
                         months = monthlyCompletions(period),
+                        // The window ends today, so the newest bucket is today's month — finished
+                        // only on the last day of it.
+                        lastMonthIsUnfinished = today != YearMonth.from(today).atEndOfMonth(),
                     )
                 }
         }

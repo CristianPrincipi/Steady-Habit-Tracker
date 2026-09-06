@@ -31,8 +31,21 @@ private val SecondaryFill = Color(0xFF2A2A2E)
 private val SwitchTrack = Color(0xFF3A3A3E)
 
 private val Border = white(alpha = 0.06f)
-private val BorderInput = white(alpha = 0.08f)
-private val BorderInputFocus = white(alpha = 0.20f)
+
+// M13.10 — raised 0.08 → 0.35 on the user's ruling. At 0.08 a text field's border was **1.26:1**
+// against its card; WCAG 1.4.11 asks 3:1 for the boundary that identifies a control. 0.35 is the
+// same figure `weekPillOutline` reaches 3.20:1 with, on the same card colour, and it lands on the
+// three controls that share this token: the field, the radio and the checkbox. The two status dots
+// that also used it moved to `dotInactive` instead — see its KDoc for why they must not follow.
+private val BorderInput = white(alpha = 0.35f)
+private val DotInactive = white(alpha = 0.08f)
+
+// M13.10 — raised 0.20 → 0.70, and NOT as a design flourish: the line above took the resting border
+// to 0.35, which left a focused field drawn **dimmer than an unfocused one**. That is a defect this
+// step would have introduced. The design's own ratio was focus ≈ 2.5x resting; this keeps focus
+// clearly the stronger of the two, which `ContrastTest` now asserts as a relationship rather than a
+// number so it cannot invert again.
+private val BorderInputFocus = white(alpha = 0.70f)
 
 private val Primary = Color(0xFF4A9EFF)
 private val Ring = Primary.copy(alpha = 0.40f)
@@ -101,7 +114,9 @@ val HabitsDarkColorScheme: ColorScheme =
         errorContainer = Card,
         onErrorContainer = Destructive,
         // `border` is the hairline on every card and the nav divider; `borderInput` is heavier and
-        // only ever outlines a text field. Material's plain/variant split lines up with that.
+        // outlines the **controls** — the text field, the radio, the checkbox. Material's
+        // plain/variant split lines up with that, and M13.10 is what made the distinction load-bearing
+        // rather than decorative: 1.4.11 applies to one of these two and not the other.
         outline = BorderInput,
         outlineVariant = Border,
         scrim = Color.Black,
@@ -339,6 +354,20 @@ data class HabitsColors(
     val focus: FocusColors,
     /** The connected status dot. Material has no success slot, only `error`. */
     val success: Color,
+    /**
+     * A status dot in its **off** state — not connected, or a wizard step not yet reached.
+     *
+     * ⭐ **Split out from `outline` in M13.10, and the split is the point.** Both used to be one
+     * token at 0.08. When the user ruled that a text input's 1.26:1 border had to reach 3:1, raising
+     * `outline` was the fix — and it would have dragged these two dots to 0.35 with it, brightening
+     * an indicator the design puts at `white/20` (`docs/design-spec.md` §6.1) for a reason that has
+     * nothing to do with the change.
+     *
+     * ⚠ **WCAG 1.4.11 does not apply here and that is why they can differ.** It governs the visual
+     * information that identifies a **component** and its states; these are decorative dots sitting
+     * beside text that already says "Not connected" in words. The controls had to move; these did not.
+     */
+    val dotInactive: Color,
     /** The warning banner's text and border. */
     val warning: Color,
 )
@@ -359,6 +388,7 @@ val HabitsDarkColors: HabitsColors =
         text = TextEmphasis(base = Color.White),
         focus = FocusColors(ring = Ring, border = BorderInputFocus),
         success = Success,
+        dotInactive = DotInactive,
         warning = Warning,
     )
 
