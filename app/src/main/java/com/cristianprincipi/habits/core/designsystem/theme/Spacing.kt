@@ -1,7 +1,9 @@
 package com.cristianprincipi.habits.core.designsystem.theme
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /*
  * Spacing and component dimensions, ported from the Figma Make prototype.
@@ -117,6 +119,27 @@ object Spacing {
 object Sizing {
     /** `w-1 h-1` — the dot under an active bottom-nav item. */
     val navIndicatorDot: Dp = 4.dp
+
+    /**
+     * M13.3 — the smallest a **decorative** label may shrink to when its column cannot hold it.
+     *
+     * ⚠⚠ **An `sp` floor, and that is the whole argument for it being acceptable.** It is a
+     * *declared* size, so the user's font scale still multiplies it: at 200% this draws at 12sp,
+     * still larger than the 10sp weekday initial and the 11sp nav label a default-scale user reads.
+     * Nobody ends up with text smaller than the design ships — the scaling is capped, not removed,
+     * and only where the alternative is a word broken in half.
+     *
+     * ⚠ **8sp was tried first and was not low enough**: at 200% on a 320dp window a ~31dp weekday
+     * column still clipped "Mon" to "Mo". The number is what the measurement asked for, not a round
+     * one — and it is a floor, so it costs nothing at any scale that never reaches it.
+     *
+     * ⚠ **Two callers, and both earn it by being decorative**: the `Mon…Sun` heading, whose
+     * semantics M13.2 cleared because every pill says the weekday in full, and the bottom nav's
+     * labels, whose word is also the tab's accessible name and is repeated by its glyph and its
+     * position. Content never gets this — `everyWordFits` gives that **room** instead, which is the
+     * distinction `TextFit.kt` opens by drawing.
+     */
+    val autoSizeFloor: TextUnit = 6.sp
 
     /** One day in `YearDotGrid` on the Year card, where a full year has to fit. */
     val yearDotSmall: Dp = 4.dp

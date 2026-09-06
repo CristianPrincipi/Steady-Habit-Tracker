@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -20,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.designsystem.component.fittedFontSize
 import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.icon.LucideStroke
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
@@ -61,37 +64,67 @@ fun HabitsNavigationBar(
         // `tonalElevation` is left at its default and does nothing here: this theme pins
         // `surfaceTint` to transparent (`Color.kt`), so Material has no colour to raise the
         // container with. Saying so is cheaper than a zero somebody later reads as a mistake.
-        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-            HabitsTab.entries.forEach { tab ->
-                val isSelected = tab == selected
-                val activeColor = tab.activeColor(HabitsTheme.colors)
-                NavigationBarItem(
-                    selected = isSelected,
-                    onClick = { onSelect(tab) },
-                    icon = {
-                        LucideIcon(
-                            glyph = tab.glyph,
-                            // The label directly beneath says the same word, so announcing the glyph
-                            // too would make a screen reader read every tab twice. `NavigationBarItem`
-                            // already carries the selected state and the label into semantics.
-                            contentDescription = null,
-                            modifier = Modifier.size(Sizing.iconLarge),
-                            strokeWidth =
-                                if (isSelected) LucideStroke.NAV_ACTIVE else LucideStroke.NAV_INACTIVE,
-                        )
-                    },
-                    label = { TabLabel(tab = tab, isSelected = isSelected, activeColor = activeColor) },
-                    colors =
-                        NavigationBarItemDefaults.colors(
-                            selectedIconColor = activeColor,
-                            selectedTextColor = activeColor,
-                            unselectedIconColor = HabitsTheme.colors.text.helper,
-                            unselectedTextColor = HabitsTheme.colors.text.helper,
-                            // Material's pill behind the active icon is not in this design, and the
-                            // 4dp dot below the label is what replaces it.
-                            indicatorColor = Color.Transparent,
-                        ),
+        // ⚠⚠ M13.3 — **these labels used to leave the bar.** `NavigationBar`'s height is a fixed
+        // 80dp and does not grow with the font, so at 200% on a 320dp window "Settings" wrapped to
+        // `Settin` over `gs` and the second line was drawn **outside the bar**, over the screen
+        // content below it. "Month" did the same. Two lines never fit here, whatever they say.
+        //
+        // ⭐ **One size for all five**, for the reason `fittedFontSize` exists: shrinking each label
+        // on its own would leave "Week" and "Year" full size beside a small "Settings", and a bar at
+        // two sizes reads as a fault. Every label is measured, the widest decides, all five match.
+        //
+        // ⚠ Shrinking is legitimate here because the word is not the only carrier: it is also the
+        // tab's accessible name, its glyph, and its position. See [Sizing.autoSizeFloor] for why a
+        // declared floor still leaves a large-font user reading larger than the design's own size.
+        BoxWithConstraints {
+            val labels = HabitsTab.entries.map { stringResource(it.label) }
+            val labelStyle = MaterialTheme.typography.labelSmall
+            val labelSize =
+                fittedFontSize(
+                    texts = labels,
+                    style = labelStyle,
+                    available = maxWidth / HabitsTab.entries.size - Spacing.cardGap,
                 )
+
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                HabitsTab.entries.forEach { tab ->
+                    val isSelected = tab == selected
+                    val activeColor = tab.activeColor(HabitsTheme.colors)
+                    NavigationBarItem(
+                        selected = isSelected,
+                        onClick = { onSelect(tab) },
+                        icon = {
+                            LucideIcon(
+                                glyph = tab.glyph,
+                                // The label directly beneath says the same word, so announcing the glyph
+                                // too would make a screen reader read every tab twice. `NavigationBarItem`
+                                // already carries the selected state and the label into semantics.
+                                contentDescription = null,
+                                modifier = Modifier.size(Sizing.iconLarge),
+                                strokeWidth =
+                                    if (isSelected) LucideStroke.NAV_ACTIVE else LucideStroke.NAV_INACTIVE,
+                            )
+                        },
+                        label = {
+                            TabLabel(
+                                tab = tab,
+                                isSelected = isSelected,
+                                activeColor = activeColor,
+                                labelStyle = labelStyle.copy(fontSize = labelSize),
+                            )
+                        },
+                        colors =
+                            NavigationBarItemDefaults.colors(
+                                selectedIconColor = activeColor,
+                                selectedTextColor = activeColor,
+                                unselectedIconColor = HabitsTheme.colors.text.helper,
+                                unselectedTextColor = HabitsTheme.colors.text.helper,
+                                // Material's pill behind the active icon is not in this design, and the
+                                // 4dp dot below the label is what replaces it.
+                                indicatorColor = Color.Transparent,
+                            ),
+                    )
+                }
             }
         }
     }
@@ -119,6 +152,7 @@ private fun TabLabel(
     tab: HabitsTab,
     isSelected: Boolean,
     activeColor: Color,
+    labelStyle: TextStyle,
 ) {
     val dot by
         animateColorAsState(
@@ -130,9 +164,19 @@ private fun TabLabel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.tabIndicatorGap),
     ) {
+        // ⚠⚠ M13.3 — **this label used to leave the bar.** `NavigationBar`'s height is a fixed 80dp
+        // and does not grow with the font, so at 200% on a 320dp window "Settings" wrapped to
+        // `Settin` over `gs` and the second line was drawn **outside the bar**, over the screen
+        // content below it. "Month" did the same. Two lines never fit here, whatever they say.
+        //
+        // ⭐ `maxLines = 1` is what stops the escape; `autoSize` is what stops that becoming a clip.
+        // The floor is a declared size and so still scales — 16sp at 200%, against the 11sp a
+        // default-scale user reads — see [Sizing.autoSizeFloor] for why that is the whole argument.
         Text(
             text = stringResource(tab.label),
-            style = MaterialTheme.typography.labelSmall,
+            style = labelStyle,
+            // What stops the escape. The size above is what stops that becoming a clip.
+            maxLines = 1,
         )
         Box(
             modifier =

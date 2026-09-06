@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.stats
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -31,6 +32,7 @@ import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.component.StatTile
 import com.cristianprincipi.habits.core.designsystem.component.StatTileIcon
 import com.cristianprincipi.habits.core.designsystem.component.YearDotGrid
+import com.cristianprincipi.habits.core.designsystem.component.everyWordFits
 import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
@@ -243,38 +245,73 @@ private fun StatTiles(
     modifier: Modifier = Modifier,
 ) {
     val color = stats.habit.color.resolve()
+    val tiles =
+        listOf(
+            StatTileSpec(R.string.stats_tile_completed_days, Lucide.Hash) {
+                stringResource(R.string.stats_count_value, stats.rate.completedDays)
+            },
+            StatTileSpec(R.string.stats_tile_completion_rate, Lucide.Percent) {
+                stringResource(R.string.percent_value, stats.rate.percent)
+            },
+            StatTileSpec(R.string.stats_tile_current_streak, Lucide.Flame) {
+                stringResource(R.string.stats_count_value, stats.streak.current)
+            },
+            StatTileSpec(R.string.stats_tile_best_streak, Lucide.Trophy) {
+                stringResource(R.string.stats_count_value, stats.streak.best)
+            },
+        )
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-            Tile(
-                label = R.string.stats_tile_completed_days,
-                glyph = Lucide.Hash,
-                value = stringResource(R.string.stats_count_value, stats.rate.completedDays),
-                color = color,
-            )
-            Tile(
-                label = R.string.stats_tile_completion_rate,
-                glyph = Lucide.Percent,
-                value = stringResource(R.string.percent_value, stats.rate.percent),
-                color = color,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
-            Tile(
-                label = R.string.stats_tile_current_streak,
-                glyph = Lucide.Flame,
-                value = stringResource(R.string.stats_count_value, stats.streak.current),
-                color = color,
-            )
-            Tile(
-                label = R.string.stats_tile_best_streak,
-                glyph = Lucide.Trophy,
-                value = stringResource(R.string.stats_count_value, stats.streak.best),
-                color = color,
-            )
+    // ⚠⚠ M13.3 — **at 200% font these read "Complete/d days" and "Completio/n rate".** Two 138dp
+    // columns on a 320dp window cannot hold "Completion" at 22sp, and Compose breaks a word it
+    // cannot fit wherever the character boundary lands.
+    //
+    // ⚠ **Shrinking would be the wrong fix here, and that is the difference from the weekday row.**
+    // These labels are content: M13.2 merged each into its tile's spoken name, so a screen reader
+    // announces "Completion rate, 87%" as one thing. They need **room**, not a smaller font.
+    //
+    // ⭐ **So the 2×2 becomes a single column when a label will not fit half the width.** Measured
+    // against the width the text actually gets — the tile minus its card padding — so the answer
+    // follows a copy change or a longer translation without anyone editing a threshold, and nothing
+    // moves at any scale where the design's grid fits.
+    BoxWithConstraints(modifier = modifier) {
+        val perTile = (maxWidth - Spacing.cardGap) / 2 - Spacing.cardPadding * 2
+        val twoColumns =
+            tiles.all { tile ->
+                everyWordFits(stringResource(tile.label), MaterialTheme.typography.labelSmall, perTile)
+            }
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            if (twoColumns) {
+                tiles.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+                        pair.forEach { tile -> Tile(spec = tile, color = color) }
+                    }
+                }
+            } else {
+                tiles.forEach { tile ->
+                    StatTile(
+                        label = stringResource(tile.label),
+                        value = tile.value(),
+                        habitColor = color,
+                        modifier = Modifier.fillMaxWidth(),
+                        icon = { StatTileIcon(glyph = tile.glyph, habitColor = color) },
+                    )
+                }
+            }
         }
     }
 }
+
+/**
+ * One of the four numbers, as data rather than as a call — so the same four can be laid out two ways.
+ *
+ * @param value read inside composition because every one of them is a `stringResource`.
+ */
+private data class StatTileSpec(
+    val label: Int,
+    val glyph: LucideGlyph,
+    val value: @Composable () -> String,
+)
 
 /**
  * The "Monthly completions" card — `docs/design-spec.md` §5.4.
@@ -369,17 +406,15 @@ private fun spokenChart(
 /** One tile, at half the row. Split out so the four calls above read as a table. */
 @Composable
 private fun RowScope.Tile(
-    label: Int,
-    glyph: LucideGlyph,
-    value: String,
+    spec: StatTileSpec,
     color: Color,
 ) {
     StatTile(
-        label = stringResource(label),
-        value = value,
+        label = stringResource(spec.label),
+        value = spec.value(),
         habitColor = color,
         modifier = Modifier.weight(1f),
-        icon = { StatTileIcon(glyph = glyph, habitColor = color) },
+        icon = { StatTileIcon(glyph = spec.glyph, habitColor = color) },
     )
 }
 

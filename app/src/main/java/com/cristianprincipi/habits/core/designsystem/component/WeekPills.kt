@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -32,6 +33,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.icon.LucideStroke
@@ -72,45 +74,67 @@ fun WeekPills(
     onToggle: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
-    ) {
-        // ⚠⚠ M13.2 — **silent, and it is the largest single win in the TalkBack pass.**
-        //
-        // These letters are a column heading: they are read *down* the pill under each one, which is
-        // a move only a sighted user makes. A screen reader goes along the row, and every pill it
-        // reaches already announces the weekday in full — "Read, Monday, August 17, 2026". Left
-        // audible, the row costs seven stops per card and five cards is **35 stops that add nothing**
-        // to what the next seven say properly.
-        //
-        // ⭐ Cleared rather than merged away, and the order matters: [WeekHabitCard]'s header is a
-        // merging boundary, and an uncleared row would be swallowed into some node rather than
-        // dropped. `clearAndSetSemantics` is also what ADR-089 does to the dot grids, for the same
-        // reason — a thing drawn for the eye is not automatically a thing worth saying.
-        Row(
-            modifier = Modifier.clearAndSetSemantics { },
-            horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
-        ) {
-            dayLabels.forEach { label ->
-                Text(
-                    text = label,
-                    modifier = Modifier.weight(1f),
-                    style = HabitsTheme.textStyles.weekdayInitial,
-                    color = HabitsTheme.colors.text.eyebrow,
-                    textAlign = TextAlign.Center,
-                )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Seven equal columns with six gaps between them — the same arithmetic both rows below lay
+        // out by, written once here because the heading needs to know it before it draws.
+        val columnWidth = (maxWidth - Spacing.weekPillGap * (DAYS_PER_WEEK - 1)) / DAYS_PER_WEEK
+
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
+            // ⚠⚠ M13.2 — **silent, and it is the largest single win in the TalkBack pass.**
+            //
+            // These letters are a column heading: they are read *down* the pill under each one,
+            // which is a move only a sighted user makes. A screen reader goes along the row, and
+            // every pill it reaches already announces the weekday in full — "Read, Monday, August
+            // 17, 2026". Left audible, the row costs seven stops per card, and five cards is **35
+            // stops that add nothing** to what the next seven say properly.
+            //
+            // ⭐ Cleared rather than merged away, and the order matters: [WeekHabitCard]'s header is
+            // a merging boundary, and an uncleared row would be swallowed into some node rather than
+            // dropped. `clearAndSetSemantics` is also what ADR-089 does to the dot grids, for the
+            // same reason — a thing drawn for the eye is not automatically a thing worth saying.
+            //
+            // ⚠⚠ M13.3 — **and one size for the row, because it shrinks rather than wraps.** At 200%
+            // font on a 320dp window each of these columns is ~31dp and "Mon" is wider than that, so
+            // Compose broke the word: `Mo` over `n`, four of the seven. An ellipsis would say `M…`
+            // and a clip would say `Mo`; a smaller word is still a word.
+            //
+            // ⚠ **`fittedFontSize` rather than `BasicText(autoSize = …)`, and the difference is
+            // visible.** Compose's own auto-sizing is per-`Text`: it shrank `Mon` and `Wed` and left
+            // the other five at full size, and a heading row at two sizes reads as a rendering fault
+            // rather than as a design.
+            //
+            // ⚠ **Shrinking is legitimate here only because the row is decorative** — the semantics
+            // above are cleared, so declining part of the font scale costs a screen reader nothing.
+            // The stat tiles look like the same problem and are not: they are content, and M13.3
+            // gives them room instead.
+            val labelStyle = HabitsTheme.textStyles.weekdayInitial
+            val labelSize = fittedFontSize(texts = dayLabels, style = labelStyle, available = columnWidth)
+
+            Row(
+                modifier = Modifier.clearAndSetSemantics { },
+                horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
+            ) {
+                dayLabels.forEach { label ->
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f),
+                        style = labelStyle.copy(fontSize = labelSize),
+                        color = HabitsTheme.colors.text.eyebrow,
+                        maxLines = 1,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
-            days.forEachIndexed { index, status ->
-                DayPill(
-                    status = status,
-                    habitColor = habitColor,
-                    isToday = index == todayIndex,
-                    contentDescription = dayContentDescriptions.getOrElse(index) { "" },
-                    onToggle = { onToggle(index) },
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
+                days.forEachIndexed { index, status ->
+                    DayPill(
+                        status = status,
+                        habitColor = habitColor,
+                        isToday = index == todayIndex,
+                        contentDescription = dayContentDescriptions.getOrElse(index) { "" },
+                        onToggle = { onToggle(index) },
+                    )
+                }
             }
         }
     }

@@ -1,8 +1,10 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -127,46 +129,106 @@ fun YearHabitCard(
     modifier: Modifier = Modifier,
 ) {
     HabitsCard(modifier = modifier) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HabitCardHeader(
+        // ⚠⚠ M13.3 — **at 200% font this row lost the habit's name.** The completion block has no
+        // width cap, so as it grew the `weight(1f)` header was squeezed until "Journal" read "Jou…"
+        // and "199 of 261" read "199 …". The name is the one thing on this card a person needs, and
+        // it was the thing that went — the block beside it kept every character of "COMPLETION".
+        //
+        // ⭐ **So the row becomes a column when the eyebrow no longer fits its share.** Measured
+        // rather than thresholded: `everyWordFits` asks whether the widest word can be drawn in the
+        // fraction of the card this block is allowed, which follows a copy change and a translation
+        // without anyone editing a number. Nothing moves at any scale where the design's row fits.
+        BoxWithConstraints {
+            val eyebrowShare = maxWidth * COMPLETION_WIDTH_SHARE
+            val fitsBeside =
+                everyWordFits(completionEyebrow, HabitsTheme.textStyles.eyebrowSmall, eyebrowShare) &&
+                    everyWordFits(completionLabel, HabitsTheme.textStyles.metricValue, eyebrowShare)
+
+            YearCardHeadline(
                 name = name,
                 description = description,
                 emoji = emoji,
                 habitColor = habitColor,
-                iconSize = HabitIconSize.LARGE,
-                nameStyle = MaterialTheme.typography.titleSmall,
-                descriptionStyle = MaterialTheme.typography.bodySmall,
-                descriptionColor = HabitsTheme.colors.text.secondary,
-                modifier = Modifier.weight(1f),
+                completionLabel = completionLabel,
+                completionEyebrow = completionEyebrow,
+                completionContentDescription = completionContentDescription,
+                stacked = !fitsBeside,
             )
-            // ⭐ Merged **with** a description rather than cleared and replaced: an explicit
-            // `contentDescription` is what a screen reader announces, while the two `Text`s stay in
-            // the merged node's config — so the eyebrow is still findable by the word it prints, and
-            // a test that looks for `COMPLETION` is testing the screen rather than this decision.
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier =
-                    Modifier.semantics(mergeDescendants = true) {
-                        contentDescription = completionContentDescription
-                    },
-            ) {
-                Text(
-                    text = completionLabel,
-                    style = HabitsTheme.textStyles.metricValue,
-                    color = HabitsTheme.colors.text.primary,
-                )
-                Text(
-                    text = completionEyebrow,
-                    style = HabitsTheme.textStyles.eyebrowSmall,
-                    color = HabitsTheme.colors.text.eyebrow,
-                    textAlign = TextAlign.End,
-                )
-            }
         }
         YearDotGrid(days = days, habitColor = habitColor, dotSize = Sizing.yearDotSmall)
+    }
+}
+
+/**
+ * The Year card's top block: the header and the completion figure, side by side or stacked.
+ *
+ * @param stacked when the row cannot hold both — see [YearHabitCard]. Stacked, the figure keeps its
+ *   end alignment and simply sits under the name instead of beside it, so the card reads the same
+ *   way down the page and nothing is truncated on either side.
+ */
+@Composable
+private fun YearCardHeadline(
+    name: String,
+    description: String,
+    emoji: String,
+    habitColor: Color,
+    completionLabel: String,
+    completionEyebrow: String,
+    completionContentDescription: String,
+    stacked: Boolean,
+) {
+    val header: @Composable (Modifier) -> Unit = { headerModifier ->
+        HabitCardHeader(
+            name = name,
+            description = description,
+            emoji = emoji,
+            habitColor = habitColor,
+            iconSize = HabitIconSize.LARGE,
+            nameStyle = MaterialTheme.typography.titleSmall,
+            descriptionStyle = MaterialTheme.typography.bodySmall,
+            descriptionColor = HabitsTheme.colors.text.secondary,
+            modifier = headerModifier,
+        )
+    }
+    val completion: @Composable (Alignment.Horizontal) -> Unit = { alignment ->
+        // ⭐ Merged **with** a description rather than cleared and replaced: an explicit
+        // `contentDescription` is what a screen reader announces, while the two `Text`s stay in
+        // the merged node's config — so the eyebrow is still findable by the word it prints, and
+        // a test that looks for `COMPLETION` is testing the screen rather than this decision.
+        Column(
+            horizontalAlignment = alignment,
+            modifier =
+                Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = completionContentDescription
+                },
+        ) {
+            Text(
+                text = completionLabel,
+                style = HabitsTheme.textStyles.metricValue,
+                color = HabitsTheme.colors.text.primary,
+            )
+            Text(
+                text = completionEyebrow,
+                style = HabitsTheme.textStyles.eyebrowSmall,
+                color = HabitsTheme.colors.text.eyebrow,
+                textAlign = TextAlign.End,
+            )
+        }
+    }
+
+    if (stacked) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+            header(Modifier.fillMaxWidth())
+            completion(Alignment.Start)
+        }
+    } else {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            header(Modifier.weight(1f))
+            completion(Alignment.End)
+        }
     }
 }
 
@@ -272,3 +334,12 @@ private fun YearHabitCardPreview() {
         )
     }
 }
+
+/**
+ * How much of the Year card the completion block may claim before the row stops being a row.
+ *
+ * ⚠ **A share rather than a `Dp`**, because the question is about balance and not about a size: the
+ * header beside it keeps the rest, and a fixed width would give a narrow card away entirely and a
+ * wide one too little. 0.4 leaves the name the clear majority at every scale where the row survives.
+ */
+private const val COMPLETION_WIDTH_SHARE = 0.4f
