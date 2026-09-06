@@ -47,6 +47,10 @@ ktor = "3.3.3"
 detekt = "1.23.8"
 ktlint = "1.8.0"
 ktlintGradle = "14.2.0"
+# Resolved live 2026-09-06 from plugins.gradle.org. 0.9.9 is both `<latest>` and `<release>` — there
+# is no pre-release ahead of it, so this one needs no exception to the stable-only rule above.
+# Build-only: Kover instruments the JVM test run and writes a report. Nothing reaches the APK.
+kover = "0.9.9"
 
 junit = "4.13.2"
 turbine = "1.2.1"
@@ -120,3 +124,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 room = { id = "androidx.room", version.ref = "room" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
