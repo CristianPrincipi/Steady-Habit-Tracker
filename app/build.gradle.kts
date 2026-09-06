@@ -12,6 +12,12 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+// M13.5 audit only — removed before the step closes.
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose-reports")
+    metricsDestination = layout.buildDirectory.dir("compose-metrics")
+}
+
 android {
     namespace = "com.cristianprincipi.habits"
     compileSdk = 37
