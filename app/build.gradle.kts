@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.PathSensitivity
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -12,10 +13,52 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
-// M13.5 audit only — removed before the step closes.
+/**
+ * The Compose stability configuration, named once because two blocks below have to agree on it.
+ *
+ * ⚠ Declared here rather than at the foot of the file: a build script's top-level `val`s initialise
+ * in source order, so one used above its declaration is simply `null` — "Cannot convert 'null' to
+ * File", reported against a line that looks perfectly correct.
+ */
+val composeStabilityFile = "compose-stability.conf"
+
+/*
+ * M13.5 — see `compose-stability.conf` and ADR-112.
+ *
+ * ⚠ Strong skipping is NOT configured here, and must not be: it has been on by default since Kotlin
+ * 2.0.20 and this module is on 2.2.10. A `featureFlags` line enabling it would read as though it
+ * were off without one.
+ *
+ * The reports/metrics destinations are commented out rather than deleted. Regenerating them is how
+ * the stability file is verified — it is the only way to see whether the compiler read it — and a
+ * commented line is a shorter path back than a paragraph describing one.
+ */
 composeCompiler {
-    reportsDestination = layout.buildDirectory.dir("compose-reports")
-    metricsDestination = layout.buildDirectory.dir("compose-metrics")
+    stabilityConfigurationFiles.add(layout.projectDirectory.file(composeStabilityFile))
+    // reportsDestination = layout.buildDirectory.dir("compose-reports")
+    // metricsDestination = layout.buildDirectory.dir("compose-metrics")
+}
+
+/*
+ * ⚠⚠ M13.5 — **the Compose plugin does not track that file as a compile input, and the failure is
+ * silent.** Editing `compose-stability.conf` leaves `compileDebugKotlin` and
+ * `compileDebugAndroidTestKotlin` UP-TO-DATE, so the edit does not take effect and nothing says so:
+ * the build succeeds, the app runs, and it was compiled against the previous contents.
+ *
+ * That cost a wrong test result here. `StabilityConfigTest` was verified by removing `HabitPeriod`
+ * from the file — it went red, correctly — and then **stayed** red after the line was restored,
+ * because the restore recompiled nothing. Without this block the only reliable edit is
+ * `--rerun-tasks`, which nobody remembers and CI does not need.
+ *
+ * Matched by name rather than by type: AGP 9 compiles Kotlin itself and
+ * `org.jetbrains.kotlin.android` is deliberately not applied (ADR-011), so `KotlinCompile` is not a
+ * type this file can name.
+ */
+tasks.matching { it.name.startsWith("compile") && it.name.endsWith("Kotlin") }.configureEach {
+    inputs
+        .file(layout.projectDirectory.file(composeStabilityFile))
+        .withPropertyName("composeStabilityConfiguration")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 android {
