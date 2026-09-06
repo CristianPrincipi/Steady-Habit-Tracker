@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
@@ -75,7 +76,22 @@ fun WeekPills(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
+        // ⚠⚠ M13.2 — **silent, and it is the largest single win in the TalkBack pass.**
+        //
+        // These letters are a column heading: they are read *down* the pill under each one, which is
+        // a move only a sighted user makes. A screen reader goes along the row, and every pill it
+        // reaches already announces the weekday in full — "Read, Monday, August 17, 2026". Left
+        // audible, the row costs seven stops per card and five cards is **35 stops that add nothing**
+        // to what the next seven say properly.
+        //
+        // ⭐ Cleared rather than merged away, and the order matters: [WeekHabitCard]'s header is a
+        // merging boundary, and an uncleared row would be swallowed into some node rather than
+        // dropped. `clearAndSetSemantics` is also what ADR-089 does to the dot grids, for the same
+        // reason — a thing drawn for the eye is not automatically a thing worth saying.
+        Row(
+            modifier = Modifier.clearAndSetSemantics { },
+            horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
+        ) {
             dayLabels.forEach { label ->
                 Text(
                     text = label,

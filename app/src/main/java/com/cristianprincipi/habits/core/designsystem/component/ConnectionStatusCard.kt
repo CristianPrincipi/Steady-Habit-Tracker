@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.Elapsed
@@ -41,7 +42,9 @@ fun ConnectionStatusCard(
     summary: ConnectionSummary,
     modifier: Modifier = Modifier,
 ) {
-    HabitsCard(modifier = modifier.fillMaxWidth()) {
+    // Merged (M13.2), for [StatTile]'s reason: "Connected to Notion" and "Last synced 3 minutes
+    // ago" are one status in two lines, and the second on its own does not say what it is about.
+    HabitsCard(modifier = modifier.fillMaxWidth().semantics(mergeDescendants = true) { }) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
             verticalAlignment = Alignment.CenterVertically,

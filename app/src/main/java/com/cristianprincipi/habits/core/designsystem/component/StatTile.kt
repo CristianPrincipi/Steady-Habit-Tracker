@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideGlyph
@@ -44,7 +45,14 @@ fun StatTile(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit = {},
 ) {
-    HabitsCard(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap)) {
+    // ⚠⚠ **Merged (M13.2).** Label and value are two `Text`s in a `Column`, and a `Column` merges
+    // nothing — so a screen reader stopped on "Current streak", then on "9", and a user who explored
+    // by touch could land on the second without ever hearing the first. Four tiles were eight stops,
+    // half of them bare numbers. Merged, a tile is one stop that says both, in the order it draws.
+    HabitsCard(
+        modifier = modifier.semantics(mergeDescendants = true) { },
+        verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
+    ) {
         Box(
             modifier =
                 Modifier

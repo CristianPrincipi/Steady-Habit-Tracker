@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -106,6 +108,11 @@ fun WeekHabitCard(
  * The percentage sits in its own column with the `COMPLETION` eyebrow beneath it — a fixed block at
  * the end of the row, so a value going from `9%` to `100%` moves glyphs inside the block and never
  * the header beside it.
+ *
+ * @param completionContentDescription what the block above says as **one** phrase. ⚠⚠ **The eyebrow
+ *   is below the figure, and reading order is drawing order** — so this card was the one place in
+ *   the app that announced a value and *then* what it measured: "87%", then "COMPLETION" (M13.2).
+ *   The design is not at fault and does not move; only the ear needs the two the other way round.
  */
 @Composable
 fun YearHabitCard(
@@ -115,6 +122,7 @@ fun YearHabitCard(
     habitColor: Color,
     completionLabel: String,
     completionEyebrow: String,
+    completionContentDescription: String,
     days: List<DayStatus>,
     modifier: Modifier = Modifier,
 ) {
@@ -134,7 +142,17 @@ fun YearHabitCard(
                 descriptionColor = HabitsTheme.colors.text.secondary,
                 modifier = Modifier.weight(1f),
             )
-            Column(horizontalAlignment = Alignment.End) {
+            // ⭐ Merged **with** a description rather than cleared and replaced: an explicit
+            // `contentDescription` is what a screen reader announces, while the two `Text`s stay in
+            // the merged node's config — so the eyebrow is still findable by the word it prints, and
+            // a test that looks for `COMPLETION` is testing the screen rather than this decision.
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier =
+                    Modifier.semantics(mergeDescendants = true) {
+                        contentDescription = completionContentDescription
+                    },
+            ) {
                 Text(
                     text = completionLabel,
                     style = HabitsTheme.textStyles.metricValue,
@@ -152,7 +170,18 @@ fun YearHabitCard(
     }
 }
 
-/** Icon, name and description — the row all three cards open with, at three different scales. */
+/**
+ * Icon, name and description — the row all three cards open with, at three different scales.
+ *
+ * ⚠⚠ **One merging boundary, and it fixes all three cards at once (M13.2).** Name and description are
+ * two `Text`s in a `Column`, and a `Column` merges nothing — so a screen reader stopped twice per
+ * card and the second stop was a bare number: "Read", then "6 of 7". **A figure heard on its own is
+ * a figure about nothing**, and touch exploration lands on it directly rather than arriving from the
+ * name above it. Merged, the card opens with "Read, 6 of 7" — one stop, in the order the eye reads.
+ *
+ * ⭐ The seven pills below are unaffected: a clickable is its own merging boundary, so they stay
+ * seven separate stops, which is exactly right for seven separate things to tap.
+ */
 @Composable
 private fun HabitCardHeader(
     name: String,
@@ -166,10 +195,12 @@ private fun HabitCardHeader(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.semantics(mergeDescendants = true) { },
         horizontalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Cleared in [HabitIcon], so the merge does not pick the emoji up and read it twice — the
+        // name it sits beside is already the thing it stands for.
         HabitIcon(emoji = emoji, name = name, habitColor = habitColor, size = iconSize)
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -235,6 +266,7 @@ private fun YearHabitCardPreview() {
             habitColor = HabitsTheme.colors.habit.orange,
             completionLabel = "84%",
             completionEyebrow = "COMPLETION",
+            completionContentDescription = "84% completion",
             days = previewYear(),
             modifier = Modifier.padding(Spacing.screenPadding),
         )

@@ -144,6 +144,11 @@ private fun YearHabitRow(
         habitColor = habit.color.resolve(),
         completionLabel = stringResource(R.string.percent_value, year.rate.percent),
         completionEyebrow = stringResource(R.string.year_completion_eyebrow),
+        completionContentDescription =
+            stringResource(
+                R.string.year_completion_a11y,
+                stringResource(R.string.percent_value, year.rate.percent),
+            ),
         days = year.period.cells.map { cell -> cell.toDayStatus() },
     )
 }

@@ -353,6 +353,14 @@
     -->
     <string name="percent_value">%1$d%%</string>
     <string name="year_completion_eyebrow">COMPLETION</string>
+    <!--
+      M13.2 - the same two facts, in the order an ear needs them.
+      The eyebrow is drawn BELOW the figure, and reading order is drawing order, so a screen
+      reader announced "87%" and only then "COMPLETION" - a value ahead of what it measures.
+      Lower case because this is spoken, never drawn: the eyebrow above is uppercase for the
+      eye, and an all-caps content description is read out letter by letter by some engines.
+    -->
+    <string name="year_completion_a11y">%1$s completion</string>
 
     <!--
       Stats view (M9) - docs/design-spec.md §5.

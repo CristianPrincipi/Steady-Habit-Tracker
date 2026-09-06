@@ -241,8 +241,15 @@ fun SetupReadOnlyRow(
     caption: String,
     modifier: Modifier = Modifier,
 ) {
+    // Merged (M13.2). The two selectable rows above are `selectable`/`toggleable` and so merge
+    // themselves; this one is the only mapping row that is neither, and it read as two stops —
+    // "Notes", then "rich_text" — where its neighbours read as one.
     Row(
-        modifier = modifier.fillMaxWidth().padding(vertical = Spacing.cardGap),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.cardGap)
+                .semantics(mergeDescendants = true) { },
         horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {

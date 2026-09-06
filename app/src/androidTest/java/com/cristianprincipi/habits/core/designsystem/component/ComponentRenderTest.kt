@@ -98,6 +98,7 @@ class ComponentRenderTest {
                         habitColor = HabitsTheme.colors.habit.orange,
                         completionLabel = "84%",
                         completionEyebrow = "COMPLETION",
+                        completionContentDescription = "84% completion",
                         days = previewYear(),
                     )
                     ColorSwatchRow(

@@ -2,7 +2,6 @@ package com.cristianprincipi.habits.feature.stats
 
 import android.content.Context
 import androidx.compose.ui.test.filterToOne
-import androidx.compose.ui.test.hasAnySibling
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
@@ -86,15 +85,17 @@ class StreakOnScreenTest {
      * The **current streak** tile, addressed by its own label rather than by its number.
      *
      * ⚠ Four tiles print bare integers through one string resource, so matching on the number alone
-     * finds whichever tiles happen to share it. `StatTile` lays its label and value out as siblings
-     * in one `Column`, which is enough to say *which* number this is without adding a test tag to
-     * production code for a test's convenience.
+     * finds whichever tiles happen to share it. The label is what says *which* number this is —
+     * still without adding a test tag to production code for a test's convenience.
+     *
+     * ⚠⚠ **This was `hasAnySibling` until M13.2, and the change is the point of that step.** A tile
+     * laid its label and value out as two sibling `Text`s, which is why a sibling lookup worked —
+     * and it is exactly why a screen reader stopped twice and announced a bare "9". `StatTile` now
+     * merges, so label and value are **one** node rather than two, and the finder asks that node for
+     * both. The assertion got stronger on the way: it is now the same node carrying both facts,
+     * rather than two nodes that happen to be adjacent.
      */
-    private fun currentStreakTile(value: Int) =
-        composeTestRule.onNode(
-            hasText(string(R.string.stats_count_value).format(value)) and
-                hasAnySibling(hasText(string(R.string.stats_tile_current_streak))),
-        )
+    private fun currentStreakTile(value: Int) = tile(R.string.stats_tile_current_streak, value)
 
     /** Today's pill for the seeded habit, named the way a screen reader would hear it. */
     private fun todaysPill() =
@@ -136,11 +137,15 @@ class StreakOnScreenTest {
         bestStreakTile(SEEDED_BEST).assertExists()
     }
 
-    private fun bestStreakTile(value: Int) =
-        composeTestRule.onNode(
-            hasText(string(R.string.stats_count_value).format(value)) and
-                hasAnySibling(hasText(string(R.string.stats_tile_best_streak))),
-        )
+    private fun bestStreakTile(value: Int) = tile(R.string.stats_tile_best_streak, value)
+
+    /** One merged stat tile: the node that carries this label and this value together (M13.2). */
+    private fun tile(
+        labelRes: Int,
+        value: Int,
+    ) = composeTestRule.onNode(
+        hasText(string(labelRes)) and hasText(string(R.string.stats_count_value).format(value)),
+    )
 
     private companion object {
         val today: LocalDate = LocalDate.now()

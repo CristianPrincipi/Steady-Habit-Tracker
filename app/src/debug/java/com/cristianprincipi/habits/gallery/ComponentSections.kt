@@ -325,6 +325,7 @@ fun HabitCardSection() {
             habitColor = HabitsTheme.colors.habit.orange,
             completionLabel = "84%",
             completionEyebrow = "COMPLETION",
+            completionContentDescription = "84% completion",
             days = GalleryYear,
             modifier = Modifier.fillMaxWidth(),
         )
