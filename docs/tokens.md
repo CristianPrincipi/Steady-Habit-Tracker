@@ -78,6 +78,12 @@ The prototype tints by appending a hex alpha byte to the habit colour. Port thes
 | `22` | 0.133 | Year dot incomplete · stat-tile icon chip |
 | `20` | 0.125 | Week pill incomplete · unselected habit chip |
 
+> ⚠ **M13.4 added an outline the prototype does not draw**: an unticked week pill at `20` is
+> **1.21:1** against its card, and SC 1.4.11 wants 3:1 for a control's state. The fill could not
+> carry it — 3:1 needs alpha `0.79` for purple, which draws unticked at nearly the ticked colour —
+> so unticked pills gain a white hairline at `0.35` (3.20:1). The fill above is unchanged.
+
+
 ### 1.5 Foreground / text opacity ramp
 
 All text is white at an opacity. This is a real ramp and should become named tokens:
@@ -93,6 +99,24 @@ All text is white at an opacity. This is a real ramp and should become named tok
 | `0.25` | Section eyebrows · weekday initials · sub-captions |
 | `0.22` | Field helper text · chart axis ticks · inactive bottom-nav item |
 | `0.15` | Input placeholder |
+
+> ### ⚠⚠ The app no longer ships these values — M13.4 re-spaced the ramp for WCAG AA (ADR-111)
+>
+> **This table stays as the record of what the prototype draws.** It is the extraction, and the
+> extraction should not be edited to match a later decision — but reading it and typing these numbers
+> into `Color.kt` would now undo that decision, so the departure is recorded here rather than only in
+> the ADR.
+>
+> **Six of these nine are below WCAG AA on the design's own background**: `0.40` is 3.81:1, `0.35` is
+> 3.19, `0.30` is 2.66, `0.25` is 2.20, `0.22` is 1.97 and `0.15` is 1.54, against the 4.5 that
+> normal text requires. Every one is drawn at 9–14sp, so none reaches the 3:1 large-text allowance.
+>
+> ⚠ **And they cannot be nudged.** The minimum alpha for 4.5:1 over both `#111113` and `#1c1c1f` is
+> `0.46`, so all six collapse onto one value — nine levels of hierarchy become four. The ramp is
+> therefore re-spaced by contrast *ratio*, 17:1 down to 4.6:1, which keeps nine distinct levels.
+>
+> The shipped values live in `TextEmphasis` and are pinned by `ContrastTest`. One level, `disabled`,
+> is deliberately left at the old `0.30` under WCAG 1.4.3's exemption for inactive controls.
 
 ---
 

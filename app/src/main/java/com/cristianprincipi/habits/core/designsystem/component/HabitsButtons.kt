@@ -89,7 +89,7 @@ fun SecondaryButton(
     val content by
         animateColorAsState(
             targetValue =
-                if (enabled) HabitsTheme.colors.text.primary else HabitsTheme.colors.text.tertiary,
+                if (enabled) HabitsTheme.colors.text.primary else HabitsTheme.colors.text.disabled,
             animationSpec = Motion.colorStateChange,
             label = "secondaryContent",
         )

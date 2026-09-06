@@ -177,6 +177,21 @@ data class HabitTintAlphas(
     val yearDotIncomplete: Float = 0x22 / OPAQUE_BYTE,
     /** `20`, ~0.125 — an incomplete day in `WeekPills`, and an unselected habit chip. */
     val weekPillIncomplete: Float = 0x20 / OPAQUE_BYTE,
+    /**
+     * M13.4 — the outline that makes an **unticked** week pill visible as a control.
+     *
+     * ⚠⚠ **Not a fill, and the arithmetic is why.** WCAG 1.4.11 wants 3:1 for the visual information
+     * that identifies a component and its states, and at `weekPillIncomplete` an empty pill is
+     * **1.21:1** against its card — very nearly invisible. Raising the *fill* to reach 3:1 needs
+     * alpha **0.79 for purple**, which draws an unticked day at almost the ticked colour and
+     * destroys the very state distinction the criterion is about. An outline buys the visibility
+     * without touching the fill, which is what Material's own unchecked checkbox does.
+     *
+     * White rather than the habit colour, because the habit colour at full strength is already what
+     * rings **today** ([todayRing]) — two habit-coloured outlines would make today stop reading as
+     * today. 0.35 gives 3.20:1 on the card.
+     */
+    val weekPillOutline: Float = 0.35f,
 ) {
     private companion object {
         const val OPAQUE_BYTE = 255f
@@ -184,42 +199,74 @@ data class HabitTintAlphas(
 }
 
 /**
- * The white text-opacity ramp — `docs/tokens.md §1.5`.
+ * The white text-opacity ramp — `docs/tokens.md §1.5`, **re-spaced for WCAG AA at M13.4**.
  *
  * Every foreground in the design is [base] at one of nine opacities, so this is one colour with
  * nine named levels rather than nine unrelated tokens: a light theme post-v1 changes [base] and
  * nothing else. Each name is the level's dominant use; the rest are listed alongside it.
+ *
+ * ### ⚠⚠ These are NOT the prototype's opacities, and it is the design's one deliberate departure
+ *
+ * The design's ramp ran `1.00 · 0.55 · 0.50 · 0.40 · 0.35 · 0.30 · 0.25 · 0.22 · 0.15`, and **six of
+ * those nine sat below WCAG AA** on this app's own background: 3.81, 3.19, 2.66, 2.20, 1.97 and 1.54
+ * against the 4.5 that normal text requires. Every one is drawn at 9–14sp, so none reached the 3:1
+ * large-text allowance either — 14sp SemiBold is not WCAG "large".
+ *
+ * ⚠ **A nine-step white-opacity ramp on near-black cannot meet AA by nudging.** The minimum alpha
+ * for 4.5:1 over both `#111113` and `#1c1c1f` is `0.46`, so all six failing levels collapse onto one
+ * value and nine levels of hierarchy become four.
+ *
+ * ⭐ **So the ramp is re-spaced by contrast RATIO rather than by alpha** — geometrically from 17:1
+ * down to 4.55:1. That keeps **nine distinct, monotonic levels**, every one compliant, and the cost
+ * is the design's low-contrast mood. The user was shown all three states rendered and chose this one
+ * (ADR-111). ⚠ The alphas below are therefore *derived from a target ratio*, not typed: `ContrastTest`
+ * is what keeps them honest, and it is what to re-run if the background ever moves.
  */
 @Immutable
 class TextEmphasis(
     private val base: Color,
 ) {
-    /** 100% — headings, habit names, stat values, completion %. */
+    /** 17:1 — headings, habit names, stat values, completion %. Unchanged. */
     val primary: Color = base
 
-    /** 55% — the Notion schema property chips on the Settings screen. */
-    val propertyChip: Color = base.copy(alpha = 0.55f)
+    /** 14.5:1 — the Notion schema property chips on the Settings screen. Was 55%. */
+    val propertyChip: Color = base.copy(alpha = 0.9216f)
 
-    /** 50% — the "Not connected" label beside the connection status dot. */
-    val statusLabel: Color = base.copy(alpha = 0.50f)
+    /** 12.3:1 — the "Not connected" label beside the connection status dot. Was 50%. */
+    val statusLabel: Color = base.copy(alpha = 0.8392f)
 
-    /** 40% — the date label between the Month/Week nav arrows. */
-    val navLabel: Color = base.copy(alpha = 0.40f)
+    /** 10.5:1 — the date label between the Month/Week nav arrows. Was 40%. */
+    val navLabel: Color = base.copy(alpha = 0.7725f)
 
-    /** 35% — habit description (Week/Year), field labels, and the nav-arrow glyphs themselves. */
-    val secondary: Color = base.copy(alpha = 0.35f)
+    /** 8.9:1 — habit description (Week/Year), field labels, and the nav-arrow glyphs themselves. Was 35%. */
+    val secondary: Color = base.copy(alpha = 0.7020f)
 
-    /** 30% — habit description (Month) and stat-tile labels. */
-    val tertiary: Color = base.copy(alpha = 0.30f)
+    /** 7.6:1 — habit description (Month) and stat-tile labels. Was 30%. */
+    val tertiary: Color = base.copy(alpha = 0.6392f)
 
-    /** 25% — section eyebrows, weekday initials, sub-captions. */
-    val eyebrow: Color = base.copy(alpha = 0.25f)
+    /** 6.4:1 — section eyebrows, weekday initials, sub-captions. Was 25%. */
+    val eyebrow: Color = base.copy(alpha = 0.5765f)
 
-    /** 22% — field helper text, chart axis ticks, and an inactive bottom-nav item. */
-    val helper: Color = base.copy(alpha = 0.22f)
+    /** 5.5:1 — field helper text, chart axis ticks, and an inactive bottom-nav item. Was 22%. */
+    val helper: Color = base.copy(alpha = 0.5176f)
 
-    /** 15% — input placeholders. */
-    val placeholder: Color = base.copy(alpha = 0.15f)
+    /** 4.6:1 — input placeholders. Was 15%. */
+    val placeholder: Color = base.copy(alpha = 0.4627f)
+
+    /**
+     * 2.7:1 — the label on a **disabled** control, and the one level deliberately left below AA.
+     *
+     * ⚠⚠ **WCAG 1.4.3 exempts "inactive user interface components" by name**, and this is the only
+     * place in the app that exemption is claimed. It exists because M13.4 created the need for it:
+     * raising the ramp took the disabled state from *white against 30% white* to *white against 64%*,
+     * and a button that no longer looks disabled is a worse accessibility outcome than a dim one —
+     * the user cannot tell it will not respond.
+     *
+     * ⭐ So this is the design's old `tertiary`, kept at its original 30% for exactly the case the
+     * standard sets aside. **Do not reach for it to make something quieter**; every level above is
+     * compliant and one of them is the right answer for live content.
+     */
+    val disabled: Color = base.copy(alpha = 0.30f)
 }
 
 /**

@@ -92,19 +92,31 @@ class ColorTest {
         assertEquals(0.125f, tint.weekPillIncomplete, ALPHA_TOLERANCE)
     }
 
+    /**
+     * ⚠⚠ **These are NOT the prototype's opacities any more — M13.4 re-spaced the ramp for WCAG AA.**
+     *
+     * The design's `0.55 · 0.50 · 0.40 · 0.35 · 0.30 · 0.25 · 0.22 · 0.15` put **six of nine levels
+     * below AA** on this app's own background, down to 1.54:1. A nine-step white ramp on near-black
+     * cannot meet AA by nudging — the minimum is 0.46 for all six, which collapses them onto one
+     * value — so the ramp is re-spaced by contrast *ratio* instead (ADR-111).
+     *
+     * ⭐ **This test and `ContrastTest` are not duplicates.** This one pins the literal alphas, so a
+     * typo in `Color.kt` fails here; that one pins the ratios those alphas were chosen for, so a
+     * change that is *legible* but no longer *compliant* fails there. A value can pass either alone.
+     */
     @Test
-    fun `the text ramp is white at the nine documented opacities`() {
+    fun `the text ramp is white at the nine opacities M13_4 derived`() {
         val text = HabitsDarkColors.text
 
         assertEquals(Color.White, text.primary)
-        assertEquals(WHITE_55, text.propertyChip.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_50, text.statusLabel.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_40, text.navLabel.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_35, text.secondary.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_30, text.tertiary.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_25, text.eyebrow.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_22, text.helper.alpha, ALPHA_TOLERANCE)
-        assertEquals(WHITE_15, text.placeholder.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_92, text.propertyChip.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_84, text.statusLabel.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_77, text.navLabel.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_70, text.secondary.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_64, text.tertiary.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_58, text.eyebrow.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_52, text.helper.alpha, ALPHA_TOLERANCE)
+        assertEquals(WHITE_46, text.placeholder.alpha, ALPHA_TOLERANCE)
     }
 
     @Test
@@ -144,15 +156,18 @@ class ColorTest {
 
         const val FOUR_ASSIGNABLE_COLOURS = 4
 
-        const val WHITE_55 = 0.55f
-        const val WHITE_50 = 0.50f
-        const val WHITE_40 = 0.40f
-        const val WHITE_35 = 0.35f
-        const val WHITE_30 = 0.30f
-        const val WHITE_25 = 0.25f
-        const val WHITE_22 = 0.22f
+        // The M13.4 ramp. Each is a whole n/255 step — see `Color.kt` for why the fourth decimal
+        // place is load-bearing and must not be tidied away.
+        const val WHITE_92 = 0.9216f
+        const val WHITE_84 = 0.8392f
+        const val WHITE_77 = 0.7725f
+        const val WHITE_70 = 0.7020f
+        const val WHITE_64 = 0.6392f
+        const val WHITE_58 = 0.5765f
+        const val WHITE_52 = 0.5176f
+        const val WHITE_46 = 0.4627f
+
         const val WHITE_20 = 0.20f
-        const val WHITE_15 = 0.15f
         const val WHITE_08 = 0.08f
         const val WHITE_06 = 0.06f
     }

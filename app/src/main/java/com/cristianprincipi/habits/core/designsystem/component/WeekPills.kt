@@ -171,6 +171,10 @@ private fun RowScope.DayPill(
     // [todayRing] — so it is the one thing on this pill that a transition was always going to suit.
     // Computed whether or not this is today: keeping the call unconditional keeps the composition
     // shape the same for all seven pills, and the border below is what decides if it is drawn.
+    // The neutral hairline on an unticked day that is not today — see the `when` below.
+    val outline =
+        HabitsTheme.colors.text.primary
+            .copy(alpha = HabitsTheme.colors.tint.weekPillOutline)
     val ring by animateColorAsState(
         targetValue = todayRing(completed, habitColor, checkColor),
         animationSpec = Motion.colorStateChange,
@@ -233,10 +237,22 @@ private fun RowScope.DayPill(
                     .then(
                         // The design rings today whether or not it is complete, so this is not an
                         // `else` on the fill above.
-                        if (isToday) {
-                            Modifier.border(Sizing.todayRing, ring, shape)
-                        } else {
-                            Modifier
+                        //
+                        // ⚠⚠ M13.4 — **and an unticked day is now outlined too, wherever it falls in
+                        // the week.** At `weekPillIncomplete` an empty pill is **1.21:1** against its
+                        // card: WCAG 1.4.11 asks for 3:1 on the information that identifies a control
+                        // and its state, and at that ratio a low-vision user cannot see there is a
+                        // checkbox there at all. ⚠ **Raising the fill instead does not work** — 3:1
+                        // needs alpha 0.79 for purple, which draws an unticked day at nearly the
+                        // ticked colour and destroys the state distinction the criterion exists for.
+                        //
+                        // ⭐ **Today still wins the ring**, in the habit colour at full strength, so
+                        // the two never compete: today is coloured, every other unticked day is a
+                        // neutral hairline, and a ticked day has no outline unless it is today.
+                        when {
+                            isToday -> Modifier.border(Sizing.todayRing, ring, shape)
+                            !completed -> Modifier.border(Sizing.todayRing, outline, shape)
+                            else -> Modifier
                         },
                     ),
             contentAlignment = Alignment.Center,

@@ -112,7 +112,7 @@ private fun ThisMonthButton(
                 if (enabled) {
                     HabitsTheme.colors.text.secondary
                 } else {
-                    HabitsTheme.colors.text.helper
+                    HabitsTheme.colors.text.disabled
                 },
         )
     }
