@@ -23,6 +23,19 @@ class FakeNotionSetupRepository : NotionSetupRepository {
 
     override val isConnected: Flow<Boolean> = connected
 
+    /**
+     * Puts the fake in the state a **relaunch** finds: a token was stored by an earlier run, and
+     * nothing else was.
+     *
+     * ⚠ It sets no token string, because there is none to set — [saveToken] records what it was
+     * given and the store only ever reports *whether* one exists (`CLAUDE.md` §3.6). That is
+     * precisely the situation M13.7 is about: the app knows it has a token and cannot show it to
+     * anybody, so a wizard that asks for it again is asking for something unrecoverable.
+     */
+    fun pretendTokenAlreadyStored() {
+        connected.value = true
+    }
+
     private val configured = MutableStateFlow(false)
 
     override val isConfigured: Flow<Boolean> = configured

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,7 +39,60 @@ class NotionSetupViewModel
         val uiState: StateFlow<NotionSetupUiState> = _uiState.asStateFlow()
 
         init {
+            resumeWhereAStoredTokenLeftOff()
             resetWhenDisconnected()
+        }
+
+        /**
+         * ⭐⭐ **M13.7 — picks the wizard up where a killed process left it, rather than asking for
+         * the token again.**
+         *
+         * ### Why this is a lock-out and not an inconvenience
+         *
+         * [NotionSetupRepository.saveToken] stores the token at the **first** step, two steps before
+         * the user has chosen anything — that repository's own KDoc says so, and warns against
+         * treating "has a token" as "is set up". Meanwhile `CLAUDE.md` §3.3 sends the user *out of
+         * the app*, into Notion, to share the database with the connection. **Backgrounding the app
+         * mid-wizard is therefore the documented flow, not an edge case**, and a process reclaimed
+         * while they are away used to bring them back to "paste your token" — with the app holding a
+         * perfectly good one it will never show anybody (§3.6), and ADR-107 recording that Notion
+         * shows a token once. The wizard is a gate around the whole app (ADR-032), so there was no
+         * way past it.
+         *
+         * ### ⚠⚠ Why the fix is not `SavedStateHandle`
+         *
+         * The obvious answer to "survive process death" is to save the state into the
+         * saved-instance-state `Bundle`. **That bundle is plaintext and system-persisted**, so for
+         * this screen it would mean writing a Notion token — which §3.6 calls a password — into
+         * exactly the storage the encrypted token store exists to avoid. The state worth restoring
+         * is already on disk, encrypted, and the repository already exposes the one bit needed:
+         * whether a token exists. `NotionSetupUiState.token` stays unsaved, deliberately.
+         *
+         * ### What it does on each of the three paths
+         *
+         * - **No stored token** — a first run. Returns before spending anything, so the token step
+         *   still opens with no request made and no busy flag flicker.
+         * - **A stored token that works** — advances to the database step through the very same
+         *   [thenShowDatabases] a fresh paste uses, so a resumed wizard and a typed one cannot drift.
+         * - **A stored token that no longer works** — revoked or rotated upstream. [thenShowDatabases]
+         *   leaves the step where it is and puts the reason on screen, so the user lands on the token
+         *   step *being told why* rather than being asked again for no stated reason. That is the one
+         *   case where asking again is right.
+         *
+         * ⚠ It reads [NotionSetupRepository.isConnected] once rather than collecting it: this is a
+         * question about how the app was found on launch, not a condition to keep watching.
+         * [resetWhenDisconnected] is the one that watches, and it watches the other flow.
+         *
+         * ⚠ **`ReplaceTokenViewModel` deliberately does not do this.** It renders the same step for
+         * a connection that already exists, and its whole purpose is to take a *new* token — so
+         * skipping the field because one is stored would skip the screen's only reason to exist.
+         */
+        private fun resumeWhereAStoredTokenLeftOff() {
+            viewModelScope.launch {
+                if (!repository.isConnected.first()) return@launch
+
+                busy { repository.findSources().thenShowDatabases() }
+            }
         }
 
         /**

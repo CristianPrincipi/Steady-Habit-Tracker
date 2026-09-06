@@ -266,6 +266,43 @@ class MonthViewModelTest {
             assertEquals(YearMonth.of(2026, 9), content(viewModel).month)
         }
 
+    /**
+     * ⭐⭐ **M13.7 — the paged month is deliberately NOT restored after process death, and this is
+     * where that decision is written down.**
+     *
+     * Constructing a second ViewModel over the same repositories *is* the process death: a
+     * ViewModel is nothing but memory, so "the system reclaimed the app and the user came back" is
+     * exactly "a fresh instance over the storage the old one left behind".
+     *
+     * ### Why this is a decision rather than a gap
+     *
+     * Observed on a seeded emulator build (M13.7): after `am kill`, the app comes back **on the
+     * Month tab** — Navigation restores its back stack from the instance-state `Bundle` — but on
+     * **the current month**, not the July that was on screen. Half the state returns. The obvious
+     * "fix" is a `SavedStateHandle` holding the anchor, and it is the wrong one:
+     *
+     * **Process death has no time bound.** A rotation is instantaneous, so restoring across one is
+     * always right; a reclaimed process may be resumed a week later, and an anchor saved then would
+     * put the user on a month they last looked at in a previous session, with `This month` quietly
+     * enabled and no indication why. `null` meaning "the current month" is the same property
+     * [thisMonthClearsTheAnchorRatherThanPinningTheCurrentMonth] protects at a month boundary —
+     * this test protects it across a restart.
+     *
+     * ⚠ It stands for all three anchors: `WeekViewModel.anchor` and `StatsViewModel.selection`
+     * behave identically and for identical reasons. One assertion is enough to fail if somebody
+     * decides restoration is missing rather than declined.
+     */
+    @Test
+    fun aRebuiltViewModelOpensOnTheCurrentMonthRatherThanTheOneThatWasOnScreen() =
+        runTest {
+            val beforeTheKill = viewModel()
+            beforeTheKill.onEvent(MonthEvent.PreviousMonthPressed)
+            beforeTheKill.onEvent(MonthEvent.PreviousMonthPressed)
+            assertEquals(YearMonth.of(2026, 6), content(beforeTheKill).month)
+
+            assertEquals(thisMonth, content(viewModel()).month)
+        }
+
     // --- empty --------------------------------------------------------------------------------
 
     @Test

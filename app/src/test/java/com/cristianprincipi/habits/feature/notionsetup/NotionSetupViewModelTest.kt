@@ -54,8 +54,63 @@ class NotionSetupViewModelTest {
         viewModel.onEvent(NotionSetupEvent.DatabaseConfirmed)
     }
 
+    // --- coming back to a half-finished wizard (M13.7) ------------------------------------------
+
+    /**
+     * ⭐⭐ **Constructing this ViewModel *is* the process death.**
+     *
+     * A test cannot kill its own process, but it does not need to: a ViewModel holds nothing but
+     * memory, so "the process died and the user came back" is exactly "a fresh instance, over the
+     * storage the old one left behind". That is the same reasoning
+     * `WeekCheckOffPersistenceTest` uses to rebuild its stack from the file.
+     *
+     * ⚠⚠ **Why this is the defect and not a nicety.** The wizard is a **gate around the whole app**
+     * (ADR-032): no mapping, no shell. `saveToken` stores the token at step one, two steps before
+     * the user has chosen anything — the repository's own KDoc says so — and §3.3 then sends them
+     * *out of the app*, into Notion, to share the database with the connection. Backgrounding the
+     * app in the middle of setup is not an edge case here; **it is the documented flow.** If the
+     * system reclaims the process while they are gone, they come back to "paste your token", the
+     * app is holding a perfectly good one it will not show them, and ADR-107 records that Notion
+     * shows a token once. That is a lock-out, not an inconvenience.
+     */
+    @Test
+    fun aWizardRebuiltOverAStoredTokenDoesNotAskForItAgain() =
+        runTest {
+            repository.pretendTokenAlreadyStored()
+            repository.sourcesResult = NotionSetupResult.Success(listOf(habitsDatabase))
+
+            assertEquals(NotionSetupStep.ChooseDatabase, state.step)
+            assertEquals(listOf(habitsDatabase), state.databases)
+            // Nothing was pasted, so nothing may be saved: the resume must reuse the stored token
+            // rather than write one back.
+            assertTrue(repository.savedTokens.isEmpty())
+        }
+
+    /**
+     * ⚠ **The resume must fail back to the token step, not past it.**
+     *
+     * A stored token that Notion now rejects — revoked, or rotated in the workspace — is the one
+     * case where asking for a token again is the *right* thing to do. The resume therefore runs the
+     * same `thenShowDatabases` path a fresh paste does, so a failure leaves the step where it was
+     * and puts the reason on screen instead of stranding the user on an empty database list.
+     */
+    @Test
+    fun aStoredTokenThatNoLongerWorksLeavesTheWizardOnTheTokenStepSayingWhy() =
+        runTest {
+            repository.pretendTokenAlreadyStored()
+            repository.sourcesResult = NotionSetupResult.Failure(SyncFailure.TokenRejected)
+
+            assertEquals(NotionSetupStep.Token, state.step)
+            assertEquals(SyncFailure.TokenRejected, state.failure)
+        }
+
     // --- the token ---------------------------------------------------------------------------
 
+    /**
+     * The control for the two above: with **no** stored token this is a first run, and the resume
+     * must not fire — no step change and, just as importantly, no network call spent looking for
+     * databases a token that does not exist could not reach.
+     */
     @Test
     fun theWizardStartsOnTheTokenStepWithNothingSent() =
         runTest {
