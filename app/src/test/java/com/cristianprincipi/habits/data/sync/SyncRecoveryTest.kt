@@ -207,6 +207,85 @@ class SyncRecoveryTest {
             assertTrue("and nothing was created upstream", world.api.created.isEmpty())
         }
 
+    // --- killed mid-drain ------------------------------------------------------------------------
+
+    @Test
+    fun aDrainKilledPartWayKeepsWhatItDeliveredAndKeepsTheRestOwed() =
+        runTest {
+            // ⭐⭐ **The push side of "airplane mode mid-sync", and M13.11's one real gap.**
+            // `aWholeOfflineWeekDrainsInOneRunWhenTheNetworkReturns` proves a week drains when the
+            // network holds. Every push-failure test before this one proved the opposite extreme,
+            // because `failUpdateWith` fails EVERY write. What a phone actually produces is neither:
+            // the drain starts, some days land, and the socket dies. `CLAUDE.md` §3.5 — "a partial
+            // run must leave the local database in a valid state" — is claimed exactly here.
+            val world = connectedWorld()
+            world.engine.sync()
+            val week = offlineWeek(world)
+
+            world.api.failWritesAfter = 3
+            val outcome = world.engine.sync()
+
+            assertTrue("the run failed", outcome is SyncOutcome.Failed)
+            assertTrue("and it is worth coming back for", outcome.isWorthRetrying)
+            assertEquals("three days reached Notion", 3, world.api.created.size)
+            // ⭐ The three must be the OLDEST three. `DayDao.withState` is `ORDER BY epochDay ASC`,
+            // so the drain is oldest-first, and a run that delivered an arbitrary three would leave
+            // the user's history arriving out of order for no reason anyone chose.
+            assertEquals(
+                "the oldest three are done",
+                List(3) { SyncState.SYNCED },
+                week.take(3).map { date -> world.dayAt(date).syncState },
+            )
+            assertEquals(
+                "and the rest still owe a push",
+                List(4) { SyncState.PENDING_PUSH },
+                week.drop(3).map { date -> world.dayAt(date).syncState },
+            )
+        }
+
+    @Test
+    fun theRunAfterAKilledDrainSendsOnlyWhatIsStillOwed() =
+        runTest {
+            // The half that matters. A day delivered before the kill must not be sent again — that
+            // is rate limit spent on nothing — and a day owed must not be skipped, which would cost
+            // the user a check-off `CLAUDE.md` §1 promises is "never lost".
+            val world = connectedWorld()
+            world.engine.sync()
+            val week = offlineWeek(world)
+            world.api.failWritesAfter = 3
+            world.engine.sync()
+
+            world.api.failWritesAfter = null
+            val outcome = world.engine.sync()
+
+            assertEquals("only the four still owed were sent", 4, (outcome as SyncOutcome.Success).daysPushed)
+            assertEquals("seven pages exist, not ten", 7, world.api.created.size)
+            assertTrue("and the whole week is settled", week.all { world.dayAt(it).syncState == SyncState.SYNCED })
+        }
+
+    @Test
+    fun aDrainKilledTwiceStillLosesNothingAndDuplicatesNothing() =
+        runTest {
+            // A flaky network does not fail once politely. Two kills in a row must converge on the
+            // same place one kill does: "running it twice must not create duplicate pages"
+            // (`CLAUDE.md` §3.5), from the push side, where the risk is real — after the first kill
+            // some days hold a page id and some do not.
+            val world = connectedWorld()
+            world.engine.sync()
+            val week = offlineWeek(world)
+
+            world.api.failWritesAfter = 3
+            world.engine.sync()
+            world.api.failWritesAfter = 2
+            world.engine.sync()
+            world.api.failWritesAfter = null
+            world.engine.sync()
+
+            assertEquals("one page per day and no more", 7, world.api.created.size)
+            assertTrue("every check-off arrived", week.all { world.dayAt(it).syncState == SyncState.SYNCED })
+            assertEquals("and no day was created twice", 7, world.api.currentPages.size)
+        }
+
     // --- a mapping that went stale between runs -------------------------------------------------
 
     @Test
@@ -303,6 +382,18 @@ class SyncRecoveryTest {
             assertTrue(outcome is SyncOutcome.Success)
             assertEquals(true, world.pushedCheck(PropertyIds.READ))
         }
+
+    /**
+     * A week of check-offs made with no network, oldest first — the state a drain starts from.
+     *
+     * None of them has a page in Notion yet, so the drain is seven creates. That is the honest shape
+     * of the case: a day is only given a page id by the push that first delivers it.
+     */
+    private suspend fun offlineWeek(world: SyncWorld): List<LocalDate> {
+        val week = (0L until 7L).map { offset -> august19.plusDays(offset) }
+        week.forEach { date -> world.checkOffLocally(date, PropertyIds.READ) }
+        return week
+    }
 
     /**
      * Six days whose edit times ascend, which is the order the real query is asked to return.

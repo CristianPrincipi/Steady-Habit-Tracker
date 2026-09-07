@@ -30,7 +30,8 @@ import java.time.Instant
  * - **Writes move the clock forward.** Every create and update stamps a new `last_edited_time`, so
  *   the pull that follows a push sees what Notion would actually report.
  * - **A run can be killed mid-pagination** ([failQueryAfterPages]), which is the only way to
- *   exercise ADR-047's cursorless resume rather than assume it.
+ *   exercise ADR-047's cursorless resume rather than assume it — and, since M13.11,
+ *   **mid-drain** too ([failWritesAfter]), which is the same claim on the push side.
  *
  * ### The scenario matrix `CLAUDE.md` §6 asks for — audited in M4.14
  *
@@ -45,12 +46,18 @@ import java.time.Instant
  * | Revoked token | `KtorNotionApiTest.aRevokedTokenIsUnauthorisedAndIsNotRetried` (client), **`SyncRecoveryTest.aRevokedTokenIsNotWorthRetrying…`** (engine) |
  * | 429 backoff | `KtorNotionApiTest.aRateLimitIsRetriedAfterTheServersOwnDelay` + `…ThatNeverClears…` (client), **`SyncRecoveryTest.aRateLimitTheClientCouldNotClear…`** (engine) |
  * | Resume after a mid-run kill | `SyncPushTest.aPageLeftBehindByAKilledRunIsAdopted…` (push side), **`SyncRecoveryTest.theNextRunResumesFromTheWatermarkAndLosesNothing`** (pull side) |
+ * | Airplane mode **mid-drain** | ⭐ M13.11: `SyncRecoveryTest.aDrainKilledPartWayKeepsWhatItDelivered…`, `…theRunAfterAKilledDrainSendsOnlyWhatIsStillOwed`, `…aKilledDrainNeverSendsADeliveredDayTwice` |
  *
  * *"Local delete" is struck: nothing local can delete a record (ADR-036).*
  *
  * ⭐ **The bold entries are M4.14's.** Before it, a descending query order — the thing ADR-047's
  * ascending sort exists to rule out — was caught by **none** of the 461 tests. It is now caught by
  * two, which was confirmed by mutating this fake to sort descending and watching them fail.
+ *
+ * ⭐ **The last row is M13.11's, and it closes the same hole on the other side.** Every push-failure
+ * test before it was all-or-nothing, because [failUpdateWith] fails *every* write — so the case a
+ * phone actually produces, a week of offline check-offs draining until the network dies halfway,
+ * could not be written. See [failWritesAfter].
  */
 class FakeNotionApi(
     var schema: NotionDataSourceDto,
@@ -83,6 +90,32 @@ class FakeNotionApi(
 
     /** Fails only `updatePage`. The `404` case is how a deleted page is discovered (§14). */
     var failUpdateWith: NotionError? = null
+
+    /**
+     * ⭐ Lets this many writes through in a run, then fails them — **a drain killed part-way**.
+     *
+     * The push-side mirror of [failQueryAfterPages], and it exists for the identical reason. That
+     * knob's own note says a fake which could only fail the *whole* query proved the run stopped but
+     * could not prove the next one picks up in the right place. [failUpdateWith] leaves push in
+     * exactly that position: it fails **every** write, so the only push failure any test could
+     * describe was an all-or-nothing one.
+     *
+     * The case a phone actually produces is neither. A week of check-offs made offline drains oldest
+     * first ([com.cristianprincipi.habits.data.local.dao.DayDao.withState] is `ORDER BY epochDay
+     * ASC`), and the network dies somewhere in the middle of it — leaving some days delivered and
+     * marked `SYNCED`, and the rest still owed. What has to be true afterwards is that the next run
+     * sends the remainder and **only** the remainder: re-sending a delivered day is wasted rate
+     * limit, and skipping an owed one loses a check-off `CLAUDE.md` §1 promises is never lost.
+     *
+     * Counts **creates and updates together**, because a dropped socket does not care which verb was
+     * in flight and a drain can contain both — a day with no page yet is a create.
+     *
+     * The failure is always a dropped socket, because that is the case this knob is named for — the
+     * network going away mid-drain. [failUpdateWith] stays the way to choose a different cause, and
+     * keeps its all-or-nothing meaning. Counted per **run**, reset by the same signal as
+     * [failQueryAfterPages]: every `sync()` opens with a cursorless pull.
+     */
+    var failWritesAfter: Int? = null
 
     /** Every `editedAtOrAfter` the engine has asked with, in order. The incremental-pull assertion. */
     val queriedEditedAtOrAfter = mutableListOf<Instant?>()
@@ -129,6 +162,7 @@ class FakeNotionApi(
     private var nextEditMillis = 1_000L
     private var nextPageNumber = 1
     private var pagesServedThisRun = 0
+    private var writesThisRun = 0
 
     /** The pages currently in the workspace, oldest edit first. */
     val currentPages: List<NotionPageDto> get() = pages.values.sortedBy { it.lastEditedTime }
@@ -193,6 +227,7 @@ class FakeNotionApi(
         if (startCursor == null) {
             queriedEditedAtOrAfter += editedAtOrAfter
             pagesServedThisRun = 0
+            writesThisRun = 0
         }
         val pageLimit = failQueryAfterPages
         if (pageLimit == null) {
@@ -228,7 +263,7 @@ class FakeNotionApi(
         dataSourceId: String,
         properties: Map<String, JsonElement>,
     ): NotionResult<NotionPageDto> {
-        failEverythingWith?.let { return NotionResult.Failure(it) }
+        refusedWrite()?.let { return it }
         duringWrite?.invoke()
         created += properties
         val page =
@@ -245,7 +280,7 @@ class FakeNotionApi(
         pageId: String,
         properties: Map<String, JsonElement>,
     ): NotionResult<NotionPageDto> {
-        (failEverythingWith ?: failUpdateWith)?.let { return NotionResult.Failure(it) }
+        refusedWrite(alsoFailWith = failUpdateWith)?.let { return it }
         duringWrite?.invoke()
         updated += pageId to properties
         // A partial update: the properties sent are merged over what the page already holds, which
@@ -262,6 +297,39 @@ class FakeNotionApi(
             pages[pageId] = page
             NotionResult.Success(page)
         } ?: NotionResult.Failure(NotionError.MissingOrNotShared)
+    }
+
+    /**
+     * Why this write should be refused, or `null` to let it through — and it spends the budget.
+     *
+     * Deciding it here rather than at each call site is what keeps creates and updates sharing one
+     * count, which is the point of [failWritesAfter]: a drain that dies part-way does not restart
+     * its tally because the next day happened to need a different verb.
+     *
+     * ⭐ **When a budget is set it is the authority and [alsoFailWith] is ignored.** Otherwise
+     * `failWritesAfter = 3` together with `failUpdateWith` would fail the *first* write rather than
+     * the fourth — the test would have asked for a partial drain and been given an all-or-nothing
+     * one, silently.
+     *
+     * `ReturnCount` is suppressed for the same reason [queryPages] suppresses it: four ways a write
+     * ends, one exit each, and the order they are checked in is the whole subject above.
+     *
+     * @param alsoFailWith a failure this endpoint has of its own — [failUpdateWith], which fails
+     *   every update when no budget is set.
+     */
+    @Suppress("ReturnCount")
+    private fun refusedWrite(alsoFailWith: NotionError? = null): NotionResult.Failure? {
+        failEverythingWith?.let { return NotionResult.Failure(it) }
+        val budget = failWritesAfter
+        if (budget != null) {
+            if (writesThisRun >= budget) {
+                return NotionResult.Failure(NotionError.Network(IOException("killed mid-push")))
+            }
+        } else {
+            alsoFailWith?.let { return NotionResult.Failure(it) }
+        }
+        writesThisRun++
+        return null
     }
 
     /**
