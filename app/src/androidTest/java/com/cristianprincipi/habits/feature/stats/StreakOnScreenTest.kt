@@ -1,11 +1,13 @@
 package com.cristianprincipi.habits.feature.stats
 
 import android.content.Context
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasNoClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -100,9 +102,68 @@ class StreakOnScreenTest {
     /** Today's pill for the seeded habit, named the way a screen reader would hear it. */
     private fun todaysPill() =
         composeTestRule.onNodeWithContentDescription(
-            string(R.string.week_pill_description).format(HABIT_NAME, accessibleDate(today, Locale.getDefault())),
+            todaysPillDescription,
             useUnmergedTree = true,
         )
+
+    private val todaysPillDescription: String
+        get() = string(R.string.week_pill_description).format(HABIT_NAME, accessibleDate(today, Locale.getDefault()))
+
+    /**
+     * ⚠⚠ **Waits for the tile to carry this value — and this is M13.13, not a tidy-up.**
+     *
+     * `theTileThatMovedIsTheCurrentStreakAndNotTheBest` failed the full instrumented run in **both**
+     * M13.7 and M13.10, at this assertion, before the test had checked anything off — and passed
+     * 2 of 2 in isolation and on a re-run both times. Two sessions recorded the same wrong
+     * diagnosis: residue from the class's other test, the one that checks off today. ⭐ **That test
+     * runs second** — `MethodSorters.DEFAULT` orders by `String.hashCode()`, and the run's own
+     * results XML confirms it on the device — so it cannot leave residue for this one, and
+     * [SeededHabitRule] wipes its rows after each method regardless.
+     *
+     * ⭐ **The mechanism is a race, and it is provable without reproducing it.**
+     * `StatsViewModel.uiState` is a `stateIn` whose `initialValue` is `StatsUiState.Loading`, so the
+     * screen **necessarily** renders `Loading` before Room answers — and Compose's idle-wait covers
+     * recomposition, not a Room read on `Dispatchers.IO`. A bare `assertExists()` here asks whether
+     * the number has arrived *yet*; it does not wait for it to.
+     *
+     * `WeekCheckOffPersistenceTest.awaitPill` learned this first and says so in as many words:
+     * *"A real ViewModel emits `Loading` first, and that draws nothing… Room is fast; it is not
+     * synchronous."* This class is the only other one that launches the real activity over real
+     * Room, and it never applied it.
+     *
+     * ⚠ **It cannot mask a wrong number.** Waiting for `3` never accepts `4`: a genuinely wrong
+     * value still fails, as a timeout rather than a miss. What it removes is the *first* method in
+     * the class losing a race the second one — running warm — never has to run.
+     */
+    private fun awaitCurrentStreakTile(value: Int) {
+        composeTestRule.waitUntil(TIMEOUT_MILLIS) { currentStreakTileCount(value) == 1 }
+        currentStreakTile(value).assertExists()
+    }
+
+    /**
+     * The seeded pill, once Week has drawn it.
+     *
+     * Same race, one screen over: Week is a real ViewModel over the same real Room, so its first
+     * frame has no habits on it either. Tapping a pill that is not there yet is the failure this
+     * test would have hit next, once the tile assertion stopped hiding it.
+     */
+    private fun awaitTodaysPill(): SemanticsNodeInteraction {
+        composeTestRule.waitUntil(TIMEOUT_MILLIS) {
+            composeTestRule
+                .onAllNodesWithContentDescription(todaysPillDescription, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .size == 1
+        }
+        return todaysPill()
+    }
+
+    private fun currentStreakTileCount(value: Int): Int =
+        composeTestRule
+            .onAllNodes(
+                hasText(string(R.string.stats_tile_current_streak)) and
+                    hasText(string(R.string.stats_count_value).format(value)),
+            ).fetchSemanticsNodes()
+            .size
 
     @Test
     fun checkingOffTodayOnWeekMovesTheCurrentStreakTileOnStats() {
@@ -111,13 +172,13 @@ class StreakOnScreenTest {
         heading(R.string.screen_title_week).assertExists()
 
         tab(R.string.tab_stats).performClick()
-        currentStreakTile(SEEDED_STREAK).assertExists()
+        awaitCurrentStreakTile(SEEDED_STREAK)
 
         tab(R.string.tab_week).performClick()
-        todaysPill().performClick()
+        awaitTodaysPill().performClick()
 
         tab(R.string.tab_stats).performClick()
-        currentStreakTile(SEEDED_STREAK + 1).assertExists()
+        awaitCurrentStreakTile(SEEDED_STREAK + 1)
     }
 
     @Test
@@ -126,14 +187,16 @@ class StreakOnScreenTest {
         // current belongs. The seeded history makes the two differ on purpose: a long run a month
         // ago that a check-off today cannot touch, and a short live one that it can.
         tab(R.string.tab_stats).performClick()
-        currentStreakTile(SEEDED_STREAK).assertExists()
+        awaitCurrentStreakTile(SEEDED_STREAK)
+        // No wait: the two tiles are one composition, so once current is on screen best is too, and
+        // waiting for it separately would let a missing tile pass as a slow one.
         bestStreakTile(SEEDED_BEST).assertExists()
 
         tab(R.string.tab_week).performClick()
-        todaysPill().performClick()
+        awaitTodaysPill().performClick()
         tab(R.string.tab_stats).performClick()
 
-        currentStreakTile(SEEDED_STREAK + 1).assertExists()
+        awaitCurrentStreakTile(SEEDED_STREAK + 1)
         bestStreakTile(SEEDED_BEST).assertExists()
     }
 
@@ -166,6 +229,9 @@ class StreakOnScreenTest {
         const val SEEDED_BEST = 12
 
         const val BEST_RUN_ENDS_DAYS_AGO = 40L
+
+        /** The suite's convention — `WeekCheckOffPersistenceTest`, `WeekUndoSnackbarTest`. */
+        const val TIMEOUT_MILLIS = 5_000L
     }
 
     /**
