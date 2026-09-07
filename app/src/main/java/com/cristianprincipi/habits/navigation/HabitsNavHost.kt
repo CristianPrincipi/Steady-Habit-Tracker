@@ -3,6 +3,9 @@ package com.cristianprincipi.habits.navigation
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -17,6 +20,7 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -117,28 +121,28 @@ fun HabitsShell(
             // milestone replaced its own in place; Stats was the last, in M9.1. `StubScreen` itself
             // stays — it is where the "the shell owns insets, a screen takes the padding it is
             // handed" rule is written down, and three files cite it by name.
-            composable<Month> {
+            screen<Month> {
                 MonthScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
             // Week reaches sync status for one reason: a first import that failed leaves the
             // landing tab empty and the wizard that would have said so already gone (ADR-072).
-            composable<Week> {
+            screen<Week> {
                 WeekScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
-            composable<Year> {
+            screen<Year> {
                 YearScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
-            composable<Stats> {
+            screen<Stats> {
                 StatsScreen(onOpenSyncStatus = { navController.navigate(SyncStatus) })
             }
-            composable<Settings> {
+            screen<Settings> {
                 SettingsScreen(
                     onOpenSyncStatus = { navController.navigate(SyncStatus) },
                     onOpenHabits = { navController.navigate(ManageHabits) },
                     onOpenAbout = { navController.navigate(About) },
                 )
             }
-            composable<SyncStatus> {
+            screen<SyncStatus> {
                 SyncStatusScreen(
                     onEditMapping = { navController.navigate(EditMapping) },
                     onReplaceToken = { navController.navigate(ReplaceToken) },
@@ -147,19 +151,19 @@ fun HabitsShell(
             // ⭐ M12.7. `popBackStack` rather than a navigate: the user came here from the sync
             // screen to fix one thing, and when it is fixed the screen behind them is the one that
             // told them it was broken - now showing that it is not.
-            composable<ReplaceToken> {
+            screen<ReplaceToken> {
                 ReplaceTokenScreen(onSaved = { navController.popBackStack() })
             }
             // ⭐ M11.8, and the last live step in M11. A destination rather than a tab, reached
             // from the Settings hub like the sync screen above it, and it takes nothing: everything
             // on it is fixed at build time.
-            composable<About> {
+            screen<About> {
                 AboutScreen()
             }
             // ⭐ Reachable since M7.5, from Settings — the user's choice over a glyph on the Week
             // header. The `+` this once waited on must never exist: ADR-010 makes a habit a column
             // in the user's Notion database, so a create button would be a control that cannot work.
-            composable<ManageHabits> {
+            screen<ManageHabits> {
                 ManageHabitsScreen(onEditMapping = { navController.navigate(EditMapping) })
             }
             // ⭐ M7.8, and the last step in M7. Reached from the habit list (adopt a column you just
@@ -167,12 +171,52 @@ fun HabitsShell(
             // is the only thing that restarts it). Saving pops straight back to whichever it was —
             // the list behind is already showing the new set, which the user chose over a
             // confirmation screen.
-            composable<EditMapping> {
+            screen<EditMapping> {
                 EditMappingScreen(onSaved = { navController.popBackStack() })
             }
         }
     }
 }
+
+/**
+ * Registers one destination, on its own opaque background.
+ *
+ * ### ⚠⚠ Every screen used to be transparent, and a back gesture showed two of them at once
+ *
+ * M15.1, and the user's report was exact: *"when I swipe back to return to Week, there is a delay
+ * that causes ghosting — I can see the previous page for a second."* Reproduced on the emulator at
+ * two points of a slow drag: **Week's title, its "Sep 7 – Sep 13" header, its day-name row and its
+ * pills were all legible through Statistics' chips, tiles and chart**, with both bottom-bar items
+ * lit at once — Week green and Stats purple, each with its own dot.
+ *
+ * The cause is not a transition. [HabitsShell]'s `Scaffold` paints `colorScheme.background` **once,
+ * behind the whole `NavHost`**, and no screen paints anything behind itself — so the two entries
+ * that a transition necessarily composes at the same time composite onto that one fill, and onto
+ * each other. Nothing was ghosting; both pages were simply being drawn.
+ *
+ * ### ⚠ Which is why this is not a fix to [isLateral]'s transitions, and must not become one
+ *
+ * The same double exposure was measured on the **push** path — About over Settings, where
+ * `popExitTransition` is a real `slideOutOfContainer` — as on the lateral path, where both
+ * transitions are `None`. A defect that survives both settings of the thing you suspect is not
+ * caused by it. `EnterTransition.None` on a tab switch stays exactly as M12.5 left it (ADR-105).
+ *
+ * ⭐ **It is a `screen<T>` rather than a `Box` inside each of the ten bodies** for the reason M15.4
+ * gives for keeping measures out of `habitPropertyIds`: an eleventh destination added through the
+ * only registration function there is cannot forget to be opaque, and a rule that cannot be
+ * forgotten is worth more than one that is merely written down.
+ */
+private inline fun <reified T : Any> NavGraphBuilder.screen(crossinline content: @Composable () -> Unit) =
+    composable<T> {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+        ) {
+            content()
+        }
+    }
 
 /**
  * Which tab this destination is, or `null` for one of the destinations that has no tab.
