@@ -112,10 +112,20 @@ fun HabitsShell(
             modifier = Modifier.padding(contentPadding),
             // ⭐ M12.5. All four are given, because leaving any one out restores the 700ms default
             // for that direction alone — a back gesture that dissolves where the forward one slid.
+            //
+            // ⚠⚠ M15.1: the two `predictive*` ones are NOT decoration, and they are why the user
+            // saw the outgoing page "in small" for half a second. navigation-compose 2.10.0 added
+            // them (2.9.8 has no such parameter — read from both artifacts, not remembered) and
+            // **they, not `popEnter`/`popExit`, are what runs while a finger is on the screen**.
+            // Left unset they take the library's own preview: the outgoing screen shrinks to a
+            // card and sits there until the gesture commits. Setting them is what makes a
+            // gesture-driven back match the back it is a gesture for.
             enterTransition = { if (isLateral()) EnterTransition.None else slideIntoContainer(Forward) },
             exitTransition = { if (isLateral()) ExitTransition.None else slideOutOfContainer(Forward) },
             popEnterTransition = { if (isLateral()) EnterTransition.None else slideIntoContainer(Back) },
             popExitTransition = { if (isLateral()) ExitTransition.None else slideOutOfContainer(Back) },
+            predictivePopEnterTransition = { if (isLateral()) EnterTransition.None else slideIntoContainer(Back) },
+            predictivePopExitTransition = { if (isLateral()) ExitTransition.None else slideOutOfContainer(Back) },
         ) {
             // ⭐ Every screen below is now real. M5.3 put a `StubScreen` on all five tabs and each
             // milestone replaced its own in place; Stats was the last, in M9.1. `StubScreen` itself
