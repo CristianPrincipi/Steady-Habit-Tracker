@@ -102,7 +102,10 @@ internal fun WeekWithUndo(
 }
 
 /**
- * Turns each [WeekMessage] into one snackbar, and its Undo into one event.
+ * Turns each [WeekMessage] into one snackbar, and its action into one event.
+ *
+ * **Two shapes since M13.12**: a write that landed offers **Undo**, a write that did not offers
+ * **Retry**. They differ in more than copy — see the `duration` on each.
  *
  * ### ⚠ `collectLatest`, so the newest tap wins immediately
  *
@@ -130,23 +133,56 @@ private fun UndoSnackbars(
     val checked = stringResource(R.string.week_undo_checked)
     val cleared = stringResource(R.string.week_undo_cleared)
     val undo = stringResource(R.string.week_undo_action)
+    val failedChecked = stringResource(R.string.week_save_failed_checked)
+    val failedCleared = stringResource(R.string.week_save_failed_cleared)
+    val failedUnnamed = stringResource(R.string.week_save_failed_unnamed)
+    val retry = stringResource(R.string.week_save_failed_action)
 
     LaunchedEffect(messages, hostState, locale) {
         messages.collectLatest { message ->
-            // Always a date, never "today": M6.11 made a tap on today silent, so no message that
-            // reaches here describes it. `WeekMessage` carries the reasoning.
             val day = shortDateLabel(message.date, locale)
             val result =
-                hostState.showSnackbar(
-                    message = (if (message.completed) checked else cleared).format(message.habitName, day),
-                    actionLabel = undo,
-                    // Short, because the pill has already shown the change and this is a second
-                    // chance rather than the news itself. Long would park it over the bottom card
-                    // for most of the time the user spends checking the rest of the week off.
-                    duration = SnackbarDuration.Short,
-                )
+                when (message) {
+                    is WeekMessage.Toggled -> {
+                        hostState.showSnackbar(
+                            // Always a date, never "today": M6.11 made a *successful* tap on today
+                            // silent, so no `Toggled` that reaches here describes it.
+                            message = (if (message.completed) checked else cleared).format(message.habitName, day),
+                            actionLabel = undo,
+                            // Short, because the pill has already shown the change and this is a
+                            // second chance rather than the news itself. Long would park it over the
+                            // bottom card for most of the time the user spends checking the rest of
+                            // the week off.
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+
+                    is WeekMessage.SaveFailed -> {
+                        hostState.showSnackbar(
+                            // ⚠ The unnamed sentence names no day either — a message that cannot say
+                            // *which* habit has nothing useful to add by saying which day, and the
+                            // one thing this case may never do is say nothing at all.
+                            message =
+                                message.habitName?.let { name ->
+                                    (if (message.completed) failedChecked else failedCleared).format(name, day)
+                                } ?: failedUnnamed,
+                            actionLabel = retry,
+                            // ⚠⚠ **Long, unlike the success case, and not for symmetry's sake.** The
+                            // pill did not move, so this snackbar is the *only* thing on screen
+                            // saying anything happened at all — and Retry is the fix, so it has to
+                            // outlast a glance. `Short` would let the app's core promise fail
+                            // quietly in four seconds.
+                            duration = SnackbarDuration.Long,
+                        )
+                    }
+                }
             if (result == SnackbarResult.ActionPerformed) {
-                onEvent(message.undo)
+                onEvent(
+                    when (message) {
+                        is WeekMessage.Toggled -> message.undo
+                        is WeekMessage.SaveFailed -> message.retry
+                    },
+                )
             }
         }
     }

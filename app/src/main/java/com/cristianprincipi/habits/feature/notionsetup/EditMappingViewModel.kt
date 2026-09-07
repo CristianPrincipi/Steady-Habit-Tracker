@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.notionsetup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
@@ -170,7 +171,9 @@ class EditMappingViewModel
         /** [NotionSetupViewModel.busy]'s twin, and for its reason: the banner means "the last thing you tried". */
         private fun busy(block: suspend () -> Unit) {
             _uiState.update { it.copy(isBusy = true, failure = null) }
-            viewModelScope.launch {
+            // Cleared on both paths — see `NotionSetupViewModel.busy`, which explains why a caught
+            // failure that left the flag set would be worse than the crash it replaced (M13.12).
+            launchWrite(onFailure = { _uiState.update { it.copy(isBusy = false) } }) {
                 block()
                 _uiState.update { it.copy(isBusy = false) }
             }

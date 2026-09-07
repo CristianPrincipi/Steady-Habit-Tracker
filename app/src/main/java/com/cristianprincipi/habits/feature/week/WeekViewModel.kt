@@ -6,6 +6,7 @@ import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.core.ui.observeEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
@@ -67,7 +68,7 @@ import javax.inject.Inject
  * a tap the user made a minute ago.
  *
  * ⚠ **A tap on today says nothing at all** — the user's M6.11 call, replacing M6.6's "every write".
- * See [habitToAnnounce] for why the split falls there and not somewhere else.
+ * See [write] for why the split falls there and not somewhere else.
  *
  * ### ⚠ A refused write still says nothing
  *
@@ -205,44 +206,14 @@ class WeekViewModel
         fun onEvent(event: WeekEvent) {
             when (event) {
                 is WeekEvent.DayToggled -> {
-                    // Both resolved here, synchronously, rather than inside the coroutine: this is
-                    // the habit as it was named and the day as it stood when the finger landed. By
-                    // the time the write returns, the state has already re-emitted — and a clock
-                    // read after a suspend point could answer a different day than the tap did.
-                    val announce = habitToAnnounce(event.habitId, event.date)
-                    viewModelScope.launch {
-                        // The write lands in Room and returns; Notion finds out when the sync engine
-                        // next runs (`CLAUDE.md` §1). The `false` means "that day has not happened
-                        // yet" — no write, and so nothing to announce or offer back.
-                        val written =
-                            toggleCompletion(
-                                habitId = event.habitId,
-                                date = event.date,
-                                completed = event.completed,
-                            )
-                        if (written && announce != null) {
-                            _messages.trySend(
-                                WeekMessage(
-                                    habitId = event.habitId,
-                                    habitName = announce,
-                                    date = event.date,
-                                    completed = event.completed,
-                                ),
-                            )
-                        }
-                    }
+                    write(event, announce = true)
                 }
 
+                // ⚠ **No message on success.** Sending one would offer to undo the undo, and the
+                // next press would offer to undo that — see `WeekEvent.UndoPressed`. A *failure*
+                // still speaks: see `write`.
                 is WeekEvent.UndoPressed -> {
-                    viewModelScope.launch {
-                        // ⚠ **No message.** Sending one here would offer to undo the undo, and the
-                        // next press would offer to undo that — see `WeekEvent.UndoPressed`.
-                        toggleCompletion(
-                            habitId = event.habitId,
-                            date = event.date,
-                            completed = event.completed,
-                        )
-                    }
+                    write(event, announce = false)
                 }
 
                 WeekEvent.PreviousWeekPressed -> {
@@ -294,9 +265,26 @@ class WeekViewModel
         private fun currentWeek(): LocalDate = startOfWeek(LocalDate.now(clock))
 
         /**
-         * The name to put in a [WeekMessage], or `null` when this tap should say nothing.
+         * Performs one [WeekEvent.Write], and says something if it does not land.
          *
-         * ### ⚠ Today is silent — the user's call at M6.11
+         * ### Everything the message needs is resolved **before** the coroutine starts
+         *
+         * The habit as it was named and the day as it stood when the finger landed. By the time the
+         * write returns the state has already re-emitted, and a clock read after a suspend point
+         * could answer a different day than the tap did — which is the bug M6.9 removed and this
+         * would quietly reintroduce.
+         *
+         * ### ⚠⚠ The failure branch is not the success branch with a different sentence
+         *
+         * Two rules are deliberately inverted for it, and both inversions are in
+         * [WeekMessage.SaveFailed]:
+         *
+         * - **A failed write speaks even on today**, where a successful one is silent (M6.11).
+         * - **A failed undo speaks**, where a successful one is silent. Its retry is the
+         *   [WeekEvent.UndoPressed] it came from, so pressing Retry cannot start the announcement
+         *   loop `WeekEvent.UndoPressed` exists to prevent.
+         *
+         * ### ⚠ Why success is silent on today — the user's call at M6.11
          *
          * A sentence on **every** check-off is a sentence on the commonest action in the app, and
          * `MEMORY`/ADR-070 §2 had it against the user's stated taste for persistent state over
@@ -304,31 +292,69 @@ class WeekViewModel
          * exactly where a mis-aim is plausible: today's column is the one the ring points at and the
          * one the landing tab exists to make trivial, while a tap on any other column is deliberate
          * back-fill onto an unmarked pill, where the neighbouring **column** and the neighbouring
-         * **row** are the two mistakes this screen invites (`WeekMessage`).
+         * **row** are the two mistakes this screen invites ([WeekMessage]).
          *
          * So the rule is a date comparison, not a new concept: **the day the user is obviously
-         * aiming at gets no sentence; any other day gets named.**
+         * aiming at gets no sentence; any other day gets named.** It applies to success only — a
+         * write that never happened is invisible on every column alike.
          *
-         * ⚠ **Read at tap time, before the write suspends.** A clock read after `toggleCompletion`
-         * returns could answer a different day than the tap did, which would make the app go quiet
-         * on a back-fill or start talking about today — rare, and impossible to reproduce.
-         *
-         * ⚠ **`null` also means the tap came from a card that is not on screen**, which no gesture
-         * can produce: the pill lives inside the very row this reads back. Returning null rather
-         * than inventing a placeholder keeps the impossible case honest — the write still happens,
-         * and what is skipped is only the sentence about it. Naming a habit "Habit" would be worse
-         * than saying nothing, because the whole value of the message is the name.
+         * @param announce whether *success* is worth a sentence. Failure is always worth one.
          */
-        private fun habitToAnnounce(
-            id: HabitId,
-            date: LocalDate,
-        ): String? =
+        private fun write(
+            event: WeekEvent.Write,
+            announce: Boolean,
+        ) {
+            val name = habitName(event.habitId)
+            val toAnnounce = name?.takeIf { announce && event.date != LocalDate.now(clock) }
+            launchWrite(
+                onFailure = {
+                    _messages.trySend(
+                        WeekMessage.SaveFailed(
+                            habitName = name,
+                            date = event.date,
+                            completed = event.completed,
+                            retry = event,
+                        ),
+                    )
+                },
+            ) {
+                // The write lands in Room and returns; Notion finds out when the sync engine next
+                // runs (`CLAUDE.md` §1). The `false` means "that day has not happened yet" — no
+                // write, and so nothing to announce or offer back.
+                val written =
+                    toggleCompletion(
+                        habitId = event.habitId,
+                        date = event.date,
+                        completed = event.completed,
+                    )
+                if (written && toAnnounce != null) {
+                    _messages.trySend(
+                        WeekMessage.Toggled(
+                            habitId = event.habitId,
+                            habitName = toAnnounce,
+                            date = event.date,
+                            completed = event.completed,
+                        ),
+                    )
+                }
+            }
+        }
+
+        /**
+         * The habit's name as this screen currently draws it, or `null` if it is not on screen.
+         *
+         * ⚠ **`null` means the tap came from a card that is not on screen**, which no gesture can
+         * produce: the pill lives inside the very row this reads back. Returning null rather than
+         * inventing a placeholder keeps the impossible case honest. Naming a habit "Habit" would be
+         * worse than saying nothing, because the whole value of a [WeekMessage.Toggled] is the name
+         * — and [WeekMessage.SaveFailed] has a sentence of its own for when there is none.
+         */
+        private fun habitName(id: HabitId): String? =
             (uiState.value as? WeekUiState.Content)
                 ?.habits
                 ?.firstOrNull { period -> period.habit.id == id }
                 ?.habit
                 ?.name
-                ?.takeIf { date != LocalDate.now(clock) }
 
         private fun stateFor(
             visible: Snapshot,

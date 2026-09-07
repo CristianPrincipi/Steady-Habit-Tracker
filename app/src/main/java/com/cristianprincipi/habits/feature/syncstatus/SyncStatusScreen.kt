@@ -30,6 +30,7 @@ import com.cristianprincipi.habits.core.designsystem.component.ConnectionStatusC
 import com.cristianprincipi.habits.core.designsystem.component.DestructiveButton
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.NotionFailureBanner
+import com.cristianprincipi.habits.core.designsystem.component.NotionFailureNote
 import com.cristianprincipi.habits.core.designsystem.component.PrimaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
 import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
@@ -148,6 +149,11 @@ fun SyncStatusContent(
         }
 
         if (state.isConnected) {
+            // ⚠ Above the button, not below it: the sentence is about the button the user just
+            // pressed, and it has to be read before they press it again (M13.12).
+            if (state.didDisconnectFail) {
+                NotionFailureNote(text = stringResource(R.string.sync_disconnect_failed))
+            }
             DestructiveButton(
                 text = stringResource(R.string.sync_disconnect),
                 onClick = { onEvent(SyncStatusEvent.DisconnectPressed) },

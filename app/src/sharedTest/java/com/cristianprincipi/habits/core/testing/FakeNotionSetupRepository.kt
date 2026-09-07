@@ -89,8 +89,18 @@ class FakeNotionSetupRepository : NotionSetupRepository {
     /** What each disconnect asked for: `true` when the local data was to go too. */
     val disconnects = mutableListOf<Boolean>()
 
+    /**
+     * ⭐ **A device that will not let the token be removed — M13.12.**
+     *
+     * `CLAUDE.md` §3.6 requires disconnect to wipe the stored token, and before M13.12 a failure
+     * here crashed the app. The attempt is still recorded, because a test about a **failed**
+     * disconnect needs to prove one was tried.
+     */
+    var failDisconnectWith: Exception? = null
+
     override suspend fun disconnect(alsoDeleteLocalData: Boolean) {
         disconnects += alsoDeleteLocalData
+        failDisconnectWith?.let { throw it }
         connected.value = false
         configured.value = false
     }

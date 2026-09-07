@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.syncstatus
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.core.datetime.elapsedBetween
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
@@ -76,6 +77,7 @@ class SyncStatusViewModel
                     discardedEdits = notices,
                     isConfirmingDisconnect = prompt.isOpen,
                     willDeleteLocalData = prompt.deleteLocalData,
+                    didDisconnectFail = prompt.failed,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -90,12 +92,17 @@ class SyncStatusViewModel
                 }
 
                 SyncStatusEvent.NoticesDismissed -> {
-                    viewModelScope.launch { syncStatus.dismissDiscardedEdits() }
+                    // ⚠ Quiet on failure, and it is the one dismissal where that is honest: the
+                    // notices are still on screen, unchanged, so the screen has already said the
+                    // dismissal did not take. See M13.12's ruling in `launchWrite`'s callers.
+                    launchWrite { syncStatus.dismissDiscardedEdits() }
                 }
 
                 SyncStatusEvent.DisconnectPressed -> {
                     // Reopened unticked every time. CLAUDE.md §3.6 makes deleting the data a
                     // separate choice from disconnecting, and a remembered tick makes it a default.
+                    // `failed` resets with it, so the warning describes this attempt and not an
+                    // older one still on screen.
                     disconnectPrompt.value = DisconnectPrompt(isOpen = true, deleteLocalData = false)
                 }
 
@@ -113,16 +120,27 @@ class SyncStatusViewModel
             }
         }
 
+        /**
+         * Wipes the token, and **says so if it did not** — `CLAUDE.md` §3.6, M13.12.
+         *
+         * ⚠⚠ The dialog is closed *before* the write, so the screen after a failure is
+         * indistinguishable from the screen after a success until something re-reads the state.
+         * That is why this one cannot be quiet: a user who asked for their credential to be removed
+         * would otherwise be shown every sign that it had been.
+         */
         private fun disconnect() {
             val deleteLocalData = disconnectPrompt.value.deleteLocalData
             // Closed first, so the dialog cannot be confirmed twice while the wipe is in flight.
             disconnectPrompt.value = DisconnectPrompt()
-            viewModelScope.launch { connection.disconnect(alsoDeleteLocalData = deleteLocalData) }
+            launchWrite(
+                onFailure = { disconnectPrompt.value = DisconnectPrompt(failed = true) },
+            ) { connection.disconnect(alsoDeleteLocalData = deleteLocalData) }
         }
 
         private data class DisconnectPrompt(
             val isOpen: Boolean = false,
             val deleteLocalData: Boolean = false,
+            val failed: Boolean = false,
         )
 
         private companion object {

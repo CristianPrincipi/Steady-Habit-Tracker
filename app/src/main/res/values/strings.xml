@@ -166,6 +166,12 @@
     <string name="sync_disconnect_delete_local_warning">This cannot be undone. If a habit\'s column was deleted in Notion, this phone may hold the only copy of its history.</string>
     <string name="sync_disconnect_confirm">Disconnect</string>
     <string name="sync_disconnect_cancel">Cancel</string>
+    <!--
+      M13.12. CLAUDE.md §3.6 requires a disconnect that wipes the token; this is what the screen says
+      when the device would not let it. It leads with the fact that matters - the token is still here
+      - because the dialog has already closed and everything else on screen looks like it worked.
+    -->
+    <string name="sync_disconnect_failed">Couldn\'t remove your token - this phone wouldn\'t save the change, so you are still connected. Try again.</string>
 
     <!--
       Failure sentences — one per SyncFailure case, rendered by NotionFailureBanner.
@@ -484,6 +490,19 @@
     <string name="week_undo_checked">%1$s checked off for %2$s</string>
     <string name="week_undo_cleared">%1$s cleared for %2$s</string>
     <string name="week_undo_action">Undo</string>
+
+    <!--
+      M13.12. The pill does not move when a write fails - the Week screen draws from Room with no
+      optimistic overlay - so this snackbar is the only thing that says anything happened. It leads
+      with what did not happen and offers the fix, and unlike the undo copy it is shown for today's
+      column too: M6.11's silence is about a tap the ring makes obvious, not about a write that
+      never landed.
+    -->
+    <string name="week_save_failed_checked">Couldn\'t check off %1$s for %2$s</string>
+    <string name="week_save_failed_cleared">Couldn\'t clear %1$s for %2$s</string>
+    <!-- No habit on screen to name - impossible from a gesture, and never silent regardless. -->
+    <string name="week_save_failed_unnamed">Couldn\'t save that change</string>
+    <string name="week_save_failed_action">Retry</string>
 
     <!--
       The About screen (M11.8) — UNDESIGNED. The prototype has no such view at all

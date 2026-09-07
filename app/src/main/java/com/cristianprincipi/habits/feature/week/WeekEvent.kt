@@ -8,7 +8,9 @@ import java.time.LocalDate
  *
  * One sealed interface and one `onEvent`, per `CLAUDE.md` §6 — rather than a lambda per control
  * piled onto the ViewModel. Five cases, because five things happen here: you check a day off, you
- * take that back from the snackbar, and you move between weeks three ways.
+ * take that back from the snackbar, and you move between weeks three ways. The first two share the
+ * [Write] supertype, because they are the two that touch storage and therefore the two that can
+ * fail (M13.12).
  *
  * ### What is deliberately not here yet
  *
@@ -18,6 +20,25 @@ import java.time.LocalDate
  * through a `Channel` — the one [WeekMessage] already travels on — not through this interface.
  */
 sealed interface WeekEvent {
+    /**
+     * The two events that **write**, and the only two that can fail.
+     *
+     * Added in M13.12 so [WeekMessage.SaveFailed] can carry the thing to try again without widening
+     * to a bare [WeekEvent] — paging is not retryable and must not be offered as though it were.
+     *
+     * The two stay distinct below rather than collapsing into one case with a flag: what separates
+     * them is whether success *announces*, and [UndoPressed] explains why that difference is a loop
+     * rather than a preference. Retrying a failed undo must stay silent for the same reason the
+     * undo itself does.
+     */
+    sealed interface Write : WeekEvent {
+        val habitId: HabitId
+        val date: LocalDate
+
+        /** The value to write — see [DayToggled], which explains why it is a value and not a flip. */
+        val completed: Boolean
+    }
+
     /**
      * A pill was tapped: set [habitId] on [date] to [completed].
      *
@@ -30,10 +51,10 @@ sealed interface WeekEvent {
      * in-flight state to model and no spinner to show. That is the architecture, not an omission.
      */
     data class DayToggled(
-        val habitId: HabitId,
-        val date: LocalDate,
-        val completed: Boolean,
-    ) : WeekEvent
+        override val habitId: HabitId,
+        override val date: LocalDate,
+        override val completed: Boolean,
+    ) : Write
 
     /**
      * The snackbar's **Undo** was pressed: restore [habitId] on [date] to [completed].
@@ -51,10 +72,10 @@ sealed interface WeekEvent {
      * message cannot be replayed into a flip of whatever the pill happens to hold now.
      */
     data class UndoPressed(
-        val habitId: HabitId,
-        val date: LocalDate,
-        val completed: Boolean,
-    ) : WeekEvent
+        override val habitId: HabitId,
+        override val date: LocalDate,
+        override val completed: Boolean,
+    ) : Write
 
     /** `‹` — step back seven days. */
     data object PreviousWeekPressed : WeekEvent

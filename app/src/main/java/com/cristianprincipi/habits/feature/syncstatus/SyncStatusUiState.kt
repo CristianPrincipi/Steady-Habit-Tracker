@@ -43,6 +43,18 @@ data class SyncStatusUiState(
      * be the only one left (`docs/notion-schema.md` §4.1).
      */
     val willDeleteLocalData: Boolean = false,
+    /**
+     * ⚠⚠ **The last disconnect did not go through — M13.12, and it is a security statement.**
+     *
+     * `CLAUDE.md` §3.6 requires an explicit disconnect that wipes the stored token. Before this,
+     * a `disconnect()` that threw took the app down; catching it quietly would have been worse,
+     * because the dialog closes *first* (so it cannot be confirmed twice) and the screen would then
+     * look exactly as it does after a **successful** disconnect until something re-read the state.
+     * A user who wanted their token gone would have been shown nothing to the contrary.
+     *
+     * Cleared when the dialog is reopened, so it describes the last attempt and never an old one.
+     */
+    val didDisconnectFail: Boolean = false,
 ) {
     /**
      * Nothing to retry while a run is already in flight — **or already owed**.

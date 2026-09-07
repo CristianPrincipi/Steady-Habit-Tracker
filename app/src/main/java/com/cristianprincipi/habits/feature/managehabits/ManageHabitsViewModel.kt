@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.managehabits
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.usecase.GetHabits
@@ -64,7 +65,12 @@ class ManageHabitsViewModel
                     // Fire and forget, like every other write in this app: the local store is the
                     // source of truth, so the row it changes is already on its way back through the
                     // flow above. Nothing waits, and nothing needs to be told it worked.
-                    viewModelScope.launch { setHabitColor(habitId = event.habitId, color = event.color) }
+                    // ⚠ Quiet on failure — M13.12's ruling, and the screen is what makes it honest.
+                    // The swatch is drawn from Room with no optimistic overlay, so a write that does
+                    // not land leaves the old colour selected in front of the user. That is
+                    // immediate, unambiguous feedback for a change that is decoration: the habit,
+                    // its history and its sync are all untouched by it.
+                    launchWrite { setHabitColor(habitId = event.habitId, color = event.color) }
                 }
             }
         }

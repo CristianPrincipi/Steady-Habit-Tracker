@@ -88,7 +88,7 @@ class WeekUndoSnackbarTest {
         completed: Boolean = true,
         habit: Habit = subject,
     ) = messages.tryEmit(
-        WeekMessage(
+        WeekMessage.Toggled(
             habitId = habit.id,
             habitName = habit.name,
             date = date,

@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.notionsetup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
@@ -96,7 +97,11 @@ class ReplaceTokenViewModel
             val token = _uiState.value.token
             if (token.isBlank()) return
 
-            viewModelScope.launch {
+            // ⚠ Quiet on failure, and the busy flag is cleared with it — a caught throw that left
+            // the spinner up would strand this screen for good (M13.12; see `NotionSetupViewModel
+            // .busy`). The banner stays for what Notion said; a token the device would not store is
+            // the device refusing, and the field is still filled in for another go.
+            launchWrite(onFailure = { _uiState.update { it.copy(isBusy = false) } }) {
                 _uiState.update { it.copy(isBusy = true, failure = null) }
 
                 repository.saveToken(token)
@@ -110,7 +115,7 @@ class ReplaceTokenViewModel
                     // configured app — but a disconnect racing this screen would land here, and a
                     // blank screen is worse than the sentence already written for this state.
                     _uiState.update { it.copy(isBusy = false, failure = SyncFailure.NotConnected) }
-                    return@launch
+                    return@launchWrite
                 }
 
                 when (val result = repository.loadProperties(mapping.sourceId)) {

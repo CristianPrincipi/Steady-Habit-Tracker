@@ -593,7 +593,7 @@ class WeekViewModelTest {
                 )
 
                 assertEquals(
-                    WeekMessage(
+                    WeekMessage.Toggled(
                         habitId = HabitId("read"),
                         habitName = "Read",
                         date = thisMonday,
@@ -674,7 +674,7 @@ class WeekViewModelTest {
                 )
 
                 // `completed` is what the tap DID, so the screen picks the "cleared" sentence.
-                assertFalse(awaitItem().completed)
+                assertFalse((awaitItem() as WeekMessage.Toggled).completed)
             }
         }
 
@@ -692,7 +692,7 @@ class WeekViewModelTest {
                 // Derived from the message rather than stored beside it, so the two cannot disagree.
                 assertEquals(
                     WeekEvent.UndoPressed(habitId = HabitId("read"), date = thisMonday, completed = false),
-                    awaitItem().undo,
+                    (awaitItem() as WeekMessage.Toggled).undo,
                 )
             }
         }
@@ -731,7 +731,7 @@ class WeekViewModelTest {
             )
 
             viewModel.messages.test {
-                assertEquals("Run", awaitItem().habitName)
+                assertEquals("Run", (awaitItem() as WeekMessage.Toggled).habitName)
                 expectNoEvents()
             }
         }
@@ -753,7 +753,7 @@ class WeekViewModelTest {
 
             viewModel.onEvent(WeekEvent.DayToggled(habitId = read.id, date = thisMonday, completed = true))
 
-            viewModel.messages.test { assertEquals(read.name, awaitItem().habitName) }
+            viewModel.messages.test { assertEquals(read.name, (awaitItem() as WeekMessage.Toggled).habitName) }
 
             // The screen is rebuilt. "Read checked off for Mon, Aug 24" must not be announced twice
             // for one tap the user made before the rotation.
@@ -776,7 +776,7 @@ class WeekViewModelTest {
             )
 
             viewModel.messages.test {
-                val only = awaitItem()
+                val only = awaitItem() as WeekMessage.Toggled
                 assertEquals(read.name, only.habitName)
                 assertEquals(today.minusDays(1), only.date)
                 expectNoEvents()

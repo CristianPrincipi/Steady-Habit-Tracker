@@ -39,6 +39,39 @@ fun NotionFailureBanner(
     failure: SyncFailure,
     modifier: Modifier = Modifier,
 ) {
+    NotionFailureNote(
+        text = stringResource(failure.messageRes()),
+        modifier = modifier,
+    ) {
+        if (failure is SyncFailure.MappingBroken) {
+            failure.issues.forEach { issue ->
+                Text(
+                    text = issue.describe(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HabitsTheme.colors.text.secondary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The same banner, said in words that are not a [SyncFailure].
+ *
+ * ⭐ **Added in M13.12 for the one failure that is not about Notion**: a disconnect that could not
+ * write. That is a **local storage** failure, and giving it a `SyncFailure` case would have put it
+ * into two exhaustive `when`s and a persisted store that are all about what the *API* said — so the
+ * shell is shared and the taxonomy is not.
+ *
+ * Extracted rather than copied, so the two can never drift into calling the same trouble different
+ * colours, which is the reason [NotionFailureBanner] lives in `core/designsystem` at all.
+ */
+@Composable
+fun NotionFailureNote(
+    text: String,
+    modifier: Modifier = Modifier,
+    details: @Composable () -> Unit = {},
+) {
     Column(
         modifier =
             modifier
@@ -54,19 +87,11 @@ fun NotionFailureBanner(
         verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
     ) {
         Text(
-            text = stringResource(failure.messageRes()),
+            text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = HabitsTheme.colors.warning,
         )
-        if (failure is SyncFailure.MappingBroken) {
-            failure.issues.forEach { issue ->
-                Text(
-                    text = issue.describe(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HabitsTheme.colors.text.secondary,
-                )
-            }
-        }
+        details()
     }
 }
 

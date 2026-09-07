@@ -139,11 +139,15 @@ private fun SampleWeek(empty: HabitsEmptyReason?) {
                     val row = Completion(event.habitId, event.date)
                     completed = if (event.completed) completed + row else completed - row
                     val habit = content.habits.first { period -> period.habit.id == event.habitId }.habit
-                    // ⚠ Silent for today, exactly as `WeekViewModel.habitToAnnounce` is (M6.11).
-                    // This activity is only worth looking at while it behaves like the real thing.
+                    // ⚠ Silent for today, exactly as `WeekViewModel.write` is (M6.11). This
+                    // activity is only worth looking at while it behaves like the real thing.
+                    //
+                    // ⚠ It never sends `WeekMessage.SaveFailed`: this gallery writes to a local
+                    // `Set`, which cannot fail, and faking a failure here would be a button that
+                    // lies rather than a screen worth looking at.
                     if (event.date != reference) {
                         messages.trySend(
-                            WeekMessage(
+                            WeekMessage.Toggled(
                                 habitId = event.habitId,
                                 habitName = habit.name,
                                 date = event.date,

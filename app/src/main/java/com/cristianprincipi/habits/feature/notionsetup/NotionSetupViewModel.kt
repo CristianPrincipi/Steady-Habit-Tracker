@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.notionsetup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
@@ -88,8 +89,12 @@ class NotionSetupViewModel
          * skipping the field because one is stored would skip the screen's only reason to exist.
          */
         private fun resumeWhereAStoredTokenLeftOff() {
-            viewModelScope.launch {
-                if (!repository.isConnected.first()) return@launch
+            // ⚠ Quiet on failure (M13.12). If the stored token cannot be read the wizard simply
+            // opens at step one, which is the same screen a genuinely fresh install gets — and is
+            // what the user needs to do anyway. `busy` below owns the failures that happen after
+            // this point, and it has a banner for them.
+            launchWrite {
+                if (!repository.isConnected.first()) return@launchWrite
 
                 busy { repository.findSources().thenShowDatabases() }
             }
@@ -114,7 +119,11 @@ class NotionSetupViewModel
          * the app no longer has is wrong wherever the screen is hosted from.
          */
         private fun resetWhenDisconnected() {
-            viewModelScope.launch {
+            // ⚠ The one collector here rather than a write, and quiet on failure for that reason:
+            // there is nothing to say and nobody to say it to. If the flow fails, this watcher stops
+            // and a later disconnect leaves the wizard showing a stale `Done` — the M4.18 bug above,
+            // which was survivable. Crashing the app on the same fault is not (M13.12).
+            launchWrite {
                 var wasConfigured = false
                 repository.isConfigured.distinctUntilChanged().collect { configured ->
                     if (wasConfigured && !configured) {
@@ -344,7 +353,12 @@ class NotionSetupViewModel
          */
         private fun busy(block: suspend () -> Unit) {
             _uiState.update { it.copy(isBusy = true, failure = null) }
-            viewModelScope.launch {
+            // ⚠⚠ **The busy flag is cleared on BOTH paths, and that is the load-bearing half of
+            // M13.12 here.** A throw used to take the app down; catching it without this would have
+            // left `isBusy` true for ever — a spinner over a screen that has stopped doing anything,
+            // which is a worse dead end than the crash. The banner is deliberately not set: every
+            // failure it names is something Notion said, and this is the device refusing to write.
+            launchWrite(onFailure = { _uiState.update { it.copy(isBusy = false) } }) {
                 block()
                 _uiState.update { it.copy(isBusy = false) }
             }

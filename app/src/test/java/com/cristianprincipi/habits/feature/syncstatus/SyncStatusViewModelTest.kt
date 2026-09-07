@@ -16,6 +16,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -195,6 +196,46 @@ class SyncStatusViewModelTest {
             viewModel.onEvent(SyncStatusEvent.DisconnectConfirmed)
 
             assertEquals(listOf(false), connection.disconnects)
+        }
+
+    @Test
+    fun aDisconnectTheDeviceRefusesSaysSoRatherThanCrashing() =
+        runTest {
+            // ⚠⚠ **M13.12, and this one is a security statement rather than a convenience.**
+            // `CLAUDE.md` §3.6 requires an explicit disconnect that wipes the token. The dialog is
+            // closed *before* the write — so it cannot be confirmed twice — which means a caught
+            // failure that said nothing would leave the screen looking exactly as it does after a
+            // SUCCESSFUL disconnect. A user who asked for their credential to be gone would be shown
+            // every sign that it was.
+            val viewModel = viewModel()
+            connection.failDisconnectWith = IOException("read-only storage")
+            viewModel.onEvent(SyncStatusEvent.DisconnectPressed)
+
+            viewModel.onEvent(SyncStatusEvent.DisconnectConfirmed)
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertTrue("the screen says the token is still here", state.didDisconnectFail)
+                assertFalse("and the dialog is not left open over it", state.isConfirmingDisconnect)
+            }
+            assertEquals("it was attempted", listOf(false), connection.disconnects)
+        }
+
+    @Test
+    fun openingTheDialogAgainClearsTheLastFailure() =
+        runTest {
+            // The warning describes the attempt the user just made, not one from a minute ago —
+            // `NotionSetupViewModel.busy` clears its banner on the way in for the same reason.
+            val viewModel = viewModel()
+            connection.failDisconnectWith = IOException("read-only storage")
+            viewModel.onEvent(SyncStatusEvent.DisconnectPressed)
+            viewModel.onEvent(SyncStatusEvent.DisconnectConfirmed)
+
+            viewModel.onEvent(SyncStatusEvent.DisconnectPressed)
+
+            viewModel.uiState.test {
+                assertFalse(awaitItem().didDisconnectFail)
+            }
         }
 
     @Test

@@ -77,12 +77,26 @@ class FakeHabitRepository(
         }
     }
 
+    /**
+     * ⭐ **A device that will not write — M13.12.**
+     *
+     * `SQLiteFullException` rather than a bare `RuntimeException`, because it is the one this app
+     * will actually meet: a phone with no space left, on the write that `CLAUDE.md` §1 promises is
+     * "never lost". Nothing in the ViewModel inspects the type, so the choice is documentation —
+     * but a fake that threw something impossible would let a test pass for the wrong reason.
+     *
+     * Set on [setCompleted] and [setColor] alike; the writes are still recorded, because a failed
+     * write **was attempted** and a test about retrying needs to count the attempts.
+     */
+    var failWritesWith: Exception? = null
+
     override suspend fun setCompleted(
         habitId: HabitId,
         date: LocalDate,
         completed: Boolean,
     ) {
         writes += Write(habitId, date, completed)
+        failWritesWith?.let { throw it }
         val row = Completion(habitId, date)
         completionRows.value = if (completed) completionRows.value + row else completionRows.value - row
     }
@@ -92,6 +106,7 @@ class FakeHabitRepository(
         color: HabitColor,
     ) {
         colorWrites += habitId to color
+        failWritesWith?.let { throw it }
         habitRows.value = habitRows.value.map { if (it.id == habitId) it.copy(color = color) else it }
     }
 }
