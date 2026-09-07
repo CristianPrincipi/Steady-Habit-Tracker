@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cristianprincipi.habits.core.ui.PullToSync
 
 /**
  * Monthly completion density for every habit at once — `docs/design-spec.md` §2.
@@ -24,10 +25,11 @@ fun MonthScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    MonthContent(
-        state = state,
-        onEvent = viewModel::onEvent,
-        onOpenSyncStatus = onOpenSyncStatus,
-        modifier = modifier,
-    )
+    PullToSync(modifier = modifier) {
+        MonthContent(
+            state = state,
+            onEvent = viewModel::onEvent,
+            onOpenSyncStatus = onOpenSyncStatus,
+        )
+    }
 }

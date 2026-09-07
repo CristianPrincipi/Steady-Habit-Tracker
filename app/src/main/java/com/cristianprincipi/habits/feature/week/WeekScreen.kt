@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.shortDateLabel
+import com.cristianprincipi.habits.core.ui.PullToSync
 import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -57,13 +58,19 @@ fun WeekScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    WeekWithUndo(
-        state = state,
-        messages = viewModel.messages,
-        onEvent = viewModel::onEvent,
-        onOpenSyncStatus = onOpenSyncStatus,
-        modifier = modifier,
-    )
+    // ⭐ M15.3. Wrapped at the screen root rather than inside [WeekWithUndo], so the seam that
+    // `WeekPreviewActivity` plugs into stays free of Hilt — and so all four tabs wrap in the same
+    // place. ⚠ The consequence is that the undo snackbar is inside the pulled area and travels a
+    // few dp with the gesture; that is a cosmetic overlap of two rare moments, and the alternative
+    // costs the preview seam.
+    PullToSync(modifier = modifier) {
+        WeekWithUndo(
+            state = state,
+            messages = viewModel.messages,
+            onEvent = viewModel::onEvent,
+            onOpenSyncStatus = onOpenSyncStatus,
+        )
+    }
 }
 
 /**

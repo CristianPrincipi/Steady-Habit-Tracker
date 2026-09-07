@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.cristianprincipi.habits.core.ui.PullToSync
 
 /**
  * A year of completions as a dot grid — `docs/design-spec.md` §4.
@@ -24,5 +25,7 @@ fun YearScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    YearContent(state = state, onOpenSyncStatus = onOpenSyncStatus, modifier = modifier)
+    PullToSync(modifier = modifier) {
+        YearContent(state = state, onOpenSyncStatus = onOpenSyncStatus)
+    }
 }

@@ -67,6 +67,24 @@ object Spacing {
     /** `space-y-5` — the gap between Settings sections, the loosest spacing in the app. */
     val settingsSectionGap: Dp = 20.dp
 
+    /**
+     * How far the pull-to-refresh indicator sits below the top of the screen — M15.3.
+     *
+     * ⚠⚠ **A tuned constant, and it exists because all four tabs have a PINNED header.**
+     * `PullToSync` wraps a whole screen, so `PullToRefreshBox` places its indicator at the top of
+     * *that* — which is on top of the header, not on top of the scrolling content. Measured on the
+     * emulator: the spinner parked over the middle of Week's `Sep 7 – Sep 13` and over Stats' habit
+     * chips, and since the user's ruling is that it **stays for the whole sync**, that is a steady
+     * state rather than a flicker.
+     *
+     * ⚠ Overlaying the *scrolling* content is conventional and fine; overlaying pinned chrome reads
+     * as a mistake. This clears the taller of the four headers (Week's title plus its week nav) and
+     * leaves the indicator floating over the first card, which is where a refresh spinner belongs.
+     *
+     * ⚠ **It is a number tuned by looking, not derived.** If a header gains a row, look again.
+     */
+    val pullIndicatorInset: Dp = 72.dp
+
     // --- §4.3 Grids ----------------------------------------------------------------------------
 
     /** The gap between days in `YearDotGrid`. */
