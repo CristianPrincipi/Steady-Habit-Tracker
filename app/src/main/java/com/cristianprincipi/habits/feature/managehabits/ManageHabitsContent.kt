@@ -219,6 +219,7 @@ private fun HabitColor.labelRes(): Int =
         HabitColor.GREEN -> R.string.habits_colour_green
         HabitColor.ORANGE -> R.string.habits_colour_orange
         HabitColor.PURPLE -> R.string.habits_colour_purple
+        HabitColor.RED -> R.string.habits_colour_red
     }
 
 @Preview(name = "Habits", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)

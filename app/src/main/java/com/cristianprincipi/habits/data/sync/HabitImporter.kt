@@ -131,9 +131,19 @@ class HabitImporter
         /**
          * The palette, cycled, for a habit seen for the first time.
          *
-         * Four colours and usually five habits, so two will match — which is the design's own
-         * behaviour and is the user's to change (M7.5). The alternative, everything in blue, looks
-         * like a bug.
+         * ⭐ **Five colours since M15.2, and that is exactly the usual five habits** — so the
+         * wrap-around this used to describe no longer happens at that size. It was not theoretical:
+         * the user's own phone showed **Focus and Read both blue**, which is what `% 4` does to a
+         * fifth habit, and adding red is what retired it.
+         *
+         * ⚠ **The fit is exact, not comfortable. A sixth habit wraps again** — onto blue, the same
+         * way. That is still the user's to change (M7.5) and still better than everything in blue,
+         * which looks like a bug; but if a sixth checkbox habit ever appears, this is the line that
+         * decides what it looks like on first import.
+         *
+         * ⚠ **Existing habits are untouched by any of this.** [import] keeps `previous?.color`, so
+         * a palette change never recolours a habit already on the device — deliberately, because
+         * this cannot tell a default apart from a colour the user picked.
          */
         private fun defaultColorAt(index: Int): String = HabitColor.entries[index % HabitColor.entries.size].name
     }

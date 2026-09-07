@@ -57,6 +57,27 @@ private val HabitBlue = Color(0xFF4A9EFF)
 private val HabitGreen = Color(0xFF76C442)
 private val HabitOrange = Color(0xFFFF7A35)
 private val HabitPurple = Color(0xFF8B5CF6)
+
+/**
+ * ⚠ **The one habit colour the prototype does not contain** — M15.2, at the user's request.
+ *
+ * `rose-600`. Chosen by measurement rather than taste, because the constraint is not the 36dp pill
+ * but the **5dp Year dot**, where a whole screen of habits is stacked one grid per card.
+ * Against [HabitOrange] it is dE2000 **26.5** at full opacity and **14.8** at the 28% incomplete
+ * dots use — the widest of seven candidates — and, decisively, **dL\* 17.4**. That last number is
+ * why it beat `#FF3B6B`, which matched it on dE (26.4) with barely half the lightness separation
+ * (8.6): at 5dp the eye keeps lightness discrimination long after chroma has gone, so two colours
+ * that differ mainly in hue converge exactly where this one has to work.
+ *
+ * ⚠ **Not `Destructive` (`#FF4D4D`), though the design ships it and it is tempting.** Two reasons,
+ * both checked: it is `colorScheme.error` and carries the *Disconnect from Notion* button, and it
+ * is the **worst** of the seven against orange (dE 16.6, dL\* 7.0).
+ *
+ * ⚠ It is the darkest assignable colour at **3.62:1** on the card, below purple's 4.01 — above the
+ * 3.0 non-text floor `ContrastTest` enforces, but with the least headroom, so it is the one to
+ * check first if that surface ever darkens.
+ */
+private val HabitRed = Color(0xFFE11D48)
 private val ChartAmber = Color(0xFFF59E0B)
 private val NavGrey = Color(0xFF888888)
 
@@ -157,16 +178,25 @@ data class HabitPalette(
     val green: Color,
     val orange: Color,
     val purple: Color,
+    val red: Color,
     val amber: Color,
     val grey: Color,
 ) {
     /**
-     * The four colours the prototype actually gives to habits, in the order it uses them.
+     * The five colours a habit can be given: the prototype's four, in the order it uses them, then
+     * [red].
+     *
+     * ⚠ **[red] is an addition, not a port** — M15.2. The order matters beyond looking tidy:
+     * `HabitImporter.defaultColorAt` cycles `HabitColor.entries` with `%`, so this list's length is
+     * what decides whether a habit set wraps round onto a colour it has already used. At four it
+     * did, on the user's own phone.
      *
      * [amber] is `--chart-5` and no habit uses it; [grey] tints the Settings tab icon and is not a
-     * habit colour at all. Both are ported because they appear in the design, not to be assigned.
+     * habit colour at all. Both are ported because they appear in the design, not to be assigned —
+     * and `ColorTest` says so, because a session reaching for a fifth colour was expected to be
+     * tempted by them. It was; it took a new token instead.
      */
-    val assignable: List<Color> get() = listOf(blue, green, orange, purple)
+    val assignable: List<Color> get() = listOf(blue, green, orange, purple, red)
 
     /** The fallback when a habit has no colour yet — `--primary` (`docs/tokens.md §1.2`). */
     val default: Color get() = blue
@@ -381,6 +411,7 @@ val HabitsDarkColors: HabitsColors =
                 green = HabitGreen,
                 orange = HabitOrange,
                 purple = HabitPurple,
+                red = HabitRed,
                 amber = ChartAmber,
                 grey = NavGrey,
             ),

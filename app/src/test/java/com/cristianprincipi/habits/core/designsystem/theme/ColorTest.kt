@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.core.designsystem.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -86,15 +87,41 @@ class ColorTest {
     }
 
     @Test
-    fun `the habit palette carries the four assignable colours in prototype order`() {
+    fun `the habit palette carries the five assignable colours, the prototype's four then ours`() {
         assertEquals(
             listOf(
                 Color(0xFF4A9EFF),
                 Color(0xFF76C442),
                 Color(0xFFFF7A35),
                 Color(0xFF8B5CF6),
+                Color(0xFFE11D48),
             ),
             HabitsDarkColors.habit.assignable,
+        )
+    }
+
+    /**
+     * ⚠⚠ **Red has to survive a 5dp dot beside orange, and that is not the same test as looking
+     * different on a swatch.**
+     *
+     * The Year screen stacks one dot grid per habit, so these two are on screen together at
+     * `Spacing.yearDot` = 5dp. `#E11D48` was chosen over six other candidates on measurement
+     * (ADR-123): the widest dE2000 from `#FF7A35` **and** the widest lightness separation, which is
+     * the channel that survives at that size.
+     *
+     * ⭐ **Asserted as lightness, not as a hex.** Pinning the hex is what the test above already
+     * does; this one pins the *property that made it the right hex*, so a future session swapping in
+     * a prettier red that happens to sit at orange's lightness is told why it may not.
+     */
+    @Test
+    fun `red and orange are separated by lightness, not only by hue`() {
+        val red = HabitsDarkColors.habit.red
+        val orange = HabitsDarkColors.habit.orange
+        val separation = kotlin.math.abs(red.luminance() - orange.luminance())
+        assertTrue(
+            "red and orange differ by %.3f in relative luminance — at 5dp that is hue alone, and hue "
+                .format(separation) + "is what goes first",
+            separation > MIN_RED_ORANGE_LUMINANCE_GAP,
         )
     }
 
@@ -104,7 +131,7 @@ class ColorTest {
         // habit colour, and a future session reaching for a fifth habit colour must not grab them.
         assertEquals(Color(0xFFF59E0B), HabitsDarkColors.habit.amber)
         assertEquals(Color(0xFF888888), HabitsDarkColors.habit.grey)
-        assertEquals(FOUR_ASSIGNABLE_COLOURS, HabitsDarkColors.habit.assignable.size)
+        assertEquals(ASSIGNABLE_COLOURS, HabitsDarkColors.habit.assignable.size)
     }
 
     @Test
@@ -184,7 +211,22 @@ class ColorTest {
          */
         const val ALPHA_TOLERANCE = 0.005f
 
-        const val FOUR_ASSIGNABLE_COLOURS = 4
+        /**
+         * ⚠ Five since M15.2, and the number is load-bearing rather than descriptive.
+         *
+         * `HabitImporter.defaultColorAt` cycles `HabitColor.entries` with `%`, so this is what
+         * decides whether a habit set wraps onto a colour it has already used. At four it did — the
+         * user's own five habits had two blues. A **sixth** habit would wrap again.
+         */
+        const val ASSIGNABLE_COLOURS = 5
+
+        /**
+         * ⭐ **Set to discriminate, not to pass.** `#E11D48` clears it at **0.181**; the two
+         * candidates it beat sit below — `#FF3B6B` at 0.100 and `#FF4D4D` (the design's own
+         * `destructive`, the tempting one) at 0.083. A threshold every candidate passes would
+         * record nothing about the choice.
+         */
+        const val MIN_RED_ORANGE_LUMINANCE_GAP = 0.15f
 
         // The M13.4 ramp. Each is a whole n/255 step — see `Color.kt` for why the fourth decimal
         // place is load-bearing and must not be tidied away.

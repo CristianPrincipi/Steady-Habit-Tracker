@@ -471,6 +471,7 @@
     <string name="habits_colour_green">Green</string>
     <string name="habits_colour_orange">Orange</string>
     <string name="habits_colour_purple">Purple</string>
+    <string name="habits_colour_red">Red</string>
 
     <!--
       Undo snackbar (M6.6) — UNDESIGNED. The prototype has no snackbar because it has no click

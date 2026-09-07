@@ -198,10 +198,11 @@ class ComponentRenderTest {
         // swatch is a ring, and `Modifier.border` draws INSIDE the bounds — a ring around a circle
         // filled with the same colour is invisible, which is exactly how the today marker vanished
         // on a completed pill. So the marker is a check glyph, and this asserts the property rather
-        // than the glyph: **selecting a swatch must change what it looks like**, for all four.
+        // than the glyph: **selecting a swatch must change what it looks like**, on every colour.
         //
-        // All four matter separately. A marker can read on blue and disappear on orange, and a test
-        // that only ever selected the first colour would never find out.
+        // Each matters separately. A marker can read on blue and disappear on orange, and a test
+        // that only ever selected the first colour would never find out. ⚠ Red (M15.2) is the
+        // darkest of the five against the card, so it is the one this now has to carry.
         var selected by mutableStateOf(0)
         composeTestRule.setContent {
             HabitsTheme {
@@ -372,7 +373,15 @@ class ComponentRenderTest {
         const val MARKER_CONTRAST = 0.15f
 
         /** The four assignable habit colours, in `HabitPalette.assignable` order. */
-        val SWATCH_NAMES = listOf("Blue", "Green", "Orange", "Purple")
+        /**
+         * ⚠ **Must stay the same length as `HabitPalette.assignable`, and nothing enforces that.**
+         *
+         * `ColorSwatchRow` is handed `assignable` for its colours and this for its labels, so a
+         * palette change that misses this line hands the row more colours than names. M15.2 added
+         * red and this list is where that was felt — the JVM gate was green and the mismatch lived
+         * here, in a suite that only runs on a device.
+         */
+        val SWATCH_NAMES = listOf("Blue", "Green", "Orange", "Purple", "Red")
 
         /** One pill per `DayStatus`, in enum order, then two fillers to make up the seven. */
         val EVERY_STATUS =

@@ -61,7 +61,7 @@ object SampleHabits {
             sample("journal", "✒️ Journal", HabitColor.PURPLE, reference.minusDays(400)),
             sample("quote", "📜 Quote", HabitColor.GREEN, reference.minusDays(260)),
             sample("diet", "🥕 Diet", HabitColor.ORANGE, reference.minusDays(180)),
-            sample("focus", "🎯 Focus", HabitColor.BLUE, reference.minusDays(95)),
+            sample("focus", "🎯 Focus", HabitColor.RED, reference.minusDays(95)),
         )
 
     /**

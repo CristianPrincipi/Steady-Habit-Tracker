@@ -37,6 +37,7 @@ fun HabitColor.resolve(): Color {
         HabitColor.GREEN -> palette.green
         HabitColor.ORANGE -> palette.orange
         HabitColor.PURPLE -> palette.purple
+        HabitColor.RED -> palette.red
     }
 }
 
