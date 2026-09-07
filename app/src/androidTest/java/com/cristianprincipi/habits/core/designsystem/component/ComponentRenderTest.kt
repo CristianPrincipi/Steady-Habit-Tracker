@@ -372,14 +372,14 @@ class ComponentRenderTest {
          */
         const val MARKER_CONTRAST = 0.15f
 
-        /** The four assignable habit colours, in `HabitPalette.assignable` order. */
         /**
-         * ⚠ **Must stay the same length as `HabitPalette.assignable`, and nothing enforces that.**
+         * The assignable habit colours, in `HabitPalette.assignable` order.
          *
-         * `ColorSwatchRow` is handed `assignable` for its colours and this for its labels, so a
-         * palette change that misses this line hands the row more colours than names. M15.2 added
-         * red and this list is where that was felt — the JVM gate was green and the mismatch lived
-         * here, in a suite that only runs on a device.
+         * ⚠ **Must stay the same length as that list, and nothing enforces it.** `ColorSwatchRow` is
+         * handed `assignable` for its colours and this for its labels, so a palette change that
+         * misses this line hands the row more colours than it has names. M15.2 added red and this
+         * is where that was felt — the JVM gate was green while the mismatch sat here, in a suite
+         * that only runs on a device.
          */
         val SWATCH_NAMES = listOf("Blue", "Green", "Orange", "Purple", "Red")
 
