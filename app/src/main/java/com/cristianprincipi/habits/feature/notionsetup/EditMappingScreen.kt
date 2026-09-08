@@ -118,7 +118,11 @@ private val previewProperties =
         NotionProperty("r", "📖 Read", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("j", "✒️ Journal", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("t", "🥕 Diet", "checkbox", NotionPropertyRole.Habit),
-        NotionProperty("w", "Weight", "number", NotionPropertyRole.Unavailable),
+        // M15.4 moved a number out of Unavailable. The fixture keeps a formula so the preview
+        // still renders the "not available" block that `Weight` used to be its only example of.
+        NotionProperty("w", "⚖️ Weight", "number", NotionPropertyRole.Measure),
+        NotionProperty("s", "😴 Sleep", "number", NotionPropertyRole.Measure),
+        NotionProperty("p", "Progress", "formula", NotionPropertyRole.Unavailable),
     )
 
 @Preview(name = "Editing", backgroundColor = 0xFF111113, showBackground = true, widthDp = 400, heightDp = 800)
@@ -133,6 +137,10 @@ private fun EditMappingPreview() {
                     dayKeyPropertyId = "d",
                     habitPropertyIds = setOf("r", "j", "t"),
                     previouslyMappedHabitIds = setOf("r", "j", "t"),
+                    // One ticked with a unit, one unticked — so the preview shows both states of
+                    // the box that is disabled rather than hidden.
+                    measurePropertyIds = setOf("w"),
+                    measureUnits = mapOf("w" to "kg"),
                 ),
             onEvent = {},
         )

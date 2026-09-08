@@ -195,6 +195,16 @@ object Sizing {
      */
     val colorSwatch: Dp = 28.dp
 
+    /**
+     * The unit box on a measure row in the mapping screen — M15.4.
+     *
+     * ⚠ **Not from the prototype**, which designs no mapping screen at all. Sized to the longest
+     * unit anyone would type rather than to a grid step: `kcal` and `mins` are four characters, and
+     * the field sits at the end of a row that also has to hold a Notion column name like
+     * `⚖️ Weight`. Wider starves the name on a narrow phone; narrower cannot show `kcal`.
+     */
+    val measureUnitField: Dp = 88.dp
+
     /** `w-8 h-8` — the habit icon on a Month card. */
     val habitIconSmall: Dp = 32.dp
 

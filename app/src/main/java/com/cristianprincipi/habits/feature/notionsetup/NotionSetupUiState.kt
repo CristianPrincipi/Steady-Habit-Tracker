@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.notionsetup
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedMeasure
 import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.model.SyncFailure
 
@@ -65,6 +66,19 @@ data class NotionSetupUiState(
     val properties: List<NotionProperty> = emptyList(),
     val dayKeyPropertyId: String? = null,
     val habitPropertyIds: Set<String> = emptySet(),
+    /** The number columns ticked as measures (M15.4). ⚠ Never pre-ticked — see [withMapping]. */
+    val measurePropertyIds: Set<String> = emptySet(),
+    /**
+     * What is in each measure's unit field right now, keyed by property id.
+     *
+     * ⭐ **Keyed rather than paired with the tick**, and kept when the box is unticked: a user who
+     * unticks `Weight` to read the warning and ticks it straight back should not have to retype
+     * `kg`. Only ticked ids reach [measuresInOrder], so an orphaned entry costs nothing.
+     *
+     * A missing key and a blank string mean the same thing — no unit — which is why nothing here
+     * distinguishes them.
+     */
+    val measureUnits: Map<String, String> = emptyMap(),
     /**
      * What was mapped **before** this screen opened, for [habitsBeingDropped] to compare against.
      *
@@ -89,12 +103,20 @@ data class NotionSetupUiState(
     val habitCandidates: List<NotionProperty>
         get() = properties.filter { it.role == NotionPropertyRole.Habit }
 
+    /** The number columns, which are what a measure can be (M15.4). */
+    val measureCandidates: List<NotionProperty>
+        get() = properties.filter { it.role == NotionPropertyRole.Measure }
+
     /**
-     * Everything that can be neither, shown anyway.
+     * Everything that can be none of the three, shown anyway.
      *
-     * `Weight`, `Sleep`, `Area` and `Progress` are the user's own data in the same database
+     * `Area` and `Progress` are the user's own data in the same database
      * (`docs/notion-schema.md` §7), and a column they can see in Notion but not here reads as a bug.
      * Showing them with their type answers "why can't I pick Progress?" on the screen itself.
+     *
+     * ⚠ **This paragraph used to name `Weight` and `Sleep` too**, and M15.4 moved them into
+     * [measureCandidates]. The sentence they leave behind is unchanged in meaning: a column that is
+     * here is still one the app will read and never touch.
      */
     val unavailableProperties: List<NotionProperty>
         get() = properties.filter { it.role == NotionPropertyRole.Unavailable }
@@ -139,6 +161,20 @@ data class NotionSetupUiState(
      */
     val habitPropertyIdsInOrder: List<String>
         get() = habitCandidates.map(NotionProperty::id).filter { it in habitPropertyIds }
+
+    /**
+     * The measures to save, in candidate order, each carrying whatever unit was typed for it.
+     *
+     * ⚠ `.trim()` here and nowhere else. The unit is a **label of ours**, not Notion data — unlike
+     * a property name, which `docs/notion-schema.md` §2.3 requires be stored verbatim and never
+     * normalised. A stray space before `kg` would draw as `84.2  kg` for ever.
+     */
+    val measuresInOrder: List<SavedMeasure>
+        get() =
+            measureCandidates
+                .map(NotionProperty::id)
+                .filter { it in measurePropertyIds }
+                .map { id -> SavedMeasure(propertyId = id, unit = measureUnits[id].orEmpty().trim()) }
 }
 
 /**
@@ -170,6 +206,10 @@ internal fun NotionSetupUiState.withMapping(
     val previouslyMapped =
         saved?.habitPropertyIds?.filterTo(mutableSetOf()) { id -> id in candidateIds }.orEmpty()
     val dayKeyCandidates = properties.filter { it.role == NotionPropertyRole.DayKey }
+    // Intersected with the current candidates for the same reason the habits are: a measure whose
+    // column was deleted or retyped upstream must not come back as a tick against nothing.
+    val measureCandidateIds = properties.filter { it.role == NotionPropertyRole.Measure }.map(NotionProperty::id)
+    val savedMeasures = saved?.measures.orEmpty().filter { it.propertyId in measureCandidateIds }
 
     return copy(
         properties = properties,
@@ -183,8 +223,34 @@ internal fun NotionSetupUiState.withMapping(
                 ?: dayKeyCandidates.singleOrNull()?.id,
         habitPropertyIds = if (saved == null) candidateIds.toSet() else previouslyMapped,
         previouslyMappedHabitIds = previouslyMapped,
+        // ⚠⚠ **Measures are NEVER pre-ticked, not even on a first run**, and that is not an
+        // oversight of the rule above — it is the same rule reaching the opposite answer.
+        // Pre-ticking every checkbox is safe because of a fact about *this* database: every
+        // checkbox column in it is a habit, so the assumption is right every time. No such fact
+        // holds for numbers. A number column could be a target, a page count, an ID, a rating;
+        // "average it on the Stats screen" is a claim only the user can make, and a wrong guess
+        // here puts a meaningless tile on a screen and stores a column of numbers nobody asked for.
+        measurePropertyIds = savedMeasures.map(SavedMeasure::propertyId).toSet(),
+        measureUnits = savedMeasures.associate { it.propertyId to it.unit },
     )
 }
+
+/** Tick or untick one number column as a measure. Shared for [withMapping]'s reason. */
+internal fun NotionSetupUiState.withMeasureToggled(propertyId: String): NotionSetupUiState =
+    copy(
+        measurePropertyIds =
+            if (propertyId in measurePropertyIds) {
+                measurePropertyIds - propertyId
+            } else {
+                measurePropertyIds + propertyId
+            },
+    )
+
+/** Every keystroke in one measure's unit field. Stored untrimmed; [measuresInOrder] trims. */
+internal fun NotionSetupUiState.withMeasureUnit(
+    propertyId: String,
+    unit: String,
+): NotionSetupUiState = copy(measureUnits = measureUnits + (propertyId to unit))
 
 /** Tick or untick one checkbox column. Shared for [withMapping]'s reason. */
 internal fun NotionSetupUiState.withHabitToggled(propertyId: String): NotionSetupUiState =

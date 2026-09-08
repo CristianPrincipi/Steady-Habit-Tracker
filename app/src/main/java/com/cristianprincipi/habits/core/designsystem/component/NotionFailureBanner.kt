@@ -116,11 +116,33 @@ private fun SyncFailure.messageRes(): Int =
 @Composable
 private fun MappingIssue.describe(): String =
     when (this) {
-        is MappingIssue.DayKeyMissing -> stringResource(R.string.notion_issue_day_key_missing)
-        is MappingIssue.DayKeyRetyped -> stringResource(R.string.notion_issue_day_key_retyped, actualType)
-        is MappingIssue.HabitMissing -> stringResource(R.string.notion_issue_habit_missing)
-        is MappingIssue.HabitRetyped -> stringResource(R.string.notion_issue_habit_retyped, name, actualType)
-        MappingIssue.WrongDataSource -> stringResource(R.string.notion_issue_wrong_data_source)
+        is MappingIssue.DayKeyMissing -> {
+            stringResource(R.string.notion_issue_day_key_missing)
+        }
+
+        is MappingIssue.DayKeyRetyped -> {
+            stringResource(R.string.notion_issue_day_key_retyped, actualType)
+        }
+
+        is MappingIssue.HabitMissing -> {
+            stringResource(R.string.notion_issue_habit_missing)
+        }
+
+        is MappingIssue.HabitRetyped -> {
+            stringResource(R.string.notion_issue_habit_retyped, name, actualType)
+        }
+
+        is MappingIssue.MeasureMissing -> {
+            stringResource(R.string.notion_issue_measure_missing)
+        }
+
+        is MappingIssue.MeasureRetyped -> {
+            stringResource(R.string.notion_issue_measure_retyped, name, actualType)
+        }
+
+        MappingIssue.WrongDataSource -> {
+            stringResource(R.string.notion_issue_wrong_data_source)
+        }
     }
 
 private const val BANNER_FILL_ALPHA = 0.08f

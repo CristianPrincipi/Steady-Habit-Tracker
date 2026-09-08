@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -226,6 +227,105 @@ fun SetupToggleRow(
                 ),
         )
         RowLabel(label = label, caption = caption)
+    }
+}
+
+/**
+ * A number column, with a tick and a box for its unit — M15.4.
+ *
+ * ### ⭐ The unit box is always there, and is **disabled** until the row is ticked
+ *
+ * Not hidden and revealed on tick, which was the first shape and is worse for two reasons. The row
+ * would change height under the finger that just tapped it, in a `LazyColumn` where every neighbour
+ * stays put. And a user scanning the list would have no way to find out that ticking `Weight` is
+ * going to ask them for anything — the affordance would only exist after the decision it informs.
+ *
+ * Disabled-in-place says both things at once: this is what you get, and not yet.
+ *
+ * ### ⚠ The unit is ours, and the name is Notion's
+ *
+ * [label] is rendered exactly as Notion sent it, emoji and all (`docs/notion-schema.md` §2.3).
+ * [unit] is a string the user typed into this app and nothing else has ever seen — it is not Notion
+ * data, it cannot be derived from the schema (`NotionPropertySchemaDto` has no number format), and
+ * `CLAUDE.md` §3.4 forbids inferring it from the column being *called* `Weight`.
+ *
+ * @param checked whether this column is mapped as a measure.
+ * @param unit what is in the box now. Blank is normal and means "show the bare number".
+ */
+@Composable
+fun SetupMeasureRow(
+    label: String,
+    checked: Boolean,
+    unit: String,
+    onToggle: () -> Unit,
+    onUnitChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val unitLabel = stringResource(R.string.setup_mapping_measure_unit_label, label)
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = Spacing.cardGap),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            // ⚠ The `toggleable` is on this inner Row, not the outer one. The whole-row target of
+            // `SetupToggleRow` cannot be copied here: it would swallow taps meant for the unit box,
+            // and toggling the row when the user aimed at a text field is the worst of both.
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() }),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = null,
+                colors =
+                    CheckboxDefaults.colors(
+                        checkedColor = MaterialTheme.colorScheme.primary,
+                        uncheckedColor = MaterialTheme.colorScheme.outline,
+                        checkmarkColor = HabitsTheme.colors.text.primary,
+                    ),
+            )
+            RowLabel(label = label, caption = null)
+        }
+        OutlinedTextField(
+            value = unit,
+            onValueChange = onUnitChange,
+            enabled = checked,
+            // M13.1's finding, applied before it can happen again: an eyebrow or a neighbouring
+            // label is a sibling, not this field's name, so a screen reader would announce the
+            // contents and never the purpose. Naming it after the column is what makes two unit
+            // boxes on one screen distinguishable without sight.
+            modifier = Modifier.width(Sizing.measureUnitField).semantics { contentDescription = unitLabel },
+            textStyle = HabitsTheme.textStyles.mono,
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.setup_mapping_measure_unit_hint),
+                    style = HabitsTheme.textStyles.mono,
+                    color = HabitsTheme.colors.text.placeholder,
+                )
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, autoCorrectEnabled = false),
+            // ADR-022's correction, for SetupTextField's reason: Material routes a text field to a
+            // shape tier that is not the design's 14dp.
+            shape = MaterialTheme.shapes.large,
+            colors =
+                TextFieldDefaults.colors(
+                    focusedTextColor = HabitsTheme.colors.text.primary,
+                    unfocusedTextColor = HabitsTheme.colors.text.primary,
+                    disabledTextColor = HabitsTheme.colors.text.tertiary,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    focusedIndicatorColor = HabitsTheme.colors.focus.border,
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
+                    disabledIndicatorColor = MaterialTheme.colorScheme.outline,
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                ),
+        )
     }
 }
 

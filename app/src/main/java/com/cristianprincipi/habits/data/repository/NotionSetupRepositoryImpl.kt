@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.data.repository
 import com.cristianprincipi.habits.data.local.LocalHabitData
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
+import com.cristianprincipi.habits.data.preferences.NotionMeasure
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.remote.notion.NotionApi
@@ -24,6 +25,7 @@ import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedMeasure
 import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
@@ -148,6 +150,7 @@ class NotionSetupRepositoryImpl
                     sourceId = mapping.dataSourceId.value,
                     dayKeyPropertyId = mapping.dayKeyPropertyId.value,
                     habitPropertyIds = mapping.habitPropertyIds.map(NotionPropertyId::value),
+                    measures = mapping.measures.map { SavedMeasure(it.id.value, it.unit) },
                 )
             }
 
@@ -155,6 +158,7 @@ class NotionSetupRepositoryImpl
             sourceId: String,
             dayKeyPropertyId: String,
             habitPropertyIds: List<String>,
+            measures: List<SavedMeasure>,
         ) {
             mappingStore.save(
                 NotionPropertyMapping(
@@ -164,6 +168,11 @@ class NotionSetupRepositoryImpl
                     // would be ADR-035's silent data loss. The screen cannot produce one — it toggles
                     // set membership — but the type is what guarantees it.
                     habitPropertyIds = habitPropertyIds.map(::NotionPropertyId).toSet(),
+                    // ⚠ Stays a List, so the same guarantee has to be made by hand — a measure
+                    // carries a unit, so two entries for one property are distinct set members and
+                    // a `Set` would not collapse them. `NotionPropertyMapping`'s `require` is what
+                    // catches it, and it throws here rather than storing an ambiguous mapping.
+                    measures = measures.map { NotionMeasure(NotionPropertyId(it.propertyId), it.unit) },
                 ),
             )
         }
@@ -242,7 +251,14 @@ private fun NotionPropertySchemaDto.asProperty(): NotionProperty =
         role =
             when (propertyType) {
                 NotionPropertyType.Date -> NotionPropertyRole.DayKey
+
                 NotionPropertyType.Checkbox -> NotionPropertyRole.Habit
+
+                // M15.4. One branch, and it inherits this function's whole argument: by the time a
+                // number reaches the mapping screen it already knows it may be a measure, so no
+                // composable has to decide it and none can get it wrong.
+                NotionPropertyType.Number -> NotionPropertyRole.Measure
+
                 else -> NotionPropertyRole.Unavailable
             },
     )

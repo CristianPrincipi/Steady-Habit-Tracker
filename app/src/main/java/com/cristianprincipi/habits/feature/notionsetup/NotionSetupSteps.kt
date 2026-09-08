@@ -232,6 +232,32 @@ fun MapPropertiesStep(
             item(key = "dropping") { DroppingHabitsNote(dropped = state.habitsBeingDropped) }
         }
 
+        // M15.4. ⚠ **Below the habits and above "not available", and the order is the argument.**
+        // The habits are what the app is for and the user must not scroll past a second tick list
+        // to reach them; the unavailable block is a footnote answering a question. Measures are
+        // real scope that most users will leave empty, which puts them exactly here.
+        //
+        // ⚠ The section is omitted entirely when the database has no number columns, matching the
+        // unavailable block below rather than the habits above — an empty-state sentence for a
+        // thing nobody asked for is a sentence explaining an absence the user never noticed.
+        if (state.measureCandidates.isNotEmpty()) {
+            item(key = "measure-eyebrow") {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
+                    SectionEyebrow(text = stringResource(R.string.setup_mapping_measures_eyebrow))
+                    StepNote(text = stringResource(R.string.setup_mapping_measures_body))
+                }
+            }
+            items(state.measureCandidates, key = { "measure-${it.id}" }) { property ->
+                SetupMeasureRow(
+                    label = property.name,
+                    checked = property.id in state.measurePropertyIds,
+                    unit = state.measureUnits[property.id].orEmpty(),
+                    onToggle = { onEvent(NotionSetupEvent.MeasureToggled(property.id)) },
+                    onUnitChange = { onEvent(NotionSetupEvent.MeasureUnitChanged(property.id, it)) },
+                )
+            }
+        }
+
         if (state.unavailableProperties.isNotEmpty()) {
             item(key = "unavailable-eyebrow") {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.cardGap)) {
@@ -380,7 +406,8 @@ private val previewProperties =
         NotionProperty("r", "📖 Read", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("j", "✒️ Journal", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("p", "Progress", "formula", NotionPropertyRole.Unavailable),
-        NotionProperty("w", "Weight", "number", NotionPropertyRole.Unavailable),
+        // M15.4. `Weight` was Unavailable here until a number became mappable.
+        NotionProperty("w", "⚖️ Weight", "number", NotionPropertyRole.Measure),
     )
 
 @Preview(backgroundColor = 0xFF111113, showBackground = true, widthDp = 400, heightDp = 700)
@@ -421,6 +448,8 @@ private fun MapPropertiesStepPreview() {
                     properties = previewProperties,
                     dayKeyPropertyId = "d",
                     habitPropertyIds = setOf("r", "j"),
+                    measurePropertyIds = setOf("w"),
+                    measureUnits = mapOf("w" to "kg"),
                 ),
             onEvent = {},
         )

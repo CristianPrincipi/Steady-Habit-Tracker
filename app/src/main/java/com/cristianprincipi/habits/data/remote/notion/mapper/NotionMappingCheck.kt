@@ -26,6 +26,13 @@ sealed interface NotionMappingCheck {
         val dayKey: MappedProperty,
         /** In the mapping's order, which is the order the user chose and `sortOrder` follows. */
         val habits: List<MappedProperty>,
+        /**
+         * The mapped number columns, in the mapping's order (M15.4). Empty is the normal state.
+         *
+         * Defaulted so that every existing construction site — and every test that asserts on a
+         * habits-only mapping — still says what it meant before measures existed.
+         */
+        val measures: List<MappedMeasure> = emptyList(),
     ) : NotionMappingCheck
 
     /**
@@ -51,6 +58,22 @@ data class MappedProperty(
     val id: NotionPropertyId,
     val name: String,
 )
+
+/**
+ * A validated measure: the resolved property, plus the unit the user typed for it (M15.4).
+ *
+ * Composed of a [MappedProperty] rather than repeating its two fields, so the "[name] is for display
+ * only, nothing looks a property up by it" contract above is stated once and inherited here.
+ */
+data class MappedMeasure(
+    val property: MappedProperty,
+    val unit: String,
+) {
+    val id: NotionPropertyId get() = property.id
+
+    /** The column's **current** name in Notion — which is what a measure tile is labelled with. */
+    val name: String get() = property.name
+}
 
 /**
  * A reason the mapping no longer describes the user's database.
@@ -103,6 +126,36 @@ sealed interface NotionMappingProblem {
      * something the user meant, and a `{"checkbox": false}` would replace it.
      */
     data class HabitRetyped(
+        val id: NotionPropertyId,
+        val name: String,
+        val actualType: String,
+    ) : NotionMappingProblem
+
+    /**
+     * A mapped measure's number property no longer exists (M15.4).
+     *
+     * ⚠⚠ **Separate from [HabitMissing] rather than folded into it, and the reason is the
+     * sentence the user reads.** Both say "a column you mapped is gone", but the advice differs:
+     * a missing habit may leave this device holding the only copy of a year of history
+     * (`docs/notion-schema.md` §4.1), whereas a missing measure loses a column of numbers Notion
+     * itself has already destroyed and the app only ever mirrored. Telling a user their history
+     * might be at risk when it is not is how a screen stops being believed.
+     *
+     * Sync pauses either way. §3.4: never silently average nothing.
+     */
+    data class MeasureMissing(
+        val id: NotionPropertyId,
+    ) : NotionMappingProblem
+
+    /**
+     * A mapped measure is still there but is no longer a number.
+     *
+     * ⚠ **This one is not the "overwrite a real value" case [HabitRetyped] is** — nothing writes
+     * to a measure, so there is nothing to overwrite. It is the *read* half of §3.4: a column
+     * retyped from `number` to `select` would decode as `Unreadable` on every page, and the average
+     * would quietly become "no readings" rather than saying the mapping is wrong.
+     */
+    data class MeasureRetyped(
         val id: NotionPropertyId,
         val name: String,
         val actualType: String,

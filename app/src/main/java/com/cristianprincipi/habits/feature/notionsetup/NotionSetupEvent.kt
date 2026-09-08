@@ -46,6 +46,17 @@ sealed interface NotionSetupEvent {
         val propertyId: String,
     ) : NotionSetupEvent
 
+    /** Tick or untick one number column as a measure (M15.4). */
+    data class MeasureToggled(
+        val propertyId: String,
+    ) : NotionSetupEvent
+
+    /** Every keystroke in one measure's unit field. Blank is normal and means "no unit". */
+    data class MeasureUnitChanged(
+        val propertyId: String,
+        val value: String,
+    ) : NotionSetupEvent
+
     /** Save the mapping and run the first import. */
     data object MappingSubmitted : NotionSetupEvent
 

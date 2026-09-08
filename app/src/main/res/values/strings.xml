@@ -74,14 +74,31 @@
     <string name="setup_mapping_day_empty">This database has no date column, so there is no way to tell which day a page is. Add one in Notion, then come back.</string>
     <string name="setup_mapping_habits_eyebrow">WHICH COLUMNS ARE HABITS?</string>
     <string name="setup_mapping_habits_empty">This database has no checkbox columns, so there are no habits to import.</string>
+    <!--
+      M15.4. The body leads with what happens next — where the number turns up — rather than with
+      what a "measure" is. The second sentence is the one that matters: the user asked for these
+      "read only", and a column the app promises never to write is worth saying out loud on the
+      screen that maps it, not only in a KDoc.
+    -->
+    <string name="setup_mapping_measures_eyebrow">ANY NUMBERS TO AVERAGE?</string>
+    <string name="setup_mapping_measures_body">Tick a number column to see its average on the Stats screen. These are only ever read — the app never writes a number back to Notion.</string>
+    <!--
+      The unit cannot be derived: the schema carries no number format, and CLAUDE.md §3.4 forbids
+      reading "kg" off a column called Weight. So it is asked for, and it is optional — blank shows
+      the bare number. The label is per-column so that two unit boxes on one screen are
+      distinguishable to a screen reader (M13.1's finding, applied before it could recur).
+    -->
+    <string name="setup_mapping_measure_unit_hint">unit</string>
+    <string name="setup_mapping_measure_unit_label">Unit for %1$s</string>
     <string name="setup_mapping_unavailable_eyebrow">NOT AVAILABLE</string>
     <!--
-      docs/notion-schema.md §7: Weight, Sleep, Area and Progress share the database and must come
-      through a sync untouched. Saying so is what stops "where is my Progress column?" being a bug
-      report. CLAUDE.md §3.2 wants the UI to PREVENT a read-only property being picked — these are
-      shown, and not selectable.
+      docs/notion-schema.md §7: Area and Progress share the database and must come through a sync
+      untouched. Saying so is what stops "where is my Progress column?" being a bug report.
+      CLAUDE.md §3.2 wants the UI to PREVENT a read-only property being picked — these are shown,
+      and not selectable. ⚠ Weight and Sleep were in this list until M15.4 gave them a section of
+      their own, which is why the sentence below names three kinds of column and not two.
     -->
-    <string name="setup_mapping_unavailable_body">These aren\'t dates or checkboxes, so they can\'t be a day or a habit. Sync leaves them exactly as they are.</string>
+    <string name="setup_mapping_unavailable_body">These aren\'t dates, checkboxes or numbers, so they can\'t be a day, a habit or an average. Sync leaves them exactly as they are.</string>
     <string name="setup_mapping_submit">Save and import</string>
     <string name="setup_mapping_needs_habit">Pick at least one habit.</string>
     <!--
@@ -205,6 +222,13 @@
     <string name="notion_issue_day_key_retyped">The day column is now a %1$s.</string>
     <string name="notion_issue_habit_missing">A habit column was deleted.</string>
     <string name="notion_issue_habit_retyped">“%1$s” is now a %2$s.</string>
+    <!--
+      M15.4. Deliberately calmer than the habit sentences above: a deleted measure column loses
+      numbers Notion has already thrown away, whereas a deleted habit column may leave this device
+      holding the only copy of a year of history. Same pause, different stakes, different words.
+    -->
+    <string name="notion_issue_measure_missing">A number column you were averaging was deleted.</string>
+    <string name="notion_issue_measure_retyped">“%1$s” is now a %2$s, so it can’t be averaged.</string>
     <string name="notion_issue_wrong_data_source">The saved setup points at a different database.</string>
     <!--
       Bottom-nav labels — docs/design-spec.md §1. One word each, because the bar gives them 10sp

@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.domain.repository
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedMeasure
 import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import kotlinx.coroutines.flow.Flow
 
@@ -107,11 +108,14 @@ interface NotionSetupRepository {
      *
      * @param habitPropertyIds in the order they should be shown — the order becomes
      *   `HabitEntity.sortOrder`.
+     * @param measures the number columns to average, in the order they should be shown, each with
+     *   the unit the user typed for it (M15.4). Empty is normal.
      */
     suspend fun saveMapping(
         sourceId: String,
         dayKeyPropertyId: String,
         habitPropertyIds: List<String>,
+        measures: List<SavedMeasure>,
     )
 
     /**

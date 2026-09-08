@@ -26,6 +26,8 @@ class NotionMappingStoreTest {
     private val readId = NotionPropertyId("ZI%40W")
     private val journalId = NotionPropertyId("Ye%3Aq")
     private val dateId = NotionPropertyId("M%3BBw")
+    private val weightId = NotionPropertyId("%3FfMg")
+    private val sleepId = NotionPropertyId("%7BQ%5Ct")
     private val databaseId = NotionDatabaseId("8f2c41d97b5e40a3ac6e1d9f0b73e254")
 
     private val mapping =
@@ -224,6 +226,83 @@ class NotionMappingStoreTest {
             val thrown = runCatching { store.mapping.first() }.exceptionOrNull()
 
             assertEquals("a real bug", thrown?.message)
+        }
+
+    // --- measures (M15.4) ---------------------------------------------------------------------
+
+    @Test
+    fun aMeasureAndItsUnitSurviveTheRoundTrip() =
+        runTest {
+            // The unit is the only thing in this file the user typed rather than picked, and it
+            // exists nowhere else — losing it silently would relabel their Stats tiles.
+            val store = NotionMappingStore(InMemoryDataStore())
+
+            store.save(mapping.copy(measures = listOf(NotionMeasure(weightId, "kg"), NotionMeasure(sleepId, "h"))))
+
+            assertEquals(
+                listOf(NotionMeasure(weightId, "kg"), NotionMeasure(sleepId, "h")),
+                store.read()?.measures,
+            )
+        }
+
+    @Test
+    fun aMappingSavedBeforeM154HasNoMeasuresAndStillReads() =
+        runTest {
+            // ⭐ The same guarantee `database_id` got at M7.5, and it matters more here: the user
+            // is connected *right now*, and a required field would have shown them the setup
+            // wizard on the next launch to collect two columns they never asked for.
+            val stored = NotionMappingStore(storeHolding(OLD_BLOB)).read()
+
+            assertEquals(NotionDataSourceId("ds-1"), stored?.dataSourceId)
+            assertEquals(emptyList<NotionMeasure>(), stored?.measures)
+        }
+
+    @Test
+    fun aMeasureStoredWithNoUnitReadsAsBlankRatherThanFailing() =
+        runTest {
+            // The unit was added with the field; a blob written by a build that stored only ids
+            // must still read, for the reason above.
+            val store =
+                NotionMappingStore(
+                    storeHolding(
+                        """{"data_source_id":"d","day_key_property_id":"M%3BBw",""" +
+                            """"habit_property_ids":["ZI%40W"],"measures":[{"property_id":"%3FfMg"}]}""",
+                    ),
+                )
+
+            assertEquals(listOf(NotionMeasure(weightId, "")), store.read()?.measures)
+        }
+
+    @Test
+    fun aBlobNamingTheSameMeasureTwiceMeansNotMapped() =
+        runTest {
+            // ⚠ Different units on purpose. `NotionPropertyMapping`'s `require` is the only thing
+            // rejecting this — the type cannot, because a measure is not a `Set` member keyed on
+            // its id — and the two-unit case is the one a `Set` would have let through.
+            val store =
+                NotionMappingStore(
+                    storeHolding(
+                        """{"data_source_id":"d","day_key_property_id":"M%3BBw",""" +
+                            """"habit_property_ids":["ZI%40W"],"measures":""" +
+                            """[{"property_id":"%3FfMg","unit":"kg"},{"property_id":"%3FfMg","unit":"lb"}]}""",
+                    ),
+                )
+
+            assertNull(store.mapping.first())
+        }
+
+    @Test
+    fun aBlobMakingOneColumnBothAHabitAndAMeasureMeansNotMapped() =
+        runTest {
+            val store =
+                NotionMappingStore(
+                    storeHolding(
+                        """{"data_source_id":"d","day_key_property_id":"M%3BBw",""" +
+                            """"habit_property_ids":["ZI%40W"],"measures":[{"property_id":"ZI%40W","unit":"kg"}]}""",
+                    ),
+                )
+
+            assertNull(store.mapping.first())
         }
 
     /**

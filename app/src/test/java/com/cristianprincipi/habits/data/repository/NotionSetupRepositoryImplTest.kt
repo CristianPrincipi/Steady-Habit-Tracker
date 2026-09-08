@@ -204,7 +204,12 @@ class NotionSetupRepositoryImplTest {
 
             assertEquals(NotionPropertyRole.Habit, roles["📖 Read"])
             assertEquals(NotionPropertyRole.DayKey, roles["Date"])
-            assertEquals(NotionPropertyRole.Unavailable, roles["Weight"])
+            // ⭐ M15.4 moved this one, and this assertion is what made the move visible: it read
+            // `Unavailable` until a number became mappable, and changing it is the whole of gap (b).
+            assertEquals(NotionPropertyRole.Measure, roles["Weight"])
+            // ⚠ A formula stays Unavailable, and that is the line the new case did NOT blur: a
+            // number is offered because the app has somewhere to put it, not because it is
+            // writable. This one cannot be written at all.
             assertEquals(NotionPropertyRole.Unavailable, roles["Progress"])
         }
 
@@ -267,6 +272,7 @@ class NotionSetupRepositoryImplTest {
                 sourceId = "ds-1",
                 dayKeyPropertyId = PropertyIds.DATE,
                 habitPropertyIds = listOf(PropertyIds.JOURNAL, PropertyIds.READ),
+                measures = emptyList(),
             )
 
             val mapping = world.mappingStore.read()
@@ -282,7 +288,7 @@ class NotionSetupRepositoryImplTest {
     fun theFirstImportRunsTheEngineAndCountsWhatArrived() =
         runTest {
             val repository = repository()
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
             world.api.givePage(page("p1", august19))
 
             assertEquals(1, repository.importNow().value())
@@ -294,7 +300,7 @@ class NotionSetupRepositoryImplTest {
             // It is returned to this screen AND written down. A failure the user has already seen
             // must not be forgotten the moment they leave the setup flow.
             val repository = repository()
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
             world.api.failEverythingWith = NotionError.Unauthorized
 
             val result = repository.importNow()
@@ -325,7 +331,7 @@ class NotionSetupRepositoryImplTest {
         runTest {
             val repository = repository()
 
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
 
             assertTrue(repository.isConfigured.first())
         }
@@ -335,7 +341,7 @@ class NotionSetupRepositoryImplTest {
         runTest {
             val repository = repository()
             repository.saveToken("ntn_pretend")
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
 
             repository.disconnect()
 
@@ -353,7 +359,7 @@ class NotionSetupRepositoryImplTest {
             // longer connected to is not something to keep showing.
             val repository = repository()
             repository.saveToken("ntn_pretend")
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
             world.api.failEverythingWith = NotionError.Unauthorized
             repository.importNow()
             world.discardedEdits.record(
@@ -375,7 +381,7 @@ class NotionSetupRepositoryImplTest {
             // means, and for a habit whose Notion column was since deleted this may be the only
             // copy left in existence (docs/notion-schema.md §4.1).
             val repository = repository()
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
             world.api.givePage(page("p1", august19))
             repository.importNow()
             assertTrue("precondition: something was imported", world.habits.current.isNotEmpty())
@@ -390,7 +396,7 @@ class NotionSetupRepositoryImplTest {
     fun deletingTheLocalDataIsAnExplicitChoiceAndTakesEverything() =
         runTest {
             val repository = repository()
-            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ))
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
             world.api.givePage(page("p1", august19, checks = mapOf(PropertyIds.READ to true)))
             repository.importNow()
             assertTrue("precondition: a completion exists", world.completions.current.isNotEmpty())

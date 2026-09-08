@@ -79,6 +79,14 @@ class EditMappingViewModel
                     _uiState.update { it.withHabitToggled(event.propertyId) }
                 }
 
+                is NotionSetupEvent.MeasureToggled -> {
+                    _uiState.update { it.withMeasureToggled(event.propertyId) }
+                }
+
+                is NotionSetupEvent.MeasureUnitChanged -> {
+                    _uiState.update { it.withMeasureUnit(event.propertyId, event.value) }
+                }
+
                 NotionSetupEvent.MappingSubmitted -> {
                     save()
                 }
@@ -159,6 +167,7 @@ class EditMappingViewModel
                     sourceId = sourceId,
                     dayKeyPropertyId = dayKey,
                     habitPropertyIds = state.habitPropertyIdsInOrder,
+                    measures = state.measuresInOrder,
                 )
                 when (val result = repository.importNow()) {
                     is NotionSetupResult.Success -> _saved.send(Unit)

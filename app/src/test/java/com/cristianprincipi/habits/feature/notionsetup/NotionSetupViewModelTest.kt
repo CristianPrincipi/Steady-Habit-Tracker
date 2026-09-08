@@ -6,6 +6,7 @@ import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedMeasure
 import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import kotlinx.coroutines.test.runTest
@@ -39,6 +40,8 @@ class NotionSetupViewModelTest {
     private val read = NotionProperty("r", "📖 Read", "checkbox", NotionPropertyRole.Habit)
     private val journal = NotionProperty("j", "✒️ Journal", "checkbox", NotionPropertyRole.Habit)
     private val progress = NotionProperty("p", "Progress", "formula", NotionPropertyRole.Unavailable)
+    private val weight = NotionProperty("w", "⚖️ Weight", "number", NotionPropertyRole.Measure)
+    private val sleep = NotionProperty("s", "😴 Sleep", "number", NotionPropertyRole.Measure)
 
     private val habitsDatabase = NotionSource("ds-1", "Habits")
 
@@ -289,6 +292,90 @@ class NotionSetupViewModelTest {
 
             assertTrue(state.habitPropertyIds.isEmpty())
             assertFalse(state.canSaveMapping)
+        }
+
+    // --- measures, and the rule that is NOT the pre-ticking rule (M15.4) ------------------------
+
+    @Test
+    fun aFirstRunTicksNoMeasureAtAll() =
+        runTest {
+            // ⭐⭐ **The one that matters, and it is the deliberate opposite of
+            // [aFirstRunTicksEveryCheckboxColumn] directly above.** Pre-ticking every checkbox is
+            // safe because of a fact about *this* database: every checkbox column in it is a habit.
+            // No such fact holds for numbers — a number column could be a target, a page count, an
+            // ID, a rating. "Average this on the Stats screen" is a claim only the user can make.
+            reachMappingStep(date, read, journal, weight, sleep)
+
+            assertTrue(state.measurePropertyIds.isEmpty())
+            // ⚠ And it does not block the save: measures are optional, habits are not.
+            assertTrue(state.canSaveMapping)
+        }
+
+    @Test
+    fun aNumberColumnIsOfferedAsAMeasureRatherThanAsUnavailable() =
+        runTest {
+            reachMappingStep(date, read, journal, weight, progress)
+
+            assertEquals(listOf(weight), state.measureCandidates)
+            assertEquals(listOf(progress), state.unavailableProperties)
+            assertFalse(state.habitCandidates.contains(weight))
+        }
+
+    @Test
+    fun aRepeatRunRestoresTheMeasuresAndTheUnitsTypedForThem() =
+        runTest {
+            repository.existingMapping =
+                SavedNotionMapping("ds-1", "d", listOf("r"), listOf(SavedMeasure("w", "kg")))
+
+            reachMappingStep(date, read, journal, weight, sleep)
+
+            assertEquals(setOf("w"), state.measurePropertyIds)
+            assertEquals("kg", state.measureUnits["w"])
+        }
+
+    @Test
+    fun aMeasureWhoseColumnWasDeletedDoesNotComeBackAsATickAgainstNothing() =
+        runTest {
+            // [aHabitWhoseColumnWasDeletedDoesNotComeBackAsATickAgainstNothing]'s twin.
+            repository.existingMapping =
+                SavedNotionMapping("ds-1", "d", listOf("r"), listOf(SavedMeasure("gone", "kg")))
+
+            reachMappingStep(date, read, journal, weight)
+
+            assertTrue(state.measurePropertyIds.isEmpty())
+        }
+
+    @Test
+    fun aUnitSurvivesUntickingAndReTickingTheColumn() =
+        runTest {
+            // The units map is keyed rather than paired with the tick, so a user who unticks
+            // `Weight` to read the section note and ticks it straight back does not retype `kg`.
+            reachMappingStep(date, read, journal, weight)
+            viewModel.onEvent(NotionSetupEvent.MeasureToggled("w"))
+            viewModel.onEvent(NotionSetupEvent.MeasureUnitChanged("w", "kg"))
+
+            viewModel.onEvent(NotionSetupEvent.MeasureToggled("w"))
+            viewModel.onEvent(NotionSetupEvent.MeasureToggled("w"))
+
+            assertEquals("kg", state.measureUnits["w"])
+        }
+
+    @Test
+    fun savingSendsOnlyTickedMeasuresAndTrimsTheirUnits() =
+        runTest {
+            // ⚠ Two things at once, and both are one-liners that would be invisible if wrong: an
+            // untyped-into but unticked column must not be saved, and a stray space would render
+            // as `84.2  kg` on the Stats tile for ever.
+            reachMappingStep(date, read, journal, weight, sleep)
+            viewModel.onEvent(NotionSetupEvent.MeasureToggled("w"))
+            viewModel.onEvent(NotionSetupEvent.MeasureUnitChanged("w", " kg "))
+            // Typed for `Sleep` and then never ticked — it must not reach the mapping.
+            viewModel.onEvent(NotionSetupEvent.MeasureUnitChanged("s", "h"))
+            repository.importResult = NotionSetupResult.Success(3)
+
+            viewModel.onEvent(NotionSetupEvent.MappingSubmitted)
+
+            assertEquals(listOf(SavedMeasure("w", "kg")), repository.savedMappings.single().measures)
         }
 
     // --- finishing ----------------------------------------------------------------------------

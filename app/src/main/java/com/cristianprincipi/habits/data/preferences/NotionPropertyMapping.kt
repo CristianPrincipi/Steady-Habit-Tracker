@@ -55,6 +55,34 @@ value class NotionDatabaseId(
 )
 
 /**
+ * A number column the app reads and averages, and the unit the user typed for it (M15.4).
+ *
+ * ⭐⭐ **A measure is not a habit, and the type system is where that is enforced.** `CLAUDE.md`
+ * §3.5 and the M15.4 audit both land on the same argument: keeping these ids **out of**
+ * [NotionPropertyMapping.habitPropertyIds] is what makes the exclusion structural rather than a
+ * filter every screen has to remember. Week pills, the Month and Year dot grids and the streak
+ * tiles all iterate habits; none of them can accidentally draw a measure, because a measure is not
+ * in the collection they read.
+ *
+ * ⭐ **It is also what keeps the push path free.** `SyncEngine.pushDay` builds its request body by
+ * mapping `MappedHabits.properties` to `NotionPropertyValue.Checkbox`, so a property id that never
+ * enters that set has **no code path** to a write payload — which is the whole of what the user's
+ * *"read only"* asked for, obtained by construction rather than by a guard somebody could remove.
+ *
+ * @param unit blank for "show the bare number". ⚠⚠ **Typed by the user, because it cannot be
+ *   derived**: `NotionPropertySchemaDto` carries no number format, and §3.4 forbids reading "kg"
+ *   off a property *named* `Weight`.
+ */
+data class NotionMeasure(
+    val id: NotionPropertyId,
+    val unit: String,
+) {
+    init {
+        require(id.value.isNotBlank()) { "A measure needs a property id." }
+    }
+}
+
+/**
  * What the user told us their Notion database means. **The whole of it.**
  *
  * `CLAUDE.md` §3.4 describes this as "one dropdown per domain field" — which property is the habit
@@ -67,12 +95,17 @@ value class NotionDatabaseId(
  * 2. **[dayKeyPropertyId]** — the `Date` property that says which day a page *is*. Not the title
  *    (unused in this database) and not `created_time` (`docs/notion-schema.md` §2).
  * 3. **[habitPropertyIds]** — which of the checkbox properties are habits.
+ * 4. **[measures]** — which of the number properties to average on the Stats screen (M15.4).
  *
- * **The third one is a subset, and the leftovers are the point.** `Weight`, `Sleep`, `Area` and
- * `Progress` sit in the same schema and are not habits; §7 requires the sync to read pages "without
- * touching them, and never null them out on write". Anything absent from this set is invisible to
- * the app: not imported, not rendered, and — because `NotionApi.updatePage` sends only the
- * properties it is given — not written.
+ * **The last two are subsets, and the leftovers are still the point.** `Area` and `Progress` sit in
+ * the same schema and are neither; §7 requires the sync to read pages "without touching them, and
+ * never null them out on write". Anything absent from both sets is invisible to the app: not
+ * imported, not rendered, and — because `NotionApi.updatePage` sends only the properties it is
+ * given — not written.
+ *
+ * ⚠ **Being in [measures] buys visibility and nothing else.** `Weight` and `Sleep` used to be
+ * leftovers and are now mapped, and §7 still holds for them exactly: a measure is pulled, stored
+ * and averaged, and there is no code path that can write one back (see [NotionMeasure]).
  *
  * **No property names anywhere.** Not stored, not defaulted, not suggested. `CLAUDE.md` §3.4 forbids
  * hardcoding one, and this type is the reason nothing needs to: the display names come from the
@@ -86,7 +119,15 @@ value class NotionDatabaseId(
  * do. It is stored beside the mapping, not instead of it, and never sent anywhere.
  *
  * **What is still deliberately *not* here.** The habits' names, colours and start dates: those are
- * Room's, and one copy of a fact is enough. The sync cursor: that is
+ * Room's, and one copy of a fact is enough.
+ *
+ * ⚠ **[NotionMeasure.unit] looks like it breaks that rule and does not.** A unit is app-local
+ * presentation, like a colour — so by the paragraph above it belongs in Room. It is here because of
+ * *when* it is collected: the user types it in the mapping screen, at the moment they tick the
+ * column, and on a first run **no row exists yet** to put it on. This follows `habitPropertyIds`'
+ * own precedent rather than the colour's — that field carries the user's order and `HabitImporter`
+ * copies it onto `HabitEntity.sortOrder`. The mapping is the input of record; Room gets the working
+ * copy. The sync cursor: that is
  * [com.cristianprincipi.habits.domain.repository.SettingsRepository]'s `lastSyncedAt`, and a
  * mapping that changed when a sync finished would invalidate a cache the user never touched.
  */
@@ -124,6 +165,20 @@ data class NotionPropertyMapping(
      * re-mapping onto a different database cannot leave a link pointing at the old one.
      */
     val databaseId: NotionDatabaseId? = null,
+    /**
+     * The number properties to average on the Stats screen, in the order they should be shown.
+     *
+     * ⚠⚠ **A `List` and not a `Set`, and that is a real loss that has to be paid for below.**
+     * [habitPropertyIds] gets ADR-035's duplicate-id guarantee for free from being a `Set`; this
+     * cannot, because a [NotionMeasure] carries a unit as well as an id, so two entries naming one
+     * property with different units are distinct set members and a `Set` would happily hold both.
+     * The `require` in [init] is what replaces the type-level guarantee — it is not belt-and-braces,
+     * it is the only thing standing there.
+     *
+     * Empty is the normal state: every mapping saved before M15.4 has none, and a user who wants no
+     * averages maps none. ⚠ **Never pre-ticked**, unlike the habits — see `withMapping`.
+     */
+    val measures: List<NotionMeasure> = emptyList(),
 ) {
     init {
         // These are `require`s rather than a nullable factory because every construction site is
@@ -137,6 +192,18 @@ data class NotionPropertyMapping(
         }
         require(databaseId == null || databaseId.value.isNotBlank()) {
             "A database id, once known, cannot be blank."
+        }
+        // The three below are what a `Set` would have given [measures] for nothing. A property
+        // that is two things at once makes every pull ambiguous in exactly ADR-035's way, and the
+        // day key being read as a measure would average a column of dates.
+        require(measures.map(NotionMeasure::id).distinct().size == measures.size) {
+            "The mapping names the same measure property twice."
+        }
+        require(measures.none { it.id in habitPropertyIds }) {
+            "A property cannot be both a habit and a measure."
+        }
+        require(measures.none { it.id == dayKeyPropertyId }) {
+            "The day-key property cannot also be a measure: ${dayKeyPropertyId.value}"
         }
     }
 }

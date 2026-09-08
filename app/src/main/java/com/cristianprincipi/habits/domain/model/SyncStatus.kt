@@ -194,6 +194,31 @@ sealed interface MappingIssue {
     ) : MappingIssue
 
     /**
+     * A mapped measure's number property no longer exists (M15.4).
+     *
+     * ⚠ **Separate from [HabitMissing] because the sentence a user reads is different.** A habit
+     * column taking its history with it is the alarming case; a measure column is numbers Notion
+     * has already destroyed and this app only mirrored. Telling someone their history may be at
+     * risk when it is not is how a screen stops being believed.
+     */
+    data class MeasureMissing(
+        val propertyId: String,
+    ) : MappingIssue
+
+    /**
+     * A mapped measure is still there but is no longer a number.
+     *
+     * ⚠ Unlike [HabitRetyped] there is nothing to overwrite — nothing writes to a measure. This is
+     * §3.4's *read* half: every page would decode as unreadable and the average would quietly
+     * become "no readings" instead of saying the mapping is wrong.
+     */
+    data class MeasureRetyped(
+        val propertyId: String,
+        val name: String,
+        val actualType: String,
+    ) : MappingIssue
+
+    /**
      * The schema validated against was not the data source the mapping names.
      *
      * A bug in this app rather than anything the user did — every call takes the id from the same

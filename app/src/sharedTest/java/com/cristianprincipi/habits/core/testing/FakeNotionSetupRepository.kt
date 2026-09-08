@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.core.testing
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
 import com.cristianprincipi.habits.domain.model.NotionSource
+import com.cristianprincipi.habits.domain.model.SavedMeasure
 import com.cristianprincipi.habits.domain.model.SavedNotionMapping
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import kotlinx.coroutines.flow.Flow
@@ -79,8 +80,9 @@ class FakeNotionSetupRepository : NotionSetupRepository {
         sourceId: String,
         dayKeyPropertyId: String,
         habitPropertyIds: List<String>,
+        measures: List<SavedMeasure>,
     ) {
-        savedMappings += SavedNotionMapping(sourceId, dayKeyPropertyId, habitPropertyIds)
+        savedMappings += SavedNotionMapping(sourceId, dayKeyPropertyId, habitPropertyIds, measures)
         configured.value = true
     }
 

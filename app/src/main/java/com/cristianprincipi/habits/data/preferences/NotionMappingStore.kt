@@ -104,6 +104,7 @@ class NotionMappingStore
                     dayKeyPropertyId = mapping.dayKeyPropertyId.value,
                     habitPropertyIds = mapping.habitPropertyIds.map(NotionPropertyId::value),
                     databaseId = mapping.databaseId?.value,
+                    measures = mapping.measures.map { StoredMeasure(it.id.value, it.unit) },
                 ),
             )
 
@@ -129,6 +130,12 @@ class NotionMappingStore
                     // List -> LinkedHashSet: the stored order is the habit order.
                     habitPropertyIds = storedMapping.habitPropertyIds.map(::NotionPropertyId).toSet(),
                     databaseId = storedMapping.databaseId?.let(::NotionDatabaseId),
+                    // Not deduplicated, not filtered, not repaired. A repeated measure id, or one
+                    // that is also a habit, trips `NotionPropertyMapping`'s own `require` and lands
+                    // in the `runCatching` below as `null` — which is this class's documented
+                    // answer for a blob it cannot make sense of, and the same answer a repeated
+                    // habit id has always got.
+                    measures = storedMapping.measures.map { NotionMeasure(NotionPropertyId(it.id), it.unit) },
                 )
             }.getOrNull()
 
@@ -151,6 +158,22 @@ class NotionMappingStore
              * existing user back through setup for a field that only draws a link.
              */
             @SerialName("database_id") val databaseId: String? = null,
+            /**
+             * Absent from every mapping written before M15.4, hence the default — the same
+             * reasoning as [databaseId] above, and the reason a user who connected last week does
+             * not get sent back through setup by this release.
+             */
+            @SerialName("measures") val measures: List<StoredMeasure> = emptyList(),
+        )
+
+        /**
+         * One measure on disk. Spelled out for [StoredMapping]'s reason: this is a storage format,
+         * not a Kotlin identifier, and renaming a field here orphans every user's saved units.
+         */
+        @Serializable
+        private data class StoredMeasure(
+            @SerialName("property_id") val id: String,
+            @SerialName("unit") val unit: String = "",
         )
 
         private companion object {

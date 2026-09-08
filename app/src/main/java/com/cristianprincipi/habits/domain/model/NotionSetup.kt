@@ -55,12 +55,31 @@ enum class NotionPropertyRole {
     Habit,
 
     /**
-     * Neither, and therefore not offered.
+     * A `number` property — eligible to be a **measure**: pulled, averaged, never pushed (M15.4).
+     *
+     * ⚠ **`Weight` and `Sleep` used to be [Unavailable], and the KDoc below used to name them as
+     * its examples.** They are why this case exists — the user asked for their daily numbers on the
+     * Stats screen, *"read only, just the average on stats"*.
+     *
+     * ⭐ **The line between this and [Unavailable] is not writability.** Notion would let us write a
+     * number; we do not, and cannot: [com.cristianprincipi.habits.data.remote.notion.mapper.NotionPropertyValue.Writable]
+     * has exactly two implementations and `Number` is not one of them, so there is no method to
+     * call. What the line actually is: whether the app has somewhere to put the value. A number it
+     * has; a `multi_select` it has not.
+     */
+    Measure,
+
+    /**
+     * None of the three, and therefore not offered.
      *
      * Two different reasons land here and the user does not need them separated: a `formula` or a
-     * `rollup` cannot be written at all, and a `number` or a `multi_select` is perfectly writable
-     * but is not a day and is not a habit. `Weight`, `Sleep`, `Area` and `Progress` are all this,
-     * and `docs/notion-schema.md` §7 requires every one of them to come through a sync untouched.
+     * `rollup` cannot be written at all, and a `multi_select` is perfectly writable but is not a
+     * day, a habit or a number. `Area` and `Progress` are both this, and `docs/notion-schema.md`
+     * §7 requires every one of them to come through a sync untouched.
+     *
+     * ⚠ **Mapping a measure does not weaken that §7 requirement for the two that moved out of
+     * here.** A measure is read and never written, so `Weight` and `Sleep` come through a sync
+     * exactly as untouched as they were when they were listed in this paragraph.
      */
     Unavailable,
 }
@@ -78,6 +97,27 @@ data class SavedNotionMapping(
     val sourceId: String,
     val dayKeyPropertyId: String,
     val habitPropertyIds: List<String>,
+    /**
+     * The mapped number columns and the unit typed for each. Empty for every mapping saved before
+     * M15.4, hence the default — an old mapping is not a broken one, it is one with no measures.
+     */
+    val measures: List<SavedMeasure> = emptyList(),
+)
+
+/**
+ * A number column the user has chosen to average, and what to call its unit.
+ *
+ * ⚠⚠ **[unit] is typed by the user and cannot be anything else.** `NotionPropertySchemaDto` is
+ * `id, name, type` and carries no number format, and `CLAUDE.md` §3.4 forbids inferring "kg" from a
+ * property *named* `Weight`. `docs/notion-schema.md` §6 has the real answer — kg and decimal hours,
+ * confirmed by the owner — and **nothing in this codebase is allowed to know it**.
+ *
+ * Blank is normal and means "show the bare number". ⚠ It is the ambiguous case for `Sleep`
+ * specifically: §2.4 records that `7.5` means 7h30m, which a unitless `7.5` does not say.
+ */
+data class SavedMeasure(
+    val propertyId: String,
+    val unit: String,
 )
 
 /**

@@ -17,6 +17,8 @@ class NotionPropertyMappingTest {
     private val readId = NotionPropertyId("ZI%40W")
     private val dateId = NotionPropertyId("M%3BBw")
     private val journalId = NotionPropertyId("Ye%3Aq")
+    private val weightId = NotionPropertyId("%3FfMg")
+    private val sleepId = NotionPropertyId("%7BQ%5Ct")
 
     private val dataSource = NotionDataSourceId("2f0b1c8e-0000-4000-8000-000000000000")
 
@@ -109,5 +111,90 @@ class NotionPropertyMappingTest {
             )
 
         assertEquals(emptySet<NotionPropertyId>(), mapping.habitPropertyIds)
+    }
+
+    // --- measures (M15.4) ---------------------------------------------------------------------
+
+    @Test
+    fun oneMeasureCannotBeMappedTwiceEvenWithDifferentUnits() {
+        // ⭐⭐ **The discriminating case, and the reason this test exists at all.**
+        // `habitPropertyIds` gets ADR-035's guarantee from being a `Set`. `measures` cannot: a
+        // NotionMeasure carries a unit, so the two entries below are *distinct* set members and a
+        // `Set<NotionMeasure>` would hold both quite happily. Written with different units on
+        // purpose — the same-unit version would pass against a `Set` and prove nothing.
+        assertThrows(IllegalArgumentException::class.java) {
+            NotionPropertyMapping(
+                dataSourceId = dataSource,
+                dayKeyPropertyId = dateId,
+                habitPropertyIds = setOf(readId),
+                measures = listOf(NotionMeasure(weightId, "kg"), NotionMeasure(weightId, "lb")),
+            )
+        }
+    }
+
+    @Test
+    fun aPropertyCannotBeBothAHabitAndAMeasure() {
+        // A checkbox is not a number, so this can only arrive from a bug — and it would make one
+        // Notion column both a check-off the app writes and a reading it averages.
+        assertThrows(IllegalArgumentException::class.java) {
+            NotionPropertyMapping(
+                dataSourceId = dataSource,
+                dayKeyPropertyId = dateId,
+                habitPropertyIds = setOf(readId),
+                measures = listOf(NotionMeasure(readId, "kg")),
+            )
+        }
+    }
+
+    @Test
+    fun theDayKeyCannotAlsoBeAMeasure() {
+        // [theDayKeyCannotAlsoBeAHabit]'s twin. Averaging a column of dates is not a smaller
+        // mistake than checking one off.
+        assertThrows(IllegalArgumentException::class.java) {
+            NotionPropertyMapping(
+                dataSourceId = dataSource,
+                dayKeyPropertyId = dateId,
+                habitPropertyIds = setOf(readId),
+                measures = listOf(NotionMeasure(dateId, "")),
+            )
+        }
+    }
+
+    @Test
+    fun aMeasureKeepsTheUnitAndTheOrderTheUserGaveIt() {
+        // The order is the display order, exactly as it is for habits, and the unit is app-local
+        // text that exists nowhere but here until M15.4b copies it into Room.
+        val mapping =
+            NotionPropertyMapping(
+                dataSourceId = dataSource,
+                dayKeyPropertyId = dateId,
+                habitPropertyIds = setOf(readId),
+                measures = listOf(NotionMeasure(sleepId, "h"), NotionMeasure(weightId, "kg")),
+            )
+
+        assertEquals(listOf(sleepId, weightId), mapping.measures.map(NotionMeasure::id))
+        assertEquals(listOf("h", "kg"), mapping.measures.map(NotionMeasure::unit))
+    }
+
+    @Test
+    fun aMeasureWithNoUnitIsAllowed() {
+        // Blank means "show the bare number" and is the default state of the box on the mapping
+        // screen. Requiring a unit would make the field mandatory for a purely cosmetic label.
+        val mapping =
+            NotionPropertyMapping(
+                dataSourceId = dataSource,
+                dayKeyPropertyId = dateId,
+                habitPropertyIds = setOf(readId),
+                measures = listOf(NotionMeasure(weightId, "")),
+            )
+
+        assertEquals("", mapping.measures.single().unit)
+    }
+
+    @Test
+    fun aBlankMeasureIdIsRejected() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NotionMeasure(NotionPropertyId(" "), "kg")
+        }
     }
 }

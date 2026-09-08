@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.remote.notion.mapper
 
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
+import com.cristianprincipi.habits.data.preferences.NotionMeasure
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
@@ -30,6 +31,8 @@ class NotionMappingValidatorTest {
     private val read = property(readId, "📖 Read", "checkbox")
     private val journal = property(journalId, "✒️ Journal", "checkbox")
     private val date = property(dateId, "Date", "date")
+    private val weightId = NotionPropertyId("%3FfMg")
+    private val weight = property(weightId, "⚖️ Weight", "number")
 
     private val mapping =
         NotionPropertyMapping(
@@ -37,6 +40,9 @@ class NotionMappingValidatorTest {
             dayKeyPropertyId = dateId,
             habitPropertyIds = setOf(readId, journalId),
         )
+
+    /** The same mapping with `Weight` averaged — M15.4's addition. */
+    private val withWeight = mapping.copy(measures = listOf(NotionMeasure(weightId, "kg")))
 
     @Test
     fun aSchemaThatStillMatchesValidates() {
@@ -206,6 +212,79 @@ class NotionMappingValidatorTest {
         val check = NotionMappingValidator.validate(mapping.copy(habitPropertyIds = emptySet()), schemaOf(date))
 
         assertEquals(emptyList<MappedProperty>(), check.valid().habits)
+    }
+
+    // --- measures (M15.4) ---------------------------------------------------------------------
+
+    @Test
+    fun aMappedMeasureValidatesAndCarriesItsCurrentNameAndItsUnit() {
+        val check = NotionMappingValidator.validate(withWeight, schemaOf(read, journal, date, weight))
+
+        assertEquals(listOf(MappedMeasure(MappedProperty(weightId, "⚖️ Weight"), "kg")), check.valid().measures)
+    }
+
+    @Test
+    fun aRenamedMeasureIsNotAProblemEither() {
+        // ⭐ [aRenamedHabitIsNotAProblem]'s payoff, extended: ADR-038 keys on the id, so renaming
+        // the column in Notion hands the caller a new label for the Stats tile and nothing else.
+        val renamed = property(weightId, "⚖️ Body weight", "number")
+
+        val check = NotionMappingValidator.validate(withWeight, schemaOf(read, journal, date, renamed))
+
+        assertEquals(
+            "⚖️ Body weight",
+            check
+                .valid()
+                .measures
+                .single()
+                .name,
+        )
+    }
+
+    @Test
+    fun aDeletedMeasureColumnIsAProblem() {
+        // §3.4: pause and say so. The alternative is an average over a column that is not there,
+        // which draws as a number rather than as a failure — nothing on the screen would look ill.
+        val check = NotionMappingValidator.validate(withWeight, schemaOf(read, journal, date))
+
+        assertEquals(listOf(NotionMappingProblem.MeasureMissing(weightId)), check.problems())
+    }
+
+    @Test
+    fun aMeasureThatIsNoLongerANumberIsAProblem() {
+        val retyped = property(weightId, "⚖️ Weight", "rich_text")
+
+        val check = NotionMappingValidator.validate(withWeight, schemaOf(read, journal, date, retyped))
+
+        assertEquals(
+            listOf(NotionMappingProblem.MeasureRetyped(weightId, "⚖️ Weight", "rich_text")),
+            check.problems(),
+        )
+    }
+
+    @Test
+    fun aNumberTheUserDidNotMapIsLeftAlone() {
+        // [aCheckboxTheUserDidNotMapIsLeftAlone]'s twin, and the same rule: a column appearing in
+        // the schema is not the user asking for it. `docs/notion-schema.md` §7 — read, untouched,
+        // and not adopted.
+        val check = NotionMappingValidator.validate(mapping, schemaOf(read, journal, date, weight))
+
+        assertTrue(check.valid().measures.isEmpty())
+    }
+
+    @Test
+    fun aBrokenHabitAndABrokenMeasureAreBothReported() {
+        // ⚠ Every problem, not the first — [NotionMappingCheck.Broken]'s rule. A user who deleted
+        // one of each should not fix one and be shown the next.
+        val check = NotionMappingValidator.validate(withWeight, schemaOf(read, date))
+
+        assertEquals(
+            listOf(
+                NotionMappingProblem.HabitMissing(journalId),
+                NotionMappingProblem.MeasureMissing(weightId),
+            ),
+            check.problems(),
+        )
     }
 
     private fun property(

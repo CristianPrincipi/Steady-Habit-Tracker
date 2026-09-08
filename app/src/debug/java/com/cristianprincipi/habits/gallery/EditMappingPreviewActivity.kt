@@ -109,6 +109,22 @@ private fun SampleMapping(
                         state.copy(dayKeyPropertyId = event.propertyId)
                     }
 
+                    is NotionSetupEvent.MeasureToggled -> {
+                        val ticked = state.measurePropertyIds
+                        state.copy(
+                            measurePropertyIds =
+                                if (event.propertyId in ticked) {
+                                    ticked - event.propertyId
+                                } else {
+                                    ticked + event.propertyId
+                                },
+                        )
+                    }
+
+                    is NotionSetupEvent.MeasureUnitChanged -> {
+                        state.copy(measureUnits = state.measureUnits + (event.propertyId to event.value))
+                    }
+
                     // The retry, which here just loads the sample schema.
                     NotionSetupEvent.DatabaseConfirmed -> {
                         stateFor(null)
@@ -123,14 +139,20 @@ private fun SampleMapping(
     )
 }
 
-/** The user's real shape, near enough: a date column, three habits, and two columns that are neither. */
+/**
+ * The user's real shape, near enough: a date column, three habits, two numbers and a formula.
+ *
+ * ⚠ The two numbers were `Unavailable` here until M15.4, and the formula is kept so the harness
+ * still renders the "not available" block they used to be the only examples of.
+ */
 private val sampleProperties =
     listOf(
         NotionProperty("d", "Date", "date", NotionPropertyRole.DayKey),
         NotionProperty("r", "📖 Read", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("j", "✒️ Journal", "checkbox", NotionPropertyRole.Habit),
         NotionProperty("t", "🥕 Diet", "checkbox", NotionPropertyRole.Habit),
-        NotionProperty("w", "Weight", "number", NotionPropertyRole.Unavailable),
+        NotionProperty("w", "⚖️ Weight", "number", NotionPropertyRole.Measure),
+        NotionProperty("s", "😴 Sleep", "number", NotionPropertyRole.Measure),
         NotionProperty("p", "Progress", "formula", NotionPropertyRole.Unavailable),
     )
 
@@ -152,6 +174,12 @@ private fun stateFor(variant: String?): NotionSetupUiState =
             NotionSetupUiState(step = NotionSetupStep.MapProperties, failure = SyncFailure.Offline)
         }
 
+        // M15.4. One measure ticked with a unit and one left alone — the two states of a box that
+        // is disabled rather than hidden, which is the thing a screenshot has to be able to show.
+        "measures" -> {
+            mapped(ticked = setOf("r", "j", "t"), measures = setOf("w"), units = mapOf("w" to "kg"))
+        }
+
         else -> {
             mapped(ticked = setOf("r", "j", "t"))
         }
@@ -160,10 +188,14 @@ private fun stateFor(variant: String?): NotionSetupUiState =
 private fun mapped(
     ticked: Set<String>,
     previously: Set<String> = setOf("r", "j", "t"),
+    measures: Set<String> = emptySet(),
+    units: Map<String, String> = emptyMap(),
 ) = NotionSetupUiState(
     step = NotionSetupStep.MapProperties,
     properties = sampleProperties,
     dayKeyPropertyId = "d",
     habitPropertyIds = ticked,
     previouslyMappedHabitIds = previously,
+    measurePropertyIds = measures,
+    measureUnits = units,
 )

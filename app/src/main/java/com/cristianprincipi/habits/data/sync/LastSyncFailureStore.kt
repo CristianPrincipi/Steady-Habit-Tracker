@@ -180,6 +180,11 @@ class LastSyncFailureStore
             const val DAY_KEY_RETYPED = "day_key_retyped"
             const val HABIT_MISSING = "habit_missing"
             const val HABIT_RETYPED = "habit_retyped"
+
+            // M15.4. ⚠ These two are a **storage format**, like `StoredMapping`'s field names:
+            // changing a string here orphans a notice already written to a user's device.
+            const val MEASURE_MISSING = "measure_missing"
+            const val MEASURE_RETYPED = "measure_retyped"
             const val WRONG_DATA_SOURCE = "wrong_data_source"
 
             /**
@@ -190,10 +195,23 @@ class LastSyncFailureStore
             fun StoredIssue.toIssue(): MappingIssue? =
                 when (kind) {
                     DAY_KEY_MISSING -> propertyId?.let(MappingIssue::DayKeyMissing)
+
                     HABIT_MISSING -> propertyId?.let(MappingIssue::HabitMissing)
+
                     WRONG_DATA_SOURCE -> MappingIssue.WrongDataSource
+
                     DAY_KEY_RETYPED -> retyped(MappingIssue::DayKeyRetyped)
+
                     HABIT_RETYPED -> retyped(MappingIssue::HabitRetyped)
+
+                    MEASURE_MISSING -> propertyId?.let(MappingIssue::MeasureMissing)
+
+                    MEASURE_RETYPED -> retyped(MappingIssue::MeasureRetyped)
+
+                    // ⚠⚠ The `else` above is why these two lines had to be written by hand. The
+                    // reverse `when` below is exhaustive and stopped the build; this one is keyed
+                    // on a String, so a missing kind is not a compile error — it is a stored
+                    // notice that reads back as nothing at all.
                     else -> null
                 }
 
@@ -205,11 +223,33 @@ class LastSyncFailureStore
 
             fun MappingIssue.stored(): StoredIssue =
                 when (this) {
-                    is MappingIssue.DayKeyMissing -> StoredIssue(DAY_KEY_MISSING, propertyId)
-                    is MappingIssue.HabitMissing -> StoredIssue(HABIT_MISSING, propertyId)
-                    MappingIssue.WrongDataSource -> StoredIssue(WRONG_DATA_SOURCE)
-                    is MappingIssue.DayKeyRetyped -> StoredIssue(DAY_KEY_RETYPED, propertyId, name, actualType)
-                    is MappingIssue.HabitRetyped -> StoredIssue(HABIT_RETYPED, propertyId, name, actualType)
+                    is MappingIssue.DayKeyMissing -> {
+                        StoredIssue(DAY_KEY_MISSING, propertyId)
+                    }
+
+                    is MappingIssue.HabitMissing -> {
+                        StoredIssue(HABIT_MISSING, propertyId)
+                    }
+
+                    MappingIssue.WrongDataSource -> {
+                        StoredIssue(WRONG_DATA_SOURCE)
+                    }
+
+                    is MappingIssue.DayKeyRetyped -> {
+                        StoredIssue(DAY_KEY_RETYPED, propertyId, name, actualType)
+                    }
+
+                    is MappingIssue.HabitRetyped -> {
+                        StoredIssue(HABIT_RETYPED, propertyId, name, actualType)
+                    }
+
+                    is MappingIssue.MeasureMissing -> {
+                        StoredIssue(MEASURE_MISSING, propertyId)
+                    }
+
+                    is MappingIssue.MeasureRetyped -> {
+                        StoredIssue(MEASURE_RETYPED, propertyId, name, actualType)
+                    }
                 }
         }
     }
@@ -266,5 +306,7 @@ private fun NotionMappingProblem.asIssue(): MappingIssue =
         is NotionMappingProblem.DayKeyRetyped -> MappingIssue.DayKeyRetyped(id.value, name, actualType)
         is NotionMappingProblem.HabitMissing -> MappingIssue.HabitMissing(id.value)
         is NotionMappingProblem.HabitRetyped -> MappingIssue.HabitRetyped(id.value, name, actualType)
+        is NotionMappingProblem.MeasureMissing -> MappingIssue.MeasureMissing(id.value)
+        is NotionMappingProblem.MeasureRetyped -> MappingIssue.MeasureRetyped(id.value, name, actualType)
         is NotionMappingProblem.WrongDataSource -> MappingIssue.WrongDataSource
     }
