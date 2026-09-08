@@ -113,4 +113,27 @@ interface HabitDao {
         habitId: String,
         color: String,
     )
+
+    /**
+     * Sets one habit's position in the list — M15.5.
+     *
+     * ⭐ **App-local, exactly like [setColor], and that is the decision this query encodes.**
+     * `sortOrder` used to be re-derived from the mapping on every sync (`sortOrder = index`), which
+     * meant the user could not own it: the next pull would put it back. `HabitImporter` now carries
+     * it forward the way it carries the colour, and this is how the user changes it.
+     *
+     * ⚠ **Callers write the whole list, not one row.** A move swaps two neighbours, and writing
+     * only one of them leaves two habits claiming a position. `HabitRepositoryImpl.setHabitOrder`
+     * renumbers everything from zero inside a transaction, which also repairs any gap or collision
+     * an older build left behind.
+     */
+    @Query("UPDATE habits SET sortOrder = :sortOrder WHERE id = :habitId")
+    suspend fun setSortOrder(
+        habitId: String,
+        sortOrder: Int,
+    )
+
+    /** The highest position in use, or null when there are no habits. New rows go after it. */
+    @Query("SELECT MAX(sortOrder) FROM habits")
+    suspend fun highestSortOrder(): Int?
 }

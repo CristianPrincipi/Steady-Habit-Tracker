@@ -7,6 +7,8 @@ import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.usecase.GetHabits
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
+import com.cristianprincipi.habits.domain.usecase.MoveDirection
+import com.cristianprincipi.habits.domain.usecase.MoveHabit
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,7 +18,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Everything the user can do on the habit list. Which is one thing (ADR-010). */
+/** Everything the user can do on the habit list. Which is two things (ADR-010). */
 sealed interface ManageHabitsEvent {
     /**
      * Give a habit a colour.
@@ -28,12 +30,24 @@ sealed interface ManageHabitsEvent {
         val habitId: HabitId,
         val color: HabitColor,
     ) : ManageHabitsEvent
+
+    /**
+     * Move a habit one place up or down — M15.5.
+     *
+     * ⭐ **Still not a schema change**, which is why it belongs on this screen beside the colour:
+     * Notion has no order property (`docs/notion-schema.md` §3), so the order is app-local
+     * presentation and nothing here is pushed. ADR-010 is untouched.
+     */
+    data class Moved(
+        val habitId: HabitId,
+        val direction: MoveDirection,
+    ) : ManageHabitsEvent
 }
 
 /**
  * Drives the habit list.
  *
- * ⭐ **Three use cases and no repository, and that is the point.** `SetHabitColor`'s KDoc asks for
+ * ⭐ **Four use cases and no repository, and that is the point.** `SetHabitColor`'s KDoc asks for
  * exactly this: a screen that can set a colour should not be holding something that can also write
  * completions, and `GetNotionDatabaseUrl` keeps `disconnect()` out of reach for the same reason. The
  * classes are thin; the reach they deny is not.
@@ -49,6 +63,7 @@ class ManageHabitsViewModel
         getHabits: GetHabits,
         getNotionDatabaseUrl: GetNotionDatabaseUrl,
         private val setHabitColor: SetHabitColor,
+        private val moveHabit: MoveHabit,
     ) : ViewModel() {
         val uiState: StateFlow<ManageHabitsUiState> =
             combine(getHabits(), getNotionDatabaseUrl()) { habits, url ->
@@ -71,6 +86,21 @@ class ManageHabitsViewModel
                     // immediate, unambiguous feedback for a change that is decoration: the habit,
                     // its history and its sync are all untouched by it.
                     launchWrite { setHabitColor(habitId = event.habitId, color = event.color) }
+                }
+
+                is ManageHabitsEvent.Moved -> {
+                    // ⚠⚠ **The list is read from the state, not from the repository**, and that is
+                    // what makes the move operate on what the user is looking at. Re-reading inside
+                    // the use case would open a window where a sync landed between the tap and the
+                    // write, and the habit would move relative to a list that was never on screen.
+                    val current = (uiState.value as? ManageHabitsUiState.Content)?.habits ?: return
+                    // Quiet on failure, for `ColorPicked`'s reason and more plainly: the row is
+                    // drawn from Room with no optimistic overlay, so a write that does not land
+                    // leaves the habit exactly where it was, in front of the user, which is
+                    // unambiguous feedback for a change that is presentation.
+                    launchWrite {
+                        moveHabit(current = current, habitId = event.habitId, direction = event.direction)
+                    }
                 }
             }
         }

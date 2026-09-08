@@ -1,19 +1,25 @@
 package com.cristianprincipi.habits.feature.managehabits
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.ColorSwatchRow
@@ -21,12 +27,16 @@ import com.cristianprincipi.habits.core.designsystem.component.HabitIcon
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
 import com.cristianprincipi.habits.core.designsystem.component.readingWidth
+import com.cristianprincipi.habits.core.designsystem.icon.Lucide
+import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.usecase.MoveDirection
 
 /**
  * The habit list — **read-only, except for the colour** (ADR-010).
@@ -113,11 +123,19 @@ fun ManageHabitsContent(
         }
 
         // ⭐ M12.5 — see `Motion`'s closing note for why this is a platform spring and not a token.
-        items(items = state.habits, key = { habit -> habit.id.value }) { habit ->
+        itemsIndexed(items = state.habits, key = { _, habit -> habit.id.value }) { index, habit ->
             HabitRow(
                 habit = habit,
+                // ⚠ Disabled at the ends rather than absent, which is this project's standing
+                // preference (ADR-060) and matters more here than usual: a control that appears
+                // and vanishes as a row moves would flicker under the very finger moving it.
+                canMoveUp = index > 0,
+                canMoveDown = index < state.habits.lastIndex,
                 onColorPicked = { color ->
                     onEvent(ManageHabitsEvent.ColorPicked(habitId = habit.id, color = color))
+                },
+                onMove = { direction ->
+                    onEvent(ManageHabitsEvent.Moved(habitId = habit.id, direction = direction))
                 },
                 modifier = Modifier.animateItem(),
             )
@@ -173,16 +191,23 @@ private fun WhereHabitsLiveCard(
 }
 
 /**
- * One habit: its icon and name, and its four colours.
+ * One habit: its icon and name, its two move buttons, and its five colours.
  *
- * The swatches sit **under** the name rather than beside it. Four 48dp targets, a 40dp icon and a
+ * The swatches sit **under** the name rather than beside it. Five 48dp targets, a 40dp icon and a
  * name do not share one row on a narrow phone without the name truncating, and the name is the part
  * that identifies the row.
+ *
+ * ⭐ **The move buttons do share that top row**, because there are only two of them and they belong
+ * beside the thing they move rather than under it. The name takes `weight(1f)` so they sit hard
+ * right, where a thumb reaches them.
  */
 @Composable
 private fun HabitRow(
     habit: Habit,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
     onColorPicked: (HabitColor) -> Unit,
+    onMove: (MoveDirection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val palette = HabitColor.entries
@@ -196,6 +221,19 @@ private fun HabitRow(
                 text = habit.name,
                 style = MaterialTheme.typography.titleSmall,
                 color = HabitsTheme.colors.text.primary,
+                modifier = Modifier.weight(1f),
+            )
+            MoveButton(
+                direction = MoveDirection.Up,
+                habitName = habit.name,
+                enabled = canMoveUp,
+                onClick = { onMove(MoveDirection.Up) },
+            )
+            MoveButton(
+                direction = MoveDirection.Down,
+                habitName = habit.name,
+                enabled = canMoveDown,
+                onClick = { onMove(MoveDirection.Down) },
             )
         }
         ColorSwatchRow(
@@ -206,6 +244,68 @@ private fun HabitRow(
         )
     }
 }
+
+/**
+ * One move arrow — M15.5.
+ *
+ * ### ⭐⭐ The glyph is `ChevronLeft`/`ChevronRight` **rotated**, not a new one
+ *
+ * There is no `chevron-up` or `chevron-down` among the app's thirteen Lucide glyphs, and
+ * `LucideGlyphs` is transcribed verbatim from the upstream SVGs — *"nothing was redrawn by hand"* —
+ * with ADR-024 settling the family on purpose. Rotating the horizontal chevron a quarter turn gives
+ * the vertical one **from the same path data**, so this needs no fourteenth glyph, no invented
+ * coordinates and no decision that belongs to the user. `ChevronLeft` turned 90° clockwise points
+ * up; `ChevronRight` turned the same way points down.
+ *
+ * ### The three sizes are `ChevronButton`'s, deliberately
+ *
+ * 18dp of glyph inside a 48dp target, matching the Month and Week nav arrows: the same gesture
+ * ("move by one") should not have two different targets in one app.
+ *
+ * ⚠ **Disabled rather than hidden at the ends**, and `clickable(enabled = false)` is what tells a
+ * screen reader so — announcing "Move Read up, disabled" is the whole reason not to hand-roll the
+ * semantics here.
+ */
+@Composable
+private fun MoveButton(
+    direction: MoveDirection,
+    habitName: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val label =
+        when (direction) {
+            MoveDirection.Up -> stringResource(R.string.habits_move_up, habitName)
+            MoveDirection.Down -> stringResource(R.string.habits_move_down, habitName)
+        }
+    Box(
+        modifier =
+            Modifier
+                .size(Sizing.minimumTouchTarget)
+                .clickable(
+                    enabled = enabled,
+                    onClickLabel = label,
+                    role = Role.Button,
+                    onClick = onClick,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        LucideIcon(
+            glyph = if (direction == MoveDirection.Up) Lucide.ChevronLeft else Lucide.ChevronRight,
+            contentDescription = null,
+            modifier = Modifier.size(Sizing.iconMedium).rotate(QUARTER_TURN),
+            tint =
+                if (enabled) {
+                    HabitsTheme.colors.text.secondary
+                } else {
+                    HabitsTheme.colors.text.disabled
+                },
+        )
+    }
+}
+
+/** Clockwise, which turns a left chevron into an up one and a right chevron into a down one. */
+private const val QUARTER_TURN = 90f
 
 /**
  * The word for a colour, for a screen reader.

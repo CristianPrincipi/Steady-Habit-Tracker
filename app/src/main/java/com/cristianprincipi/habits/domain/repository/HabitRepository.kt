@@ -48,6 +48,25 @@ interface HabitRepository {
     ): Flow<List<Completion>>
 
     /**
+     * Put the habits in this order — M15.5.
+     *
+     * **The whole list, not a move**, and the list is the domain's business rather than this
+     * layer's: [com.cristianprincipi.habits.domain.usecase.MoveHabit] owns the rule that a move
+     * swaps with a neighbour, and this only writes the answer. An interface that took
+     * `(habitId, direction)` would put list arithmetic in the data layer and make the rule
+     * untestable without a database.
+     *
+     * ⚠ **Ids not in [orderedIds] are left where they are.** The caller passes every visible
+     * habit, so in practice the set is complete; a partial list is not rejected because there is
+     * nothing sensible to do about it — renumbering only what was named is the least surprising
+     * answer and cannot lose a habit.
+     *
+     * Local only. Notion has no order property (`docs/notion-schema.md` §3), so this is never
+     * pushed — the same standing as the colour.
+     */
+    suspend fun setHabitOrder(orderedIds: List<HabitId>)
+
+    /**
      * Check a habit off on a day, or take it back.
      *
      * **Idempotent, and states rather than toggles.** Two calls with `completed = true` leave one

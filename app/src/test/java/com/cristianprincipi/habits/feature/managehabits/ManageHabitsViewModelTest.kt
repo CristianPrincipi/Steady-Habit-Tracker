@@ -9,6 +9,7 @@ import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.usecase.GetHabits
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
+import com.cristianprincipi.habits.domain.usecase.MoveHabit
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -39,6 +40,7 @@ class ManageHabitsViewModelTest {
             getHabits = GetHabits(habits),
             getNotionDatabaseUrl = GetNotionDatabaseUrl(connection),
             setHabitColor = SetHabitColor(habits),
+            moveHabit = MoveHabit(habits),
         )
 
     @Test

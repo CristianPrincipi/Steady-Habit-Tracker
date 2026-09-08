@@ -67,11 +67,22 @@ class HabitImporter
         /**
          * Brings the habit table in line with the mapped schema.
          *
-         * **Three things are carried forward from an existing row, and each has a reason.** The
+         * **Four things are carried forward from an existing row, and each has a reason.** The
          * local [HabitEntity.id], because every completion in the database points at it. The
          * [HabitEntity.color], because it is app-local and exists nowhere else — `HabitDao.upsert`
          * writes every column, so a fresh entity would silently repaint the user's habits
          * (`docs/notion-schema.md` §3). The start date, because [refreshStartDates] owns it.
+         *
+         * ⭐⭐ **And since M15.5, [HabitEntity.sortOrder] — which used to be `index` here, and that
+         * was the whole reason the user could not own their habit order.** Re-deriving it on every
+         * sync meant any order they set was correct until the next pull and then silently gone.
+         * It is app-local presentation exactly as the colour is: Notion has no order property to
+         * be authoritative about one.
+         *
+         * ⚠ **A habit that goes inactive keeps its position and gets it back**, because the row is
+         * kept rather than deleted (ADR-081) and `previous` still finds it. Unticking a habit and
+         * re-ticking it therefore does not move it to the end, which is what a user who was
+         * checking something would expect.
          *
          * A **renamed** property arrives as a new [MappedProperty.name] on an unchanged id and is
          * simply written down (ADR-038). A habit the mapping no longer names goes inactive rather
@@ -81,21 +92,32 @@ class HabitImporter
         suspend fun import(habits: List<MappedProperty>): MappedHabits {
             val existing = habitDao.findAll().associateBy(HabitEntity::notionPropertyId)
             val today = LocalDate.now(clock).toEpochDay()
+            // ⚠ Read once, before the loop, and advanced by hand — new habits go **after**
+            // everything that already has a position, in the order the mapping lists them.
+            // Recomputing it per habit would give every new habit the same number.
+            var nextOrder = (habitDao.highestSortOrder() ?: -1) + 1
 
             val entities =
-                habits.mapIndexed { index, mapped ->
+                habits.map { mapped ->
                     val previous = existing[mapped.id.value]
+                    // ⚠ Bound here rather than inlined into both arguments below. `color` is
+                    // declared before `sortOrder`, so `nextOrder++` in one and `nextOrder` in the
+                    // other would work only because Kotlin evaluates named arguments in
+                    // declaration order — true, and far too quiet a thing to depend on.
+                    val position = previous?.sortOrder ?: nextOrder++
                     HabitEntity(
                         id = previous?.id ?: UUID.randomUUID().toString(),
                         notionPropertyId = mapped.id.value,
                         notionPropertyName = mapped.name,
-                        color = previous?.color ?: defaultColorAt(index),
+                        color = previous?.color ?: defaultColorAt(position),
                         // Provisional, and corrected by refreshStartDates once days exist. Today
                         // rather than the epoch: an uncorrected zero would render as 1970 and turn
                         // every completion rate into a rounding error.
                         startDateEpochDay = previous?.startDateEpochDay ?: today,
                         isActive = true,
-                        sortOrder = index,
+                        // App-local since M15.5 — see the KDoc. A habit seen for the first time is
+                        // appended; every other keeps where the user put it.
+                        sortOrder = position,
                     )
                 }
 

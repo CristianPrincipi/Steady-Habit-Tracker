@@ -73,6 +73,20 @@ class FakeHabitDao(
         val habit = rows.value[habitId] ?: return
         rows.value = rows.value + (habitId to habit.copy(color = color))
     }
+
+    override suspend fun setSortOrder(
+        habitId: String,
+        sortOrder: Int,
+    ) {
+        val habit = rows.value[habitId] ?: return
+        rows.value = rows.value + (habitId to habit.copy(sortOrder = sortOrder))
+    }
+
+    /**
+     * ⚠ `maxOfOrNull`, so an empty table answers `null` rather than `0` — which is what makes
+     * `HabitImporter` start a first run at position 0 instead of 1.
+     */
+    override suspend fun highestSortOrder(): Int? = rows.value.values.maxOfOrNull(HabitEntity::sortOrder)
 }
 
 class FakeDayDao(

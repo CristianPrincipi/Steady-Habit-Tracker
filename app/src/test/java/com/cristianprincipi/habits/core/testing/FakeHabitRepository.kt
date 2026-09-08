@@ -36,6 +36,15 @@ class FakeHabitRepository(
     val colorWrites = mutableListOf<Pair<HabitId, HabitColor>>()
 
     /**
+     * Every `setHabitOrder` this received, in order — M15.5.
+     *
+     * ⚠ Recorded as well as applied, because "wrote nothing" is a thing a test needs to assert:
+     * a move that does nothing must not write, since a no-op write still emits through the flow and
+     * animates the list.
+     */
+    val orderWrites = mutableListOf<List<HabitId>>()
+
+    /**
      * Every window `observeCompletions` was asked for, in order — one entry per **call**.
      *
      * M9.7's counter. The invariant it exists to hold is ADR-094 §1's: one range query answers the
@@ -99,6 +108,14 @@ class FakeHabitRepository(
         failWritesWith?.let { throw it }
         val row = Completion(habitId, date)
         completionRows.value = if (completed) completionRows.value + row else completionRows.value - row
+    }
+
+    override suspend fun setHabitOrder(orderedIds: List<HabitId>) {
+        orderWrites += orderedIds
+        // Reordered rather than renumbered: this fake has no `sortOrder` column, so the list order
+        // *is* the order, which is what `observeHabits` hands back.
+        val byId = habitRows.value.associateBy(Habit::id)
+        habitRows.value = orderedIds.mapNotNull(byId::get) + habitRows.value.filterNot { it.id in orderedIds }
     }
 
     override suspend fun setColor(

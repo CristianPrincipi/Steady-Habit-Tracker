@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.usecase.moved
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsContent
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsEvent
 import com.cristianprincipi.habits.feature.managehabits.ManageHabitsUiState
@@ -106,6 +107,13 @@ private fun SampleHabitList(
                         habits.map { habit ->
                             if (habit.id == event.habitId) habit.copy(color = event.color) else habit
                         }
+                }
+
+                // M15.5. The harness reuses the domain's own `moved`, so what a screenshot shows is
+                // the rule the app runs rather than a second implementation that could disagree
+                // with it - including the no-op at either end.
+                is ManageHabitsEvent.Moved -> {
+                    habits = habits.moved(event.habitId, event.direction) ?: habits
                 }
             }
         },

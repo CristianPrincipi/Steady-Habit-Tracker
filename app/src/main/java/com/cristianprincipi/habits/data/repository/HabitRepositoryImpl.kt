@@ -117,4 +117,27 @@ class HabitRepositoryImpl
         ) {
             habitDao.setColor(habitId = habitId.value, color = color.name)
         }
+
+        /**
+         * Renumbers the habits from zero, in one transaction — M15.5.
+         *
+         * ⭐ **Renumbering beats writing only what moved, and the difference is what it repairs.**
+         * A move swaps two neighbours, so two rows change and a partial write leaves two habits
+         * claiming one position — which `ORDER BY sortOrder` resolves arbitrarily, so the list
+         * would settle into an order nobody chose. Writing `0..n-1` also normalises the gaps and
+         * duplicates that any older build could have left, at a cost of five tiny updates.
+         *
+         * **One transaction**, for `setCompleted`'s reason: a half-applied renumber is a list in an
+         * order the user did not ask for, and it would persist until they moved something again.
+         *
+         * No day is touched and no sync state moves. Notion has no order property, so this edit is
+         * not something it can ever be behind on — the same standing as the colour above.
+         */
+        override suspend fun setHabitOrder(orderedIds: List<HabitId>) {
+            transactionRunner.withTransaction {
+                orderedIds.forEachIndexed { index, habitId ->
+                    habitDao.setSortOrder(habitId = habitId.value, sortOrder = index)
+                }
+            }
+        }
     }

@@ -509,7 +509,21 @@
       than with what is missing, which is the wording the user chose for sync_waiting_for_network.
     -->
     <string name="habits_body">Each of these is a checkbox column in your Notion database, so its name and its history live there.</string>
-    <string name="habits_colour_body">Tap a colour to change how a habit looks in this app. Colours stay on this phone — Notion never sees them.</string>
+    <!--
+      M15.5. One sentence covering both app-local controls on this screen rather than two, because
+      they are the same claim: the order and the colours are ours, and Notion never sees either.
+      Notion has no order property at all (docs/notion-schema.md §3), so there is nothing there for
+      this to disagree with.
+    -->
+    <string name="habits_colour_body">Tap a colour to change how a habit looks, or the arrows to reorder the list. Both stay on this phone — Notion never sees them.</string>
+    <!--
+      Named per habit, so five rows of two buttons are ten distinguishable stops for a screen
+      reader rather than ten identical "Move up"s. Passed as onClickLabel, so TalkBack reads it as
+      the ACTION on an already-named row ("double tap to move Read up") instead of renaming the row.
+      The disabled state comes from clickable(enabled = false) and needs no string of its own.
+    -->
+    <string name="habits_move_up">Move %1$s up</string>
+    <string name="habits_move_down">Move %1$s down</string>
     <string name="habits_open_in_notion">Open in Notion</string>
     <string name="habits_notion_pending">Available after the next sync.</string>
     <string name="habits_empty">No habits yet. They arrive from Notion with the first sync.</string>
