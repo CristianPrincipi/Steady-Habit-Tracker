@@ -249,6 +249,11 @@ dependencies {
     androidTestImplementation(libs.androidx.test.espresso.core)
     // Room's processor must run for the androidTest source set too — see RoomToolchainProbe.
     kspAndroidTest(libs.androidx.room.compiler)
+    // ⚠ `MigrationTestHelper` is instrumented-only: it opens a real SQLite file at an old version
+    // and runs the migration against it, which no JVM test can do. The schema JSON it validates
+    // against is already in the androidTest APK — the Room Gradle plugin puts `app/schemas/` on the
+    // androidTest assets path by itself, verified by unzipping the built APK rather than assumed.
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
 

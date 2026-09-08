@@ -3,21 +3,25 @@ package com.cristianprincipi.habits.data.local.dao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
+import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
 /**
- * In-memory stand-ins for the three DAOs, so the repository can be tested on the JVM.
+ * In-memory stand-ins for the four DAOs, so the repository can be tested on the JVM.
  *
  * Room's real DAOs need a device (ADR-017), which puts a several-minute emulator round trip between
  * writing a line of repository logic and finding out whether it works. These fakes make that loop a
  * second long. They are not a substitute for M3.11, which tests the real SQL against real SQLite —
  * they test the repository's decisions, not the queries'.
  *
- * Two behaviours are reproduced deliberately because the repository depends on them:
- * [FakeCompletionDao] enforces the foreign key to `days`, and its insert ignores duplicates.
+ * Three behaviours are reproduced deliberately because the repository depends on them:
+ * [FakeCompletionDao] enforces the foreign key to `days` and its insert ignores duplicates, and
+ * [FakeMeasureDao] enforces the same key while its insert **replaces** — which is the one place the
+ * two tables differ, and the difference the real DAOs are tested for on a device.
  */
 class FakeHabitDao(
     initial: List<HabitEntity> = emptyList(),
@@ -169,5 +173,80 @@ class FakeCompletionDao(
         epochDay: Long,
     ) {
         rows.value = rows.value.filterNot { it.habitId == habitId && it.epochDay == epochDay }.toSet()
+    }
+}
+
+/**
+ * `measures` and `measurements`, in memory — M15.4.
+ *
+ * ⚠⚠ **[upsertReading] replaces where [FakeCompletionDao.insert] ignores, and that asymmetry is
+ * the point rather than an inconsistency.** A completion has no payload, so re-recording it must
+ * change nothing; a reading has a value the user can correct in Notion, so a pull that finds 84.2
+ * where we hold 84.0 has to land. A fake that ignored would let the sync engine pin the first number
+ * it ever saw and no JVM test would notice.
+ */
+class FakeMeasureDao(
+    initial: List<MeasureEntity> = emptyList(),
+    /** Mirrors `measurements`' foreign key to `days`, for [FakeCompletionDao]'s reason. */
+    private val dayExists: (Long) -> Boolean = { true },
+) : MeasureDao {
+    private val measures = MutableStateFlow(initial.associateBy { it.id })
+    private val readings = MutableStateFlow(emptyMap<Pair<String, Long>, MeasurementEntity>())
+
+    val current: List<MeasureEntity> get() = measures.value.values.toList()
+
+    val currentReadings: List<MeasurementEntity> get() = readings.value.values.toList()
+
+    override fun observeActive(): Flow<List<MeasureEntity>> =
+        measures.map { all -> all.values.filter { it.isActive }.sortedBy { it.sortOrder } }
+
+    override suspend fun findAll(): List<MeasureEntity> = measures.value.values.toList()
+
+    override fun observeBetween(
+        from: Long,
+        to: Long,
+    ): Flow<List<MeasurementEntity>> =
+        readings.map { all ->
+            all.values
+                .filter { it.epochDay in from..to }
+                .sortedWith(compareBy({ it.epochDay }, { it.measureId }))
+        }
+
+    override suspend fun upsert(measures: List<MeasureEntity>) {
+        this.measures.value = this.measures.value + measures.associateBy { it.id }
+    }
+
+    override suspend fun deactivateAllExcept(ids: List<String>) {
+        measures.value =
+            measures.value.mapValues { (_, measure) ->
+                if (measure.id in ids) measure else measure.copy(isActive = false)
+            }
+    }
+
+    override suspend fun upsertReading(reading: MeasurementEntity) {
+        check(dayExists(reading.epochDay)) {
+            "FOREIGN KEY constraint failed: no row in `days` for epochDay ${reading.epochDay}"
+        }
+        readings.value = readings.value + ((reading.measureId to reading.epochDay) to reading)
+    }
+
+    override suspend fun deleteReading(
+        measureId: String,
+        epochDay: Long,
+    ) {
+        readings.value = readings.value - (measureId to epochDay)
+    }
+
+    /** What the foreign key's cascade does when a day is deleted. Wire it to [FakeDayDao.onDelete]. */
+    fun dropDay(epochDay: Long) {
+        readings.value = readings.value.filterKeys { (_, day) -> day != epochDay }
+    }
+
+    override suspend fun deleteAllReadings() {
+        readings.value = emptyMap()
+    }
+
+    override suspend fun deleteAllMeasures() {
+        measures.value = emptyMap()
     }
 }

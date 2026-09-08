@@ -4,6 +4,7 @@ import com.cristianprincipi.habits.data.local.TestTransactionRunner
 import com.cristianprincipi.habits.data.local.dao.FakeCompletionDao
 import com.cristianprincipi.habits.data.local.dao.FakeDayDao
 import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
+import com.cristianprincipi.habits.data.local.dao.FakeMeasureDao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
@@ -206,6 +207,7 @@ class SyncWorld(
     val habits = FakeHabitDao()
     val days = FakeDayDao()
     val completions = FakeCompletionDao { epochDay -> epochDay in days.current }
+    val measures = FakeMeasureDao(dayExists = { epochDay -> epochDay in days.current })
 
     private val preferences = InMemoryDataStore()
     val mappingStore = NotionMappingStore(preferences)
@@ -233,7 +235,12 @@ class SyncWorld(
         )
 
     init {
-        days.onDelete = { epochDay -> completions.dropDay(epochDay) }
+        days.onDelete = { epochDay ->
+            completions.dropDay(epochDay)
+            // The second cascade `measurements` declares. Missing it here would let a JVM test
+            // watch a reading outlive the day it belongs to, which the device would not.
+            measures.dropDay(epochDay)
+        }
     }
 
     suspend fun connect(mapping: NotionPropertyMapping = defaultMapping) {

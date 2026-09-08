@@ -10,6 +10,10 @@ import com.cristianprincipi.habits.core.testing.dataSourceOf
 import com.cristianprincipi.habits.core.testing.page
 import com.cristianprincipi.habits.data.local.LocalHabitData
 import com.cristianprincipi.habits.data.local.TestTransactionRunner
+import com.cristianprincipi.habits.data.local.entity.DayEntity
+import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
+import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.remote.notion.NotionError
@@ -20,6 +24,7 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionRichTextDto
 import com.cristianprincipi.habits.data.sync.DiscardedEdit
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncSide
+import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.NotionProperty
 import com.cristianprincipi.habits.domain.model.NotionPropertyRole
 import com.cristianprincipi.habits.domain.model.NotionSetupResult
@@ -57,7 +62,14 @@ class NotionSetupRepositoryImplTest {
             syncEngine = world.engine,
             lastFailure = LastSyncFailureStore(dataStore),
             discardedEdits = world.discardedEdits,
-            localData = LocalHabitData(world.habits, world.days, world.completions, TestTransactionRunner()),
+            localData =
+                LocalHabitData(
+                    world.habits,
+                    world.days,
+                    world.completions,
+                    world.measures,
+                    TestTransactionRunner(),
+                ),
         )
 
     private fun <T> NotionSetupResult<T>.value(): T = (this as NotionSetupResult.Success).value
@@ -406,6 +418,48 @@ class NotionSetupRepositoryImplTest {
             assertTrue("habits gone", world.habits.current.isEmpty())
             assertTrue("days gone", world.days.current.isEmpty())
             assertTrue("completions gone", world.completions.current.isEmpty())
+        }
+
+    @Test
+    fun deletingTheLocalDataTakesTheMeasureReadingsToo() =
+        runTest {
+            // ⚠⚠ **The failure this guards against surfaces nowhere.** A table added to the
+            // database and forgotten in `LocalHabitData` does not break anything visible:
+            // disconnect reports success, every screen goes empty because the habits are gone, and
+            // the user's weight history quietly stays on the device after they asked for it to be
+            // removed. `CLAUDE.md` §3.6 says the disconnect wipes "the synced local data", and this
+            // is the only thing checking that "the synced local data" still means all of it.
+            val repository = repository()
+            repository.saveMapping("ds-1", PropertyIds.DATE, listOf(PropertyIds.READ), emptyList())
+            world.days.upsert(
+                DayEntity(
+                    epochDay = august19.toEpochDay(),
+                    notionPageId = "p1",
+                    localUpdatedAtEpochMillis = null,
+                    remoteLastEditedAtEpochMillis = 1L,
+                    syncState = SyncState.SYNCED,
+                ),
+            )
+            world.measures.upsert(
+                listOf(
+                    MeasureEntity(
+                        id = "m1",
+                        notionPropertyId = PropertyIds.WEIGHT,
+                        notionPropertyName = "Weight",
+                        unit = "kg",
+                        color = HabitColor.GREEN.name,
+                        isActive = true,
+                        sortOrder = 0,
+                    ),
+                ),
+            )
+            world.measures.upsertReading(MeasurementEntity("m1", august19.toEpochDay(), 84.0))
+            assertTrue("precondition: a reading exists", world.measures.currentReadings.isNotEmpty())
+
+            repository.disconnect(alsoDeleteLocalData = true)
+
+            assertTrue("readings gone", world.measures.currentReadings.isEmpty())
+            assertTrue("measures gone", world.measures.current.isEmpty())
         }
 
     @Test
