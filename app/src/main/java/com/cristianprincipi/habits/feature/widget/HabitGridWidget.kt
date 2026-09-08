@@ -1,16 +1,227 @@
 package com.cristianprincipi.habits.feature.widget
 
 import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
+import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.background
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
+import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
+import com.cristianprincipi.habits.R
+import com.cristianprincipi.habits.core.designsystem.component.DayStatus
+import com.cristianprincipi.habits.core.designsystem.component.DotGridMetrics
+import com.cristianprincipi.habits.core.designsystem.component.dotGridBitmap
+import com.cristianprincipi.habits.core.designsystem.component.yearDayColor
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColorScheme
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColors
+import com.cristianprincipi.habits.core.ui.resolveIn
 
+/**
+ * A habit's trailing year on the home screen, as the dot grid the app already draws.
+ *
+ * ⭐ **One resizable provider, not one per habit.** iOS ships discrete size families; Android ships
+ * a provider that resizes plus a configuration activity that asks which habit. `SizeMode.Responsive`
+ * supplies the two layouts the reference shows, and the narrow one simply holds fewer weeks — which
+ * is the reference's own firmer fact (`docs/widget-reference/README.md`): the dot size is identical
+ * in both, so half the width is half the history rather than smaller dots.
+ *
+ * ⚠ **The picture is a `Bitmap`, and that is forced.** Glance compiles to `RemoteViews`, so it has
+ * no `Canvas`; see `drawDotGrid`'s KDoc for why the drawing is shared with `YearDotGrid` rather
+ * than written twice.
+ *
+ * ⚠ **Colours come from `HabitsDarkColors` directly, not from a theme.** There is no composition
+ * here to carry one, and v1 is dark-only by decision (`CLAUDE.md` §1).
+ */
 internal class HabitGridWidget : GlanceAppWidget() {
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL, LARGE))
+
     override suspend fun provideGlance(
         context: Context,
         id: GlanceId,
     ) {
-        provideContent { Text("spike") }
+        // Read and resolve BEFORE provideContent: loading is suspend and the composition is not, so
+        // the alternative is a composable that blocks or one that renders empty and then corrects
+        // itself — which on a widget is a visible flash of the wrong answer.
+        val habitId = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID]
+        val state = loadHabitWidgetState(context, habitId)
+        provideContent { WidgetBody(state) }
+    }
+
+    internal companion object {
+        /** The configured subject. Written by the configuration activity, read above. */
+        val HABIT_ID = stringPreferencesKey("habit_id")
+
+        /** Roughly 2x2 and 4x2 home-screen cells — the reference's two footprints. */
+        val SMALL = DpSize(160.dp, 120.dp)
+        val LARGE = DpSize(320.dp, 120.dp)
     }
 }
+
+@Composable
+private fun WidgetBody(state: HabitWidgetState) {
+    Column(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer))
+                .cornerRadius(CARD_CORNER)
+                .padding(CARD_PADDING),
+    ) {
+        when (state) {
+            HabitWidgetState.Unconfigured -> {
+                Message(R.string.widget_unconfigured)
+            }
+
+            HabitWidgetState.HabitMissing -> {
+                Message(R.string.widget_habit_missing)
+            }
+
+            is HabitWidgetState.Content -> {
+                Header(state)
+                Spacer(GlanceModifier.height(HEADER_GAP))
+                Grid(state)
+            }
+        }
+    }
+}
+
+/**
+ * ⚠ **Both empty states are sentences, not blank space.** A widget outlives the screen that made
+ * it, so an empty grid would read as a habit with no history rather than as a widget with no habit.
+ */
+@Composable
+private fun Message(textRes: Int) {
+    Text(
+        text = LocalContext.current.getString(textRes),
+        style =
+            TextStyle(
+                color = ColorProvider(HabitsDarkColors.text.secondary),
+                fontSize = SUBTITLE_SIZE,
+            ),
+        maxLines = MESSAGE_LINES,
+    )
+}
+
+@Composable
+private fun Header(state: HabitWidgetState.Content) {
+    val context = LocalContext.current
+    val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier =
+                GlanceModifier
+                    .size(BADGE_SIZE)
+                    .cornerRadius(BADGE_CORNER)
+                    // The same wash the app's habit icon sits on, so the badge reads as the habit's
+                    // colour without competing with the grid drawn in it at full strength.
+                    .background(ColorProvider(habitColor.copy(alpha = BADGE_TINT))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = state.emoji, style = TextStyle(fontSize = BADGE_EMOJI_SIZE))
+        }
+        Spacer(GlanceModifier.width(BADGE_GAP))
+        Column {
+            Text(
+                text = state.name,
+                style =
+                    TextStyle(
+                        color = ColorProvider(HabitsDarkColors.text.primary),
+                        fontSize = TITLE_SIZE,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                // Ellipsised rather than wrapped: the narrow widget has one line's room, and the
+                // reference truncates there too.
+                maxLines = 1,
+            )
+            Text(
+                text =
+                    context.getString(
+                        R.string.habit_card_summary,
+                        state.completedThisWeek,
+                        state.daysThisWeek,
+                    ),
+                style =
+                    TextStyle(
+                        color = ColorProvider(HabitsDarkColors.text.secondary),
+                        fontSize = SUBTITLE_SIZE,
+                    ),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * The dot grid, sized to whatever width this instance was given.
+ *
+ * ⭐ **The dot size is fixed and the column count follows from the width**, not the other way round.
+ * That is the reference measured rather than eyeballed (ADR-128 §4): both widgets draw dots at an
+ * identical pitch, so the narrow one holds *fewer weeks*. Fixing the columns instead would shrink
+ * the dots until the small widget was a different picture of the same year.
+ */
+@Composable
+private fun Grid(state: HabitWidgetState.Content) {
+    val density = LocalContext.current.resources.displayMetrics.density
+    val availableDp = LocalSize.current.width.value - (CARD_PADDING.value * 2)
+    val columns = widgetGridColumns(availableDp, DOT_SIZE.value, DOT_GAP.value)
+    val days = state.year.lastWeeks(columns)
+
+    val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
+    val tint = HabitsDarkColors.tint.yearDotIncomplete
+    val bitmap =
+        remember(days, density) {
+            dotGridBitmap(
+                days = days,
+                metrics =
+                    DotGridMetrics(
+                        dotPx = DOT_SIZE.value * density,
+                        gapPx = DOT_GAP.value * density,
+                        radiusPx = DOT_CORNER.value * density,
+                    ),
+            ) { status: DayStatus -> habitColor.yearDayColor(status, tint).toArgb() }
+        }
+    Image(provider = ImageProvider(bitmap), contentDescription = null)
+}
+
+private val CARD_PADDING = 12.dp
+private val CARD_CORNER = 16.dp
+private val HEADER_GAP = 10.dp
+private val BADGE_SIZE = 36.dp
+private val BADGE_CORNER = 18.dp
+private val BADGE_GAP = 8.dp
+private val DOT_SIZE = 6.dp
+private val DOT_GAP = 2.dp
+private val DOT_CORNER = 1.dp
+private val TITLE_SIZE = 15.sp
+private val SUBTITLE_SIZE = 12.sp
+private val BADGE_EMOJI_SIZE = 16.sp
+private const val BADGE_TINT = 0.15f
+private const val MESSAGE_LINES = 3

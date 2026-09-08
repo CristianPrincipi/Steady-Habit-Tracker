@@ -59,3 +59,42 @@ internal fun drawDotGrid(
         )
     }
 }
+
+/**
+ * The same grid, as a [android.graphics.Bitmap] sized to fit it exactly.
+ *
+ * ⭐ **The widget's only way to have a dot grid at all** — Glance shows this through an `Image`.
+ * Sized from [DotGridMetrics] rather than from a caller's guess, because `RemoteViews` clips an
+ * oversized bitmap silently and a short one leaves a gap nothing reports.
+ *
+ * ⚠ **`ARGB_8888` and not `RGB_565`**: [DayStatus.PADDING] must leave the wallpaper showing, which
+ * needs a real alpha channel. A year at widget scale is well inside the ~1MB the `RemoteViews`
+ * Binder transaction allows, so the cheaper config would buy a transparency bug for nothing.
+ */
+internal fun dotGridBitmap(
+    days: List<DayStatus>,
+    metrics: DotGridMetrics,
+    colorOf: (DayStatus) -> Int,
+): android.graphics.Bitmap {
+    val columns = dotGridColumns(days.size)
+    val bitmap =
+        android.graphics.Bitmap.createBitmap(
+            kotlin.math
+                .ceil(metrics.widthPx(columns))
+                .toInt()
+                .coerceAtLeast(1),
+            kotlin.math
+                .ceil(metrics.heightPx)
+                .toInt()
+                .coerceAtLeast(1),
+            android.graphics.Bitmap.Config.ARGB_8888,
+        )
+    drawDotGrid(
+        canvas = Canvas(bitmap),
+        days = days,
+        metrics = metrics,
+        paint = Paint(Paint.ANTI_ALIAS_FLAG),
+        colorOf = colorOf,
+    )
+    return bitmap
+}

@@ -99,6 +99,43 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!--
+          HOME SCREEN WIDGETS (M15.6b).
+
+          ⚠ The receiver is NOT exported. A widget provider is driven by the system's own
+          AppWidgetService, which holds BIND_APPWIDGET and reaches it regardless; exporting it would
+          let any app on the device broadcast APPWIDGET_UPDATE at us for nothing in return.
+
+          android:label is the row the user sees in the widget picker. The description and the
+          footprint live in @xml/habit_grid_widget_info.
+
+          ⚠ The configuration activity IS exported, and it has to be: the launcher starts it, from
+          another process, when a widget is dropped. It is safe to export because it does nothing
+          on its own - it reads EXTRA_APPWIDGET_ID and finishes immediately when that is absent,
+          which is what a launch from anywhere else looks like.
+        -->
+        <receiver
+            android:name=".feature.widget.HabitGridWidgetReceiver"
+            android:exported="false"
+            android:label="@string/widget_habit_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/habit_grid_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".feature.widget.HabitWidgetConfigActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MyHabitApp">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
     </application>
 
 </manifest>

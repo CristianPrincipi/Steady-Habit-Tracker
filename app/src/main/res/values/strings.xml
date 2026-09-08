@@ -627,4 +627,34 @@
     <string name="about_licence_dm_mono_terms">SIL Open Font License 1.1 · Copyright 2020 The DM Mono Project Authors</string>
     <string name="about_licence_lucide">Lucide icons</string>
     <string name="about_licence_lucide_terms">ISC License · Copyright 2026 Lucide Icons and Contributors, with portions by Cole Bemis</string>
+    <!--
+      Home screen widgets - M15.6.
+
+      widget_habit_label and _description are what the WIDGET PICKER shows when the user long-presses
+      their home screen. Two entries rather than one is the user's own call (2026-09-08): the picker
+      shows a preview image, and a dot grid cannot preview a number, so a habit grid and a measure
+      cannot honestly share one row.
+
+      ⚠ The two empty states are SENTENCES rather than blank space. A widget outlives the screen
+      that made it - the habit behind it can be un-ticked in the mapping months later - and an empty
+      grid would read as a habit with no history rather than as a widget with no habit.
+
+      ⚠ Both lead with what to do rather than with what is wrong. "Remove this widget" is an
+      instruction; "No habit configured" is a complaint the user cannot act on.
+    -->
+    <string name="widget_habit_label">Habit grid</string>
+    <string name="widget_habit_description">A year of one habit, as a dot grid.</string>
+    <string name="widget_unconfigured">Remove this widget and add it again to pick a habit.</string>
+    <string name="widget_habit_missing">Tick this habit again in Settings, or remove the widget.</string>
+
+    <!--
+      The configuration screen the system opens when a widget is dropped.
+
+      ⚠ widget_config_empty is shown ONLY once the habit list has actually loaded - see
+      HabitWidgetConfigUiState.loaded. Deciding it from an empty list alone would flash this at a
+      user who has five habits, for the one frame before Room answers.
+    -->
+    <string name="widget_config_title">Choose a habit</string>
+    <string name="widget_config_empty">Connect to Notion first, then add this widget.</string>
+
 </resources>

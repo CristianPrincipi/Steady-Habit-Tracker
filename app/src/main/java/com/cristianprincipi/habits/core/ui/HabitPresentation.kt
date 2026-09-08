@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import com.cristianprincipi.habits.core.designsystem.component.DayStatus
+import com.cristianprincipi.habits.core.designsystem.theme.HabitPalette
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.HabitColor
@@ -30,16 +31,30 @@ import com.cristianprincipi.habits.domain.model.PeriodCell
  */
 @Composable
 @ReadOnlyComposable
-fun HabitColor.resolve(): Color {
-    val palette = HabitsTheme.colors.habit
-    return when (this) {
+fun HabitColor.resolve(): Color = resolveIn(HabitsTheme.colors.habit)
+
+/**
+ * The same resolution **without a composition** — for callers that have no theme to read.
+ *
+ * ⭐⭐ **This exists for the home-screen widget (M15.6), and it is why [resolve] became a
+ * one-liner.** A widget draws into a `Bitmap` on a background thread: there is no composition, no
+ * `LocalDensity` and no `HabitsTheme`, so the composable form is unavailable to it. Splitting the
+ * `when` out and having [resolve] delegate keeps the mapping in **one** place — a second copy in
+ * `feature/widget/` is exactly how a habit ends up one green on screen and a different green on the
+ * home screen, with nothing failing.
+ *
+ * ⚠ The widget passes `HabitsDarkColors.habit`, because v1 is dark-only by decision (`CLAUDE.md`
+ * §1). When a light theme arrives it will have to choose a palette per widget update rather than
+ * per composition, and this signature is what lets it.
+ */
+fun HabitColor.resolveIn(palette: HabitPalette): Color =
+    when (this) {
         HabitColor.BLUE -> palette.blue
         HabitColor.GREEN -> palette.green
         HabitColor.ORANGE -> palette.orange
         HabitColor.PURPLE -> palette.purple
         HabitColor.RED -> palette.red
     }
-}
 
 /**
  * What a grid cell looks like.

@@ -18,6 +18,18 @@ data class HabitPeriod(
     val cells: List<PeriodCell>,
     val todayIndex: Int,
 ) {
+    /**
+     * How many of [cells] are checked off — the "N" in the card's *"N of 7 this week"* line.
+     *
+     * ⚠ **Moved here from `WeekContent` in M15.6**, where it was a private extension, because the
+     * home-screen widget prints the same sentence (`Plan.md` M15.6, the user's own answer for the
+     * widget subtitle). Two counts of the same thing is two things that can disagree, and the pair
+     * that disagreed would be a screen and a home screen showing different numbers for one habit
+     * on one day — visible, alarming, and with nothing broken to find.
+     */
+    val completedCount: Int
+        get() = cells.count { cell -> cell is PeriodCell.Day && cell.state == DayState.COMPLETED }
+
     companion object {
         /** [todayIndex] for a period that does not contain today. */
         const val TODAY_ABSENT = -1

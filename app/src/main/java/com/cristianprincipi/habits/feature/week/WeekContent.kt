@@ -144,7 +144,27 @@ private fun WeekList(
     }
 }
 
-/** One habit's card, with the domain mapped onto what the design system draws. */
+/**
+ * One habit's card, with the domain mapped onto what the design system draws.
+ *
+ * ### The card's second line
+ *
+ * ⚠ **It is not what the design asked for, because what it asked for no longer exists.**
+ * `docs/design-spec.md` §3 gives the card a *description* — the prototype's own example is
+ * `"15 min practice"` — and **ADR-027 deleted `Habit.description`**: Notion has nowhere to keep one
+ * and ADR-010 makes the habit set read-only, so there is neither a source nor an editor for it.
+ *
+ * Leaving the slot blank is not free either. `HabitCardHeader` draws that line unconditionally, so
+ * an empty string still holds the space and the card reads as though something failed to load. The
+ * slot is therefore filled with the most useful fact a *week* view has: how much of it is done.
+ *
+ * **Undesigned — the user should look at it (M2.8, and `Plan.md` M6.11).** The alternative is
+ * dropping the second line and letting the card get shorter, which changes a shape the design does
+ * specify. Whichever wins, M8's Month and Year cards have the same hole.
+ *
+ * ⭐ **The count itself moved to `HabitPeriod.completedCount` in M15.6**, because the home-screen
+ * widget prints this same sentence and two counts of one thing can disagree.
+ */
 @Composable
 private fun WeekHabitRow(
     period: HabitPeriod,
@@ -167,25 +187,6 @@ private fun WeekHabitRow(
         onToggleDay = { index -> period.toggleAt(index)?.let(onEvent) },
     )
 }
-
-/**
- * The card's second line.
- *
- * ⚠ **This is not what the design asked for, because what it asked for no longer exists.**
- * `docs/design-spec.md` §3 gives the card a *description* — the prototype's own example is
- * `"15 min practice"` — and **ADR-027 deleted `Habit.description`**: Notion has nowhere to keep one
- * and ADR-010 makes the habit set read-only, so there is neither a source nor an editor for it.
- *
- * Leaving the slot blank is not free either. `HabitCardHeader` draws that line unconditionally, so
- * an empty string still holds the space and the card reads as though something failed to load. The
- * slot is therefore filled with the most useful fact a *week* view has: how much of it is done.
- *
- * **Undesigned — the user should look at it (M2.8, and `Plan.md` M6.11).** The alternative is
- * dropping the second line and letting the card get shorter, which changes a shape the design does
- * specify. Whichever wins, M8's Month and Year cards have the same hole.
- */
-private val HabitPeriod.completedCount: Int
-    get() = cells.count { cell -> cell is PeriodCell.Day && cell.state == DayState.COMPLETED }
 
 /**
  * The event a tap on pill [index] means, or `null` when there is no day behind it.
