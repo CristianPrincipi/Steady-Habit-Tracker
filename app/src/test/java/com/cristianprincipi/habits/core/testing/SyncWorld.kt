@@ -10,6 +10,7 @@ import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
+import com.cristianprincipi.habits.data.preferences.NotionMeasure
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.preferences.SettingsDataStore
@@ -20,7 +21,9 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDt
 import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.HabitImporter
+import com.cristianprincipi.habits.data.sync.MeasureImporter
 import com.cristianprincipi.habits.data.sync.SyncEngine
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -160,6 +163,48 @@ fun NotionPageDto.withWeight(weight: Double): NotionPageDto =
                 ),
     )
 
+/**
+ * The `Weight` column present on the page and **holding nothing** — a skipped weigh-in.
+ *
+ * ⚠⚠ Notion sends `"number": null` for this, which decodes to `NotionPropertyValue.Empty`, and
+ * it is the one input in M15.4 that can be got wrong invisibly: read as `0.0` it stores a
+ * zero-kilo day and drags the average down with nothing on screen looking unwell. Written out here
+ * rather than produced by omitting the property, because an **absent** column is a different case
+ * (the page predates it) and a fixture that conflated the two could not tell them apart.
+ */
+fun NotionPageDto.withEmptyWeight(): NotionPageDto =
+    copy(
+        properties =
+            properties +
+                (
+                    "Weight" to
+                        buildJsonObject {
+                            put("id", PropertyIds.WEIGHT)
+                            put("type", "number")
+                            put("number", JsonNull)
+                        }
+                ),
+    )
+
+/** `Weight` retyped upstream to something this build will not read as a number. */
+fun NotionPageDto.withUnreadableWeight(): NotionPageDto =
+    copy(
+        properties =
+            properties +
+                (
+                    "Weight" to
+                        buildJsonObject {
+                            put("id", PropertyIds.WEIGHT)
+                            put("type", "a_type_from_the_future")
+                            put("a_type_from_the_future", "84")
+                        }
+                ),
+    )
+
+/** [defaultMapping] with `Weight` averaged — M15.4's addition, in kilograms. */
+val mappingWithWeight: NotionPropertyMapping =
+    defaultMapping.copy(measures = listOf(NotionMeasure(NotionPropertyId(PropertyIds.WEIGHT), "kg")))
+
 fun NotionPageDto.weightValue(): Double? =
     properties.values
         .firstOrNull { it["id"]?.jsonPrimitive?.content == PropertyIds.WEIGHT }
@@ -226,8 +271,10 @@ class SyncWorld(
                     transactionRunner = TestTransactionRunner(),
                     clock = clock,
                 ),
+            measureImporter = MeasureImporter(measureDao = measures),
             dayDao = days,
             completionDao = completions,
+            measureDao = measures,
             transactionRunner = TestTransactionRunner(),
             discardedEdits = discardedEdits,
             settings = SettingsRepositoryImpl(settings),

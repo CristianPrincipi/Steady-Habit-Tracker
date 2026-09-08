@@ -3,8 +3,10 @@ package com.cristianprincipi.habits.data.sync
 import com.cristianprincipi.habits.data.local.TransactionRunner
 import com.cristianprincipi.habits.data.local.dao.CompletionDao
 import com.cristianprincipi.habits.data.local.dao.DayDao
+import com.cristianprincipi.habits.data.local.dao.MeasureDao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDatabaseId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
@@ -99,8 +101,10 @@ class SyncEngine
         private val api: NotionApi,
         private val mappingStore: NotionMappingStore,
         private val habitImporter: HabitImporter,
+        private val measureImporter: MeasureImporter,
         private val dayDao: DayDao,
         private val completionDao: CompletionDao,
+        private val measureDao: MeasureDao,
         private val transactionRunner: TransactionRunner,
         private val discardedEdits: DiscardedEditStore,
         private val settings: SettingsRepository,
@@ -139,12 +143,13 @@ class SyncEngine
                 }
 
             val habits = habitImporter.import(valid.habits)
+            val measures = measureImporter.import(valid.measures)
 
             // Recorded before the outcome is known, and deliberately so: a discard that happened
             // is a fact whether or not the rest of the run succeeded, and a failed push must not
             // be the reason the user never hears about it.
             val discarded = mutableListOf<DiscardedEdit>()
-            val pullResult = pull(mapping, habits, discarded)
+            val pullResult = pull(mapping, habits, measures, discarded)
             discardedEdits.record(discarded)
 
             val pulled =
@@ -178,6 +183,7 @@ class SyncEngine
         private suspend fun pull(
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            measures: MappedMeasures,
             discarded: MutableList<DiscardedEdit>,
         ): NotionResult<PullReport> {
             // Read once, before the first request. The filter has to stay identical across a
@@ -201,7 +207,7 @@ class SyncEngine
                     }
 
                 page.results.forEach { dto ->
-                    if (applyPage(dto, mapping, habits, discarded)) applied++ else skipped++
+                    if (applyPage(dto, mapping, habits, measures, discarded)) applied++ else skipped++
                 }
                 // `isTruncated` needs no branch of its own, and that is a consequence of the sort
                 // rather than an oversight: at the 10,000 ceiling an ascending run has applied the
@@ -226,6 +232,7 @@ class SyncEngine
             dto: NotionPageDto,
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            measures: MappedMeasures,
             discarded: MutableList<DiscardedEdit>,
         ): Boolean {
             val day = dto.property(mapping.dayKeyPropertyId.value) as? NotionPropertyValue.DateValue
@@ -259,6 +266,14 @@ class SyncEngine
                         ),
                     )
                     if (plan.state == SyncState.SYNCED) applyCompletions(dto, epochDay, habits)
+                    // ⭐⭐ **Unconditional, where the completions above are gated on SYNCED — and
+                    // that is not an oversight of the gate but the absence of the thing it
+                    // protects.** That branch exists so a pull cannot clobber a check-off this
+                    // device has not pushed yet. Nothing can edit a measure locally: `Writable`
+                    // has two implementations and `Number` is not one, so there is no unpushed
+                    // reading anywhere to lose. Notion is authoritative for these, always
+                    // (M15.4), so a day that owes a push still gets today's weight.
+                    applyMeasurements(dto, epochDay, measures)
                     plan
                 }
             // Outside the transaction on purpose: a notice for a write that rolled back would be
@@ -388,6 +403,52 @@ class SyncEngine
 
                     null -> {
                         completionDao.delete(habitId = habitId, epochDay = epochDay)
+                    }
+
+                    else -> {
+                        Unit
+                    }
+                }
+            }
+        }
+
+        /**
+         * Writes the page's numbers over the local ones, one mapped measure at a time.
+         *
+         * [applyCompletions]' twin, with one case that has no counterpart there and one that reads
+         * the same and means something different.
+         *
+         * **An [NotionPropertyValue.Empty] number is a day with no reading, and it must delete.**
+         * Notion gives this its own case — *"the property is on the page but holds nothing"* — and
+         * it is what a skipped weigh-in looks like. Storing `0.0` for it would drag the average
+         * down with nothing on screen looking unwell, which is the one failure in this whole
+         * feature that a user could not detect. An **absent** property means the same thing here:
+         * the page predates the column.
+         *
+         * An **unreadable** value is left alone rather than deleted, exactly as a completion is. A
+         * value that will not decode means the shape changed, and throwing away a real reading over
+         * it would be inventing a gap.
+         */
+        private suspend fun applyMeasurements(
+            dto: NotionPageDto,
+            epochDay: Long,
+            measures: MappedMeasures,
+        ) {
+            measures.properties.forEach { mapped ->
+                val measureId = measures.localIdOf(mapped) ?: return@forEach
+                when (val value = dto.property(mapped.id.value)) {
+                    is NotionPropertyValue.Number -> {
+                        measureDao.upsertReading(
+                            MeasurementEntity(
+                                measureId = measureId,
+                                epochDay = epochDay,
+                                value = value.value,
+                            ),
+                        )
+                    }
+
+                    NotionPropertyValue.Empty, null -> {
+                        measureDao.deleteReading(measureId = measureId, epochDay = epochDay)
                     }
 
                     else -> {
