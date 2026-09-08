@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.cristianprincipi.habits.data.sync.SyncScheduler
 import dagger.hilt.android.HiltAndroidApp
+import java.util.concurrent.Executors
 import javax.inject.Inject
 
 /**
@@ -31,11 +32,28 @@ class HabitsApplication :
     @Inject
     lateinit var syncScheduler: SyncScheduler
 
+    /**
+     * ⚠⚠ **The executor is set explicitly, and it is a widget fix rather than a sync one.**
+     * WorkManager's default pool is `max(2, min(cpus - 1, 4))` — four threads on this phone. Glance
+     * runs **each widget's composition as a WorkManager job that stays alive for a 45-second idle
+     * timeout**, so four home-screen widgets occupy the entire default pool, and anything else —
+     * another widget's session, or `SyncWorker` — waits for one to expire.
+     *
+     * That is not theoretical: logcat on the user's phone showed a widget taking **44 seconds** to
+     * fill after they picked a habit, with two Glance sessions closing `wasOpen=false` after
+     * exactly 45s. See ADR-129 §13.
+     *
+     * ⭐ **[WORK_THREADS] is sized for sessions, not for throughput.** One thread per concurrently
+     * open widget session, plus room for a sync — v1 has seven possible subjects and a user may
+     * place the same one twice, so the ceiling is not small. Idle threads in a fixed pool cost
+     * almost nothing; a starved widget costs 45 seconds of the user's attention.
+     */
     override val workManagerConfiguration: Configuration
         get() =
             Configuration
                 .Builder()
                 .setWorkerFactory(workerFactory)
+                .setExecutor(Executors.newFixedThreadPool(WORK_THREADS))
                 .build()
 
     /**
@@ -50,5 +68,16 @@ class HabitsApplication :
     override fun onCreate() {
         super.onCreate()
         syncScheduler.ensureScheduled()
+    }
+
+    private companion object {
+        /**
+         * Enough threads that a home screen full of widgets cannot starve a sync, or each other.
+         *
+         * ⚠ Not a tuning knob for speed. Nothing here runs faster with more threads — the jobs are
+         * mostly *waiting*, because a Glance session holds its thread for a 45-second idle timeout
+         * whether or not it is doing anything. This is a concurrency floor, not a throughput one.
+         */
+        const val WORK_THREADS = 12
     }
 }

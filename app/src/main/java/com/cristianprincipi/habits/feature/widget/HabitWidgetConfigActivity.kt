@@ -29,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.appwidget.updateAll
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -103,9 +102,16 @@ class HabitWidgetConfigActivity : ComponentActivity() {
     /**
      * Stores the choice against this widget, draws it once, and reports success.
      *
-     * ⭐ **The explicit `updateAll` is what makes the widget appear filled rather than empty.**
-     * Writing the state alone changes nothing on screen — Glance re-reads only when something asks
-     * it to, and at this moment nothing has: the widget was composed before the user picked.
+     * ⭐ **The explicit update is what makes the widget appear filled rather than empty.** Writing
+     * the state alone changes nothing on screen — Glance re-reads only when something asks it to,
+     * and at this moment nothing has: the widget was composed before the user picked.
+     *
+     * ⚠⚠ **`update(glanceId)` and NOT `updateAll`, and this was measured rather than tidied.**
+     * `updateAll` re-composed every widget on the home screen, and each Glance composition runs in
+     * its own **WorkManager** job that stays alive for a 45-second idle timeout. Four widgets
+     * therefore filled WorkManager's default four-thread pool, and the next widget's session sat
+     * queued until one expired — logcat showed a **44-second** wait and two sessions closing with
+     * `wasOpen=false` after exactly 45s. Configuring one widget must touch one widget.
      */
     private fun bind(
         appWidgetId: Int,
@@ -135,7 +141,7 @@ class HabitWidgetConfigActivity : ComponentActivity() {
                     this[HabitGridWidget.HABIT_ID] = habit.id.value
                 }
             }
-            HabitGridWidget().updateAll(this@HabitWidgetConfigActivity)
+            HabitGridWidget().update(this@HabitWidgetConfigActivity, glanceId)
             setResult(
                 RESULT_OK,
                 Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId),
