@@ -3,6 +3,8 @@ package com.cristianprincipi.habits.feature.widget
 import android.content.Context
 import android.os.SystemClock
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -81,14 +84,38 @@ internal class HabitGridWidget : GlanceAppWidget() {
 
         // Read and resolve BEFORE provideContent: loading is suspend and the composition is not, so
         // the alternative is a composable that blocks or one that renders empty and then corrects
-        // itself — which on a widget is a visible flash of the wrong answer.
-        val habitId = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID]
-        WidgetProbe.log("provide state $id habitId=$habitId +${SystemClock.uptimeMillis() - started}ms")
-        val state = loadHabitWidgetState(context, habitId)
+        // itself — which on a widget is a visible flash of the wrong answer. This is the FIRST
+        // frame only; everything after it comes from the reactive read below.
+        val initialHabitId = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID]
+        WidgetProbe.log("provide state $id habitId=$initialHabitId +${SystemClock.uptimeMillis() - started}ms")
+        val initial = loadHabitWidgetState(context, initialHabitId)
         WidgetProbe.log(
-            "provide loaded $id ${state.javaClass.simpleName} +${SystemClock.uptimeMillis() - started}ms",
+            "provide loaded $id ${initial.javaClass.simpleName} +${SystemClock.uptimeMillis() - started}ms",
         )
-        provideContent { WidgetBody(state) }
+
+        provideContent {
+            // ⚠⚠ THE HABIT ID IS RE-READ HERE, AND THIS FUNCTION RUNNING ONCE IS WHY (ADR-129 §16).
+            // `runGlance` calls provideGlance exactly once per Glance session and holds the result
+            // behind a `remember`, while `provideContent` returns Nothing — so a widget that closed
+            // over the resolved value showed whatever was true when its session STARTED, for the
+            // life of that session. Configuring a widget therefore did nothing visible:
+            // `update()` on a live session sends UpdateGlanceState, which recomposes and re-pushes
+            // the identical content rather than re-running the read above. The widget corrected
+            // itself only when the session died of Glance's 45-second idle timeout and a new one
+            // began — which is exactly the 40–50s the user reported.
+            //
+            // `currentState` reads LocalState, which is what UpdateGlanceState actually moves, so
+            // the value below changes the moment the configuration activity writes it.
+            val habitId = currentState(HABIT_ID)
+            val state by
+                produceState(initial, habitId) {
+                    // Skipped on the first composition, where `initial` is already this answer —
+                    // re-reading Room to arrive back where we started would cost every session a
+                    // duplicate query for nothing.
+                    if (habitId != initialHabitId) value = loadHabitWidgetState(context, habitId)
+                }
+            WidgetBody(state)
+        }
     }
 
     internal companion object {
