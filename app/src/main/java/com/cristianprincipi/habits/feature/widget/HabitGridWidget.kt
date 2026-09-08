@@ -2,8 +2,8 @@ package com.cristianprincipi.habits.feature.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -79,8 +79,11 @@ internal class HabitGridWidget : GlanceAppWidget() {
         // the alternative is a composable that blocks or one that renders empty and then corrects
         // itself — which on a widget is a visible flash of the wrong answer. This is the FIRST
         // frame only; everything after it comes from the reactive read below.
-        val initialHabitId = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID]
-        val initial = loadHabitWidgetState(context, initialHabitId)
+        val initial =
+            loadHabitWidgetState(
+                context,
+                getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID],
+            )
 
         provideContent {
             // ⚠⚠ THE HABIT ID IS RE-READ HERE, AND THIS FUNCTION RUNNING ONCE IS WHY (ADR-129 §16).
@@ -96,13 +99,16 @@ internal class HabitGridWidget : GlanceAppWidget() {
             // `currentState` reads LocalState, which is what UpdateGlanceState actually moves, so
             // the value below changes the moment the configuration activity writes it.
             val habitId = currentState(HABIT_ID)
+            // ⭐ M15.6c: and the flow is why a SECOND check-off inside 45 seconds moves the grid.
+            // `update()` on a live session only re-pushes what this function already resolved, so
+            // without a live read the widget would go stale for exactly as long as it had most
+            // recently been updated (ADR-130). `initial` is the seed, so the opening frame is the
+            // resolved answer rather than a placeholder, and it is kept across a habitId change —
+            // `collectAsState` remembers its value without keys — so switching habits shows the
+            // previous grid for the ~25ms of the query instead of an empty card.
             val state by
-                produceState(initial, habitId) {
-                    // Skipped on the first composition, where `initial` is already this answer —
-                    // re-reading Room to arrive back where we started would cost every session a
-                    // duplicate query for nothing.
-                    if (habitId != initialHabitId) value = loadHabitWidgetState(context, habitId)
-                }
+                remember(habitId) { habitWidgetStateFlow(context, habitId) }
+                    .collectAsState(initial)
             WidgetBody(state)
         }
     }

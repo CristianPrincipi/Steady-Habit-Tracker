@@ -56,4 +56,17 @@ class SyncOutcomeRetryTest {
         assertFalse(SyncOutcome.NotConfigured.isWorthRetrying)
         assertFalse(SyncOutcome.MappingBroken(problems = emptyList()).isWorthRetrying)
     }
+
+    @Test
+    fun onlyAPullCanChangeWhatAWidgetDraws() {
+        // M15.6c. A push-only success sent local state TO Notion, so every widget is already
+        // drawing it; nothing else touched Room at all. `updateAll` starts a Glance session per
+        // placed widget, so "refresh on every sync" would be that cost on every run that could not
+        // move a pixel.
+        assertTrue(SyncOutcome.Success(daysPulled = 3, daysPushed = 0).changedLocalData)
+        assertFalse(SyncOutcome.Success(daysPulled = 0, daysPushed = 5).changedLocalData)
+        assertFalse(SyncOutcome.Success(daysPulled = 0, daysPushed = 0).changedLocalData)
+        assertFalse(SyncOutcome.NotConfigured.changedLocalData)
+        assertFalse(failing(NotionError.Unauthorized).changedLocalData)
+    }
 }

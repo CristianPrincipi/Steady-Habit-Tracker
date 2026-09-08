@@ -1,5 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
+import com.cristianprincipi.habits.core.widget.WidgetRefresher
+import com.cristianprincipi.habits.core.widget.refreshQuietly
 import com.cristianprincipi.habits.data.local.TransactionRunner
 import com.cristianprincipi.habits.data.local.dao.CompletionDao
 import com.cristianprincipi.habits.data.local.dao.DayDao
@@ -43,6 +45,7 @@ class HabitRepositoryImpl
         private val completionDao: CompletionDao,
         private val transactionRunner: TransactionRunner,
         private val clock: Clock,
+        private val widgets: WidgetRefresher,
     ) : HabitRepository {
         override fun observeHabits(): Flow<List<Habit>> = habitDao.observeActive().map { it.toDomain() }
 
@@ -103,6 +106,11 @@ class HabitRepositoryImpl
                     completionDao.delete(habitId = habitId.value, epochDay = epochDay)
                 }
             }
+            // ⭐ M15.6c, and AFTER the transaction on purpose: a home-screen widget must be told
+            // about a check-off that has actually landed, never one that is still open and could
+            // still roll back. It is the repository rather than `ToggleCompletion` because this is
+            // the point where the write is a fact, and because a second caller cannot forget.
+            widgets.refreshQuietly()
         }
 
         /**
@@ -116,6 +124,12 @@ class HabitRepositoryImpl
             color: HabitColor,
         ) {
             habitDao.setColor(habitId = habitId.value, color = color.name)
+            // ⚠ The widget draws the grid AND its badge in this colour, so a recolour that did not
+            // reach the home screen would leave two answers on one device. M15.6c's step text names
+            // only the check-off and the sync; this is the third write that changes what a widget
+            // shows, and leaving it out would have been a known-stale surface rather than a scope
+            // boundary.
+            widgets.refreshQuietly()
         }
 
         /**

@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
 import app.cash.turbine.test
+import com.cristianprincipi.habits.core.testing.RecordingWidgetRefresher
 import com.cristianprincipi.habits.data.local.TestTransactionRunner
 import com.cristianprincipi.habits.data.local.dao.FakeCompletionDao
 import com.cristianprincipi.habits.data.local.dao.FakeDayDao
@@ -55,12 +56,14 @@ class HabitRepositoryImplTest {
         habitDao: FakeHabitDao = FakeHabitDao(),
         dayDao: FakeDayDao = FakeDayDao(),
         completionDao: FakeCompletionDao = FakeCompletionDao { dayDao.current.containsKey(it) },
+        widgets: RecordingWidgetRefresher = RecordingWidgetRefresher(),
     ) = HabitRepositoryImpl(
         habitDao = habitDao,
         dayDao = dayDao,
         completionDao = completionDao,
         transactionRunner = TestTransactionRunner(),
         clock = clock,
+        widgets = widgets,
     )
 
     @Test
@@ -270,5 +273,67 @@ class HabitRepositoryImplTest {
             repository(habitDao = habitDao, dayDao = dayDao).setColor(HabitId("a"), HabitColor.GREEN)
 
             assertTrue(dayDao.current.isEmpty())
+        }
+
+    @Test
+    fun everyWriteThatChangesWhatAWidgetDrawsTellsTheHomeScreen() =
+        runTest {
+            // M15.6c. ⭐ **The repository rather than `ToggleCompletion`, so a second caller cannot
+            // forget** — and both writes count, because the widget draws the grid from completions
+            // and the grid AND its badge in the habit's colour.
+            val habitDao = FakeHabitDao(listOf(habit(id = "a", name = "Read", sortOrder = 0)))
+            val widgets = RecordingWidgetRefresher()
+            val repository = repository(habitDao = habitDao, widgets = widgets)
+
+            repository.setCompleted(HabitId("a"), LocalDate.of(2026, 1, 5), completed = true)
+            assertEquals(1, widgets.refreshes)
+
+            repository.setCompleted(HabitId("a"), LocalDate.of(2026, 1, 5), completed = false)
+            assertEquals(2, widgets.refreshes)
+
+            repository.setColor(HabitId("a"), HabitColor.GREEN)
+            assertEquals(3, widgets.refreshes)
+        }
+
+    @Test
+    fun theOrderWriteDoesNotTellTheHomeScreen() =
+        runTest {
+            // ⚠ **The counterpart, and it is what stops this becoming "refresh on every write".** A
+            // widget shows ONE habit, so the order habits appear in cannot change a single pixel of
+            // it. Waking every widget for it would be work with no possible effect, and the
+            // assertion is here so a future session adding a write has to decide rather than copy.
+            val habitDao =
+                FakeHabitDao(
+                    listOf(
+                        habit(id = "a", name = "Read", sortOrder = 0),
+                        habit(id = "b", name = "Journal", sortOrder = 1),
+                    ),
+                )
+            val widgets = RecordingWidgetRefresher()
+
+            repository(habitDao = habitDao, widgets = widgets)
+                .setHabitOrder(listOf(HabitId("b"), HabitId("a")))
+
+            assertEquals(0, widgets.refreshes)
+        }
+
+    @Test
+    fun aWidgetThatCannotRepaintDoesNotFailTheCheckOff() =
+        runTest {
+            // ⚠⚠ **`CLAUDE.md` §1: a check-off always succeeds locally.** M13.12 made every
+            // ViewModel write report its failures to the user, so an exception escaping a widget
+            // repaint would put a red message under a tap that worked perfectly. `refreshQuietly`
+            // is what prevents it, and it lives on the interface rather than in the one
+            // implementation precisely so this test does not depend on which one is bound.
+            val habitDao = FakeHabitDao(listOf(habit(id = "a", name = "Read", sortOrder = 0)))
+            val dayDao = FakeDayDao()
+            val widgets = RecordingWidgetRefresher(failWith = IllegalStateException("no launcher"))
+
+            repository(habitDao = habitDao, dayDao = dayDao, widgets = widgets)
+                .setCompleted(HabitId("a"), LocalDate.of(2026, 1, 5), completed = true)
+
+            assertEquals(1, widgets.refreshes)
+            // The write still landed, which is the whole point.
+            assertTrue(dayDao.current.containsKey(LocalDate.of(2026, 1, 5).toEpochDay()))
         }
 }

@@ -22,6 +22,7 @@ import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.testing.RecordingWidgetRefresher
 import com.cristianprincipi.habits.data.local.HabitsDatabase
 import com.cristianprincipi.habits.data.local.RoomTransactionRunner
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
@@ -150,6 +151,7 @@ class WeekCheckOffPersistenceTest {
                 completionDao = instance.completionDao(),
                 transactionRunner = RoomTransactionRunner(instance),
                 clock = clock,
+                widgets = RecordingWidgetRefresher(),
             )
         return WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),

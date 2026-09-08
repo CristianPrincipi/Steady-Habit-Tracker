@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.cristianprincipi.habits.core.testing.RecordingWidgetRefresher
 import com.cristianprincipi.habits.core.testing.createInMemoryDatabase
 import com.cristianprincipi.habits.data.local.HabitsDatabase
 import com.cristianprincipi.habits.data.local.RoomTransactionRunner
@@ -51,6 +52,7 @@ class HabitRepositoryRoomTest {
                     completionDao = database.completionDao(),
                     transactionRunner = RoomTransactionRunner(database),
                     clock = Clock.fixed(Instant.ofEpochMilli(fixedMillis), ZoneOffset.UTC),
+                    widgets = RecordingWidgetRefresher(),
                 )
             // A completion's other foreign key points at `habits`, so the habit has to exist for
             // any of this to be about the day at all.
