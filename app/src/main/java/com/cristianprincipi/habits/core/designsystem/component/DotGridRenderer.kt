@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.core.designsystem.component
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import androidx.core.graphics.createBitmap
 
 /**
  * Draws a GitHub-style dot grid onto a **plain [Canvas]** rather than a Compose one, column-major:
@@ -78,7 +79,7 @@ internal fun dotGridBitmap(
 ): android.graphics.Bitmap {
     val columns = dotGridColumns(days.size)
     val bitmap =
-        android.graphics.Bitmap.createBitmap(
+        createBitmap(
             kotlin.math
                 .ceil(metrics.widthPx(columns))
                 .toInt()

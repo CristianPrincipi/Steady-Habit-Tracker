@@ -53,6 +53,15 @@
     -->
     <issue id="UnusedAttribute">
         <ignore regexp="enableOnBackInvokedCallback" />
+
+        <!--
+          M15.6b. targetCellWidth/targetCellHeight are the API 31+ way to size a widget in launcher
+          CELLS rather than dp, and habit_grid_widget_info.xml carries minWidth/minHeight beside
+          them as the documented pre-31 fallback — which is the platform's own migration path, not
+          an oversight. Below 31 the attributes are ignored and the dp figures apply.
+        -->
+        <ignore regexp="targetCellWidth" />
+        <ignore regexp="targetCellHeight" />
     </issue>
 
 </lint>

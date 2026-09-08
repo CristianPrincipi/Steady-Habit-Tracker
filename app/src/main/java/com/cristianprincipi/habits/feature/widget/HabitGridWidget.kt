@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.widget
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
@@ -12,6 +13,7 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalGlanceId
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
@@ -72,11 +74,20 @@ internal class HabitGridWidget : GlanceAppWidget() {
         context: Context,
         id: GlanceId,
     ) {
+        // ⚠⚠ TEMPORARY — M15.6b's 40–50s probe; see WidgetProbe. Remove the four lines when it is
+        // diagnosed.
+        val started = SystemClock.uptimeMillis()
+        WidgetProbe.log("provide entry $id")
+
         // Read and resolve BEFORE provideContent: loading is suspend and the composition is not, so
         // the alternative is a composable that blocks or one that renders empty and then corrects
         // itself — which on a widget is a visible flash of the wrong answer.
         val habitId = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[HABIT_ID]
+        WidgetProbe.log("provide state $id habitId=$habitId +${SystemClock.uptimeMillis() - started}ms")
         val state = loadHabitWidgetState(context, habitId)
+        WidgetProbe.log(
+            "provide loaded $id ${state.javaClass.simpleName} +${SystemClock.uptimeMillis() - started}ms",
+        )
         provideContent { WidgetBody(state) }
     }
 
@@ -211,8 +222,14 @@ private fun Grid(state: HabitWidgetState.Content) {
 
     val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
     val tint = HabitsDarkColors.tint.yearDotIncomplete
+    // ⚠⚠ TEMPORARY — M15.6b's 40–50s probe; see WidgetProbe. One line per COMPOSITION, so counting
+    // them in a capture answers the recomposition-loop question, and one per BITMAP inside the
+    // remember, so the two can be told apart: a loop that rebuilds the bitmap every time is a
+    // different cost from one that does not.
+    WidgetProbe.log("grid compose ${LocalGlanceId.current} size=${size.width}x${size.height} $fit")
     val bitmap =
         remember(days, fit, density) {
+            val startedAt = SystemClock.uptimeMillis()
             dotGridBitmap(
                 days = days,
                 metrics =
@@ -222,6 +239,12 @@ private fun Grid(state: HabitWidgetState.Content) {
                         radiusPx = (fit.dotDp / DOT_CORNER_RATIO) * density,
                     ),
             ) { status: DayStatus -> habitColor.yearDayColor(status, tint).toArgb() }
+                .also {
+                    WidgetProbe.log(
+                        "grid bitmap ${it.width}x${it.height}px ${it.byteCount}B " +
+                            "in ${SystemClock.uptimeMillis() - startedAt}ms",
+                    )
+                }
         }
     Image(provider = ImageProvider(bitmap), contentDescription = null)
 }
