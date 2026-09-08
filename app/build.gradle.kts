@@ -222,6 +222,13 @@ dependencies {
     // reboot; nothing in the check-off path waits on it.
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Home screen widgets (M15.6). Approved by the user 2026-09-08 over plain RemoteViews, which
+    // needs no dependency at all now that the dot grid is drawn to a Bitmap either way. Glance
+    // earns its place on SizeMode.Responsive — the two widget sizes are one declaration rather
+    // than hand-managed onAppWidgetOptionsChanged — and on a suspend content function, so reading
+    // Room needs no AppWidgetManager dance across a process boundary.
+    implementation(libs.androidx.glance.appwidget)
+
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 

@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.core.designsystem.component
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -8,11 +9,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -22,7 +24,6 @@ import com.cristianprincipi.habits.core.designsystem.theme.HabitsCorners
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
-import kotlin.math.ceil
 
 /**
  * A year of days as a GitHub-style density grid — seven rows, one column per week
@@ -51,13 +52,20 @@ fun YearDotGrid(
     dotSize: Dp = Sizing.yearDot,
 ) {
     val scrollState = rememberScrollState()
-    val columns = ceil(days.size / DAYS_PER_WEEK.toFloat()).toInt().coerceAtLeast(1)
+    val columns = dotGridColumns(days.size)
     val gap = Spacing.yearDotGap
     val tint = HabitsTheme.colors.tint.yearDotIncomplete
 
-    val dotPx = with(LocalDensity.current) { dotSize.toPx() }
-    val gapPx = with(LocalDensity.current) { gap.toPx() }
-    val radiusPx = with(LocalDensity.current) { HabitsCorners.yearDot.toPx() }
+    val metrics =
+        with(LocalDensity.current) {
+            DotGridMetrics(
+                dotPx = dotSize.toPx(),
+                gapPx = gap.toPx(),
+                radiusPx = HabitsCorners.yearDot.toPx(),
+            )
+        }
+    // Remembered rather than allocated per draw: this recomposes on every scroll frame.
+    val paint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
 
     LaunchedEffect(scrollState.maxValue) { scrollState.scrollTo(scrollState.maxValue) }
 
@@ -70,15 +78,15 @@ fun YearDotGrid(
                         height = dotSize * DAYS_PER_WEEK + gap * (DAYS_PER_WEEK - 1),
                     ).clearAndSetSemantics { },
         ) {
-            days.forEachIndexed { index, status ->
-                if (status == DayStatus.PADDING) return@forEachIndexed
-                val column = index / DAYS_PER_WEEK
-                val row = index % DAYS_PER_WEEK
-                drawRoundRect(
-                    color = habitColor.yearDayColor(status, tint),
-                    topLeft = Offset(column * (dotPx + gapPx), row * (dotPx + gapPx)),
-                    size = Size(dotPx, dotPx),
-                    cornerRadius = CornerRadius(radiusPx, radiusPx),
+            // The geometry moved to `drawDotGrid` in M15.6 so the home-screen widget draws this
+            // exact picture — Glance has no Canvas, so its grid is a Bitmap fed by the same code.
+            drawIntoCanvas { canvas ->
+                drawDotGrid(
+                    canvas = canvas.nativeCanvas,
+                    days = days,
+                    metrics = metrics,
+                    paint = paint,
+                    colorOf = { status -> habitColor.yearDayColor(status, tint).toArgb() },
                 )
             }
         }
@@ -92,7 +100,7 @@ fun YearDotGrid(
  * incomplete day — 6% against 28%. A year is long enough that a habit's start date is a real
  * feature of the picture rather than noise.
  */
-private fun Color.yearDayColor(
+internal fun Color.yearDayColor(
     status: DayStatus,
     incompleteTint: Float,
 ): Color =
