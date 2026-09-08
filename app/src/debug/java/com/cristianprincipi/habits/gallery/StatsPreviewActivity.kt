@@ -23,6 +23,10 @@ import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureAverage
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.feature.stats.StatsContent
 import com.cristianprincipi.habits.feature.stats.StatsEvent
 import com.cristianprincipi.habits.feature.stats.StatsUiState
@@ -140,6 +144,36 @@ private fun SampleStats(
                             id = selectedId.value,
                             completions = history,
                             habits = habits,
+                        ),
+                    // M15.4. ⚠ Two states in one frame on purpose: a measure with readings and one
+                    // with none, because the dash is the case that cannot be checked any other way
+                    // — a regression to `0.0` would draw a plausible number and look fine.
+                    averages =
+                        listOf(
+                            MeasureAverage(
+                                measure =
+                                    Measure(
+                                        id = MeasureId("w"),
+                                        name = "Weight",
+                                        emoji = "⚖️",
+                                        unit = "kg",
+                                        color = HabitColor.GREEN,
+                                    ),
+                                value = 84.24,
+                                readings = 22,
+                            ),
+                            MeasureAverage(
+                                measure =
+                                    Measure(
+                                        id = MeasureId("s"),
+                                        name = "Sleep",
+                                        emoji = "😴",
+                                        unit = "h",
+                                        color = HabitColor.PURPLE,
+                                    ),
+                                value = null,
+                                readings = 0,
+                            ),
                         ),
                 ),
         onEvent = { event -> if (event is StatsEvent.HabitSelected) selectedId = event.habitId },

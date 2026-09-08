@@ -47,6 +47,8 @@ import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.core.ui.toDayStatus
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureAverage
+import com.cristianprincipi.habits.domain.usecase.GetMeasureAverages
 import com.cristianprincipi.habits.domain.usecase.HabitStats
 import java.util.Locale
 
@@ -146,6 +148,12 @@ private fun StatsSections(
         YearOverviewCard(stats = state.selected)
         StatTiles(stats = state.selected)
         MonthlyCompletionsCard(stats = state.selected)
+        // ⚠ Last, which is the user's own placement ("at the end"), and the one section here whose
+        // numbers do not move when the selector does. Omitted entirely when nothing is mapped — a
+        // heading over an absence explains something the user never noticed was missing.
+        if (state.averages.isNotEmpty()) {
+            DailyAveragesSection(averages = state.averages)
+        }
     }
 }
 
@@ -301,6 +309,82 @@ private fun StatTiles(
         }
     }
 }
+
+/**
+ * The "Daily averages" section — `Weight` and `Sleep`, M15.4.
+ *
+ * ### ⭐⭐ The heading is the deliverable, not the tiles
+ *
+ * Everything above it on this screen answers *for the habit selected at the top*; these two do not
+ * change whatever is selected. The user was shown both shapes — two more tiles in the existing grid,
+ * or a section of their own — and chose the heading, so the change of scope reads as a different
+ * question rather than as a tile that has stopped responding.
+ *
+ * ### ⚠ The label carries the window, and it has to
+ *
+ * Thirty days is the only span on this screen that is not the trailing year the grid and the chart
+ * use. A tile labelled just "Weight" would let a reader carry that year down from the section above.
+ * The number comes from [GetMeasureAverages.MEASURE_WINDOW_DAYS], so the label cannot drift from
+ * what was computed.
+ *
+ * ### ⚠⚠ An empty window draws a dash, never a zero
+ *
+ * [MeasureAverage.value] is null when there was nothing to average, and this renders that as an em
+ * dash. `0.0 kg` would be a confident, specific, wrong number where the honest answer is that the
+ * user has not weighed themselves this month.
+ *
+ * ### ⚠ No icon, and that is a gap rather than a choice
+ *
+ * The four tiles above each carry a Lucide glyph, and there is no apt one among the thirteen the
+ * app has: `Hash` already means "count" two sections up, and the rest are tab icons. `LucideGlyphs`
+ * is transcribed verbatim from the upstream SVGs — *"nothing was redrawn by hand"* — and ADR-024
+ * settled the family deliberately, so a fourteenth glyph is a design decision with the user rather
+ * than something to sketch. Until then these draw without one; `StatTile` already defaults to that.
+ *
+ * Reuses `StatTile` otherwise, so a measure sits in the same card, at the same radius, with the same
+ * merged screen-reader stop as the four above it. The difference the user asked for is the heading
+ * and the scope, not the drawing.
+ */
+@Composable
+private fun DailyAveragesSection(
+    averages: List<MeasureAverage>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.cardGap),
+    ) {
+        SectionEyebrow(text = stringResource(R.string.stats_measures_eyebrow))
+        averages.forEach { average ->
+            StatTile(
+                label =
+                    stringResource(
+                        R.string.stats_measure_window,
+                        average.measure.name,
+                        GetMeasureAverages.MEASURE_WINDOW_DAYS,
+                    ),
+                value = average.displayValue(),
+                habitColor = average.measure.color.resolve(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * The averaged number as the tile prints it — a dash when there is nothing to print.
+ *
+ * ⚠ One decimal place, and the unit only when the user typed one. Two decimals would imply a
+ * precision the mean of a dozen readings has not got; none would lose the difference between 84.2
+ * and 84, which for a body weight is most of the reason to track it.
+ */
+@Composable
+private fun MeasureAverage.displayValue(): String =
+    when {
+        value == null -> stringResource(R.string.stats_measure_none)
+        measure.unit.isBlank() -> stringResource(R.string.stats_measure_value, value)
+        else -> stringResource(R.string.stats_measure_value_with_unit, value, measure.unit)
+    }
 
 /**
  * One of the four numbers, as data rather than as a call — so the same four can be laid out two ways.

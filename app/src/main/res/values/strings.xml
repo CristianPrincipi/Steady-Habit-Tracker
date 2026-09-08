@@ -444,6 +444,41 @@
     <string name="stats_chart_month_separator">", "</string>
 
     <!--
+      The "Daily averages" section - M15.4.
+
+      ⭐ THE HEADING IS THE DELIVERABLE, not the tiles. Stats is a per-habit screen: everything above
+      this heading answers for the habit selected at the top, and these two do not change whatever
+      is selected. The user chose "their own section with a heading" over "two more tiles in the
+      grid" with both shapes drawn for them, precisely so that the change of scope is legible
+      instead of reading as a tile that has stopped working.
+
+      ⚠ stats_measure_window NAMES THE WINDOW, and it has to. Thirty days is the only span on this
+      screen that is not the trailing year the grid and the chart use, so a label reading just
+      "Weight" would let the reader carry the year down from the section above. The number comes
+      from GetMeasureAverages.MEASURE_WINDOW_DAYS rather than being typed here, so a label that
+      said 30 while the use case computed 60 is not expressible.
+
+      ⚠⚠ stats_measure_none is a DASH, not a zero. A window with no readings has no average, and
+      "0.0 kg" would be a confident, specific, wrong number where the honest answer is that the user
+      has not weighed themselves this month. That distinction runs from the storage layer - no row
+      for a day with no reading - all the way to this string.
+
+      stats_measure_value keeps one decimal: Weight arrives as 84 and displays as 84.00 in Notion
+      (docs/notion-schema.md §2.4), and Sleep is decimal hours where 7.5 means 7h30m. One place is
+      enough to tell 84.2 from 84, and two would imply a precision a mean of a dozen readings has
+      not got. The unit is separate because it is blank for a measure the user gave none.
+    -->
+    <string name="stats_measures_eyebrow">DAILY AVERAGES</string>
+    <string name="stats_measure_window">%1$s · last %2$d days</string>
+    <string name="stats_measure_value">%1$.1f</string>
+    <string name="stats_measure_value_with_unit">%1$.1f %2$s</string>
+    <string name="stats_measure_none">—</string>
+    <plurals name="stats_measure_readings">
+        <item quantity="one">%1$d reading</item>
+        <item quantity="other">%1$d readings</item>
+    </plurals>
+
+    <!--
       M9.6. Shown INSIDE the chart card, in place of the drawing, for a habit too young to have a
       curve - a line needs two points, so one month has nothing to draw.
 

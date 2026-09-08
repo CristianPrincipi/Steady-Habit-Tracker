@@ -1,7 +1,9 @@
 package com.cristianprincipi.habits.feature.stats
 
+import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
+import com.cristianprincipi.habits.core.testing.FakeMeasureRepository
 import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
 import com.cristianprincipi.habits.core.testing.FakeTodayFlow
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
@@ -11,6 +13,11 @@ import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureAverage
+import com.cristianprincipi.habits.domain.model.MeasureId
+import com.cristianprincipi.habits.domain.model.MeasureReading
 import com.cristianprincipi.habits.domain.model.PeriodCell
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
@@ -18,6 +25,7 @@ import com.cristianprincipi.habits.domain.usecase.CalculateStreak
 import com.cristianprincipi.habits.domain.usecase.GetCompletionRate
 import com.cristianprincipi.habits.domain.usecase.GetHabitStats
 import com.cristianprincipi.habits.domain.usecase.GetHabits
+import com.cristianprincipi.habits.domain.usecase.GetMeasureAverages
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -63,6 +71,18 @@ class StatsViewModelTest {
     private val read = testHabit(id = "read", name = "Read", startDate = LocalDate.of(2024, 1, 1))
     private val diet = testHabit(id = "diet", name = "Diet", startDate = LocalDate.of(2024, 1, 1))
 
+    private val weightMeasure =
+        Measure(
+            id = MeasureId("w"),
+            name = "Weight",
+            emoji = "",
+            unit = "kg",
+            color = HabitColor.GREEN,
+        )
+
+    /** No measures by default, so every test written before M15.4 still means what it meant. */
+    private val measures = FakeMeasureRepository()
+
     private fun viewModel(repository: FakeHabitRepository): StatsViewModel =
         StatsViewModel(
             getHabits = GetHabits(repository),
@@ -73,6 +93,7 @@ class StatsViewModelTest {
                     completionRate = GetCompletionRate(clock),
                     clock = clock,
                 ),
+            getMeasureAverages = GetMeasureAverages(measures = measures, clock = clock),
             syncStatus = syncStatus,
             today = todayFlow,
         )
@@ -292,4 +313,77 @@ class StatsViewModelTest {
                 assertEquals(0, state.selected.rate.completedDays)
             }
         }
+
+    // --- the daily averages (M15.4) --------------------------------------------------------------
+
+    @Test
+    fun theAveragesDoNotChangeWhenTheSelectedHabitDoes() =
+        runTest {
+            // ⭐⭐ **The property the section's own heading exists to explain.** Everything else in
+            // this state answers for the selected habit; these two do not. Asserting it here is what
+            // stops a later refactor "tidying" the averages into `HabitStats`, where they would
+            // become a fifth tile that silently starts following the selector.
+            measures.setMeasures(listOf(weightMeasure))
+            measures.setReadings(listOf(MeasureReading(weightMeasure.id, today.minusDays(1), 84.0)))
+            val viewModel = viewModel(repository())
+
+            viewModel.uiState.test {
+                val first = awaitItem() as StatsUiState.Content
+                assertEquals(84.0, first.averages.single().value!!, 0.0001)
+
+                viewModel.onEvent(StatsEvent.HabitSelected(diet.id))
+
+                val afterSelecting = awaitItem() as StatsUiState.Content
+                assertEquals(diet.id, afterSelecting.selectedId)
+                assertEquals(first.averages, afterSelecting.averages)
+            }
+        }
+
+    @Test
+    fun noMappedNumbersMeansNoAveragesSection() =
+        runTest {
+            // The default for every test above this one, asserted once so it is a decision rather
+            // than an accident: a user who mapped no number columns gets an empty list, and the
+            // screen omits the section instead of drawing an empty heading.
+            viewModel(repository()).uiState.test {
+                assertEquals(emptyList<MeasureAverage>(), (awaitItem() as StatsUiState.Content).averages)
+            }
+        }
+
+    @Test
+    fun theAveragesFollowTheDayOverIntoTomorrow() =
+        runTest {
+            // ⚠ The reason the ViewModel puts `today()` in front of this use case. The window ends
+            // on the day the clock is read, so a Stats screen left open past midnight would keep
+            // averaging up to yesterday — silently, on the one tab a user can sit on. The reading
+            // below is exactly 30 days before today, so it is outside the window now and inside it
+            // never again: a day later it is 31 days old.
+            measures.setMeasures(listOf(weightMeasure))
+            measures.setReadings(listOf(MeasureReading(weightMeasure.id, today.minusDays(29), 84.0)))
+            val viewModel = viewModel(repository())
+
+            viewModel.uiState.test {
+                assertEquals(1, (awaitItem() as StatsUiState.Content).averages.single().readings)
+
+                rollOverTo(today.plusDays(1))
+
+                // ⚠ **Awaited rather than counted.** A new day moves two independent flows — the
+                // habit stats and the averages — so the number of emissions is an implementation
+                // detail, and a test that consumed exactly one would fail on the *other* one
+                // arriving first. M13.13's lesson: assert on the state you are waiting for.
+                assertEquals(0, awaitAverageReadings(0))
+                // The other flow's emission for the same new day may still be queued behind this
+                // one, and it is not what the test is about.
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    /** The first emission whose single average has [readings] readings. */
+    private suspend fun ReceiveTurbine<StatsUiState>.awaitAverageReadings(readings: Int): Int {
+        while (true) {
+            val state = awaitItem()
+            val actual = (state as? StatsUiState.Content)?.averages?.singleOrNull()?.readings
+            if (actual == readings) return actual
+        }
+    }
 }

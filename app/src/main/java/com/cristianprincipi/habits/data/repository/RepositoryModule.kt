@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.data.repository
 
 import com.cristianprincipi.habits.domain.repository.HabitRepository
+import com.cristianprincipi.habits.domain.repository.MeasureRepository
 import com.cristianprincipi.habits.domain.repository.NotionSetupRepository
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
@@ -23,6 +24,10 @@ interface RepositoryModule {
     @Binds
     @Singleton
     fun bindHabitRepository(impl: HabitRepositoryImpl): HabitRepository
+
+    @Binds
+    @Singleton
+    fun bindMeasureRepository(impl: MeasureRepositoryImpl): MeasureRepository
 
     @Binds
     @Singleton

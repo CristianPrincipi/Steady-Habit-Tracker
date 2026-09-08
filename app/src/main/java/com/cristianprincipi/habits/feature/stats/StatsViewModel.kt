@@ -6,9 +6,11 @@ import com.cristianprincipi.habits.core.datetime.TodayFlow
 import com.cristianprincipi.habits.core.ui.observeEmptyReason
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureAverage
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitStats
 import com.cristianprincipi.habits.domain.usecase.GetHabits
+import com.cristianprincipi.habits.domain.usecase.GetMeasureAverages
 import com.cristianprincipi.habits.domain.usecase.HabitStats
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +53,7 @@ class StatsViewModel
     constructor(
         private val getHabits: GetHabits,
         private val getHabitStats: GetHabitStats,
+        private val getMeasureAverages: GetMeasureAverages,
         private val syncStatus: SyncStatusRepository,
         private val today: TodayFlow,
     ) : ViewModel() {
@@ -85,13 +88,37 @@ class StatsViewModel
                 }
             }
 
+        /**
+         * The measure averages, re-read on a new day — M15.4.
+         *
+         * ⚠ [today] for [chosen]'s reason and one of its own: [GetMeasureAverages] reads the clock
+         * **once, at invoke**, and its 30-day window ends on that day. A Stats screen left open past
+         * midnight would otherwise keep averaging up to yesterday, silently, on the one tab a user
+         * can sit on.
+         */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private val averages: Flow<List<MeasureAverage>> =
+            today().flatMapLatest { getMeasureAverages() }
+
         val uiState: StateFlow<StatsUiState> =
-            combine(statsForChosen, syncStatus.observeEmptyReason()) { (habits, stats), reason ->
+            combine(
+                statsForChosen,
+                averages,
+                syncStatus.observeEmptyReason(),
+            ) { (habits, stats), measureAverages, reason ->
                 if (stats == null) {
-                    // No habits at all rather than no data for one — see StatsUiState.Empty.
+                    // ⚠ No habits at all rather than no data for one — see StatsUiState.Empty. A
+                    // user with measures but no habits still lands here, deliberately: the screen is
+                    // a per-habit deep dive with a section appended, not the other way round, and
+                    // two averages under a habit selector with nothing to select would be a screen
+                    // about nothing.
                     StatsUiState.Empty(reason)
                 } else {
-                    StatsUiState.Content(habits = habits, selected = stats)
+                    StatsUiState.Content(
+                        habits = habits,
+                        selected = stats,
+                        averages = measureAverages,
+                    )
                 }
             }.stateIn(
                 scope = viewModelScope,

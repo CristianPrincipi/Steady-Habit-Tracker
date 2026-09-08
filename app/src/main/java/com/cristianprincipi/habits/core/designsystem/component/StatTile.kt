@@ -36,6 +36,12 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * @param icon supplied by the caller so the icon set can change without touching this signature —
  *   the four are Lucide's `Hash`, `Percent`, `Flame` and `Trophy` (ADR-024). The slot is expected
  *   to draw at [Sizing.iconSmall] in [habitColor]; [StatTileIcon] does exactly that.
+ *
+ *   ⚠⚠ **`null`, not an empty lambda, for a tile with no icon — M15.4.** The default used to be
+ *   `{}`, and a caller that took it got the 28dp tinted chip **with nothing in it**: on screen a
+ *   small coloured square that reads as an icon which failed to load. Found by rendering the
+ *   measure tiles, which have no apt glyph among the thirteen. A nullable slot lets the chip be
+ *   omitted rather than drawn empty, and makes "this tile has no icon" a thing the type can say.
  */
 @Composable
 fun StatTile(
@@ -43,7 +49,7 @@ fun StatTile(
     value: String,
     habitColor: Color,
     modifier: Modifier = Modifier,
-    icon: @Composable () -> Unit = {},
+    icon: (@Composable () -> Unit)? = null,
 ) {
     // ⚠⚠ **Merged (M13.2).** Label and value are two `Text`s in a `Column`, and a `Column` merges
     // nothing — so a screen reader stopped on "Current streak", then on "9", and a user who explored
@@ -53,17 +59,21 @@ fun StatTile(
         modifier = modifier.semantics(mergeDescendants = true) { },
         verticalArrangement = Arrangement.spacedBy(Spacing.weekPillGap),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(Sizing.statTileIcon)
-                    .background(
-                        color = habitColor.copy(alpha = HabitsTheme.colors.tint.yearDotIncomplete),
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-            contentAlignment = Alignment.Center,
-            content = { icon() },
-        )
+        // The chip is the icon's background, so no icon means no chip. Drawing it empty is
+        // what M15.4 caught on the emulator, and it looked like a bug rather than like a choice.
+        if (icon != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(Sizing.statTileIcon)
+                        .background(
+                            color = habitColor.copy(alpha = HabitsTheme.colors.tint.yearDotIncomplete),
+                            shape = MaterialTheme.shapes.medium,
+                        ),
+                contentAlignment = Alignment.Center,
+                content = { icon() },
+            )
+        }
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,

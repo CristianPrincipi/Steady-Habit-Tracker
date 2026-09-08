@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.stats
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureAverage
 import com.cristianprincipi.habits.domain.usecase.HabitStats
 
 /**
@@ -51,10 +52,20 @@ sealed interface StatsUiState {
      * @param selected the chosen habit's [HabitStats]. It is not an index into [habits] and not an
      *   id to look up: a screen that stored either could render a name from one habit and a streak
      *   from another for the frame between a re-order and the next query.
+     * @param averages the "Daily averages" section — M15.4, and **the only thing in this state that
+     *   does not change when [selected] does**. That is why it is a field beside it rather than a
+     *   fifth tile inside `HabitStats`: `StatTiles` takes a `HabitStats` and every number it draws
+     *   comes out of it, so a measure smuggled in there would be a tile that ignores the selector
+     *   sitting in a grid where the other four obey it. The screen gives these their own heading
+     *   for the same reason — the user's decision, with both shapes in front of them.
+     *
+     *   Empty is the normal state: a user who has mapped no number columns has no averages, and the
+     *   section is omitted rather than drawn empty.
      */
     data class Content(
         val habits: List<Habit>,
         val selected: HabitStats,
+        val averages: List<MeasureAverage> = emptyList(),
     ) : StatsUiState {
         /** Which pill draws as selected. Derived, so it cannot disagree with [selected]. */
         val selectedId: HabitId get() = selected.habit.id

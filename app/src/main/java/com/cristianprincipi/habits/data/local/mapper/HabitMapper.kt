@@ -21,7 +21,7 @@ fun HabitEntity.toDomain(): Habit {
         id = HabitId(id),
         name = name,
         emoji = emoji,
-        color = color.toHabitColor(),
+        color = color.toStoredHabitColor(),
         startDate = LocalDate.ofEpochDay(startDateEpochDay),
     )
 }
@@ -31,11 +31,16 @@ fun List<HabitEntity>.toDomain(): List<Habit> = map { it.toDomain() }
 /**
  * Reads a stored [HabitColor] name, falling back rather than throwing.
  *
+ * `internal` rather than private since M15.4: `MeasureMapper` reads the same column from its own
+ * table, and two copies of "what does an unrecognised colour name mean" is two answers waiting to
+ * disagree.
+ *
  * The column holds a name this app wrote (`HabitColor.name`), so an unknown value means the enum
  * changed under existing data. Crashing every screen over a colour would be a poor trade for a
  * field that is decoration; the habit and its whole history still render, in blue.
  */
-private fun String.toHabitColor(): HabitColor = HabitColor.entries.firstOrNull { it.name == this } ?: HabitColor.BLUE
+internal fun String.toStoredHabitColor(): HabitColor =
+    HabitColor.entries.firstOrNull { it.name == this } ?: HabitColor.BLUE
 
 /**
  * Splits a Notion property name into its leading emoji and the rest.
