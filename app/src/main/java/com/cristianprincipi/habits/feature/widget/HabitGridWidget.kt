@@ -244,8 +244,15 @@ private fun Grid(state: HabitWidgetState.Content) {
 
     val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
     val tint = HabitsDarkColors.tint.yearDotIncomplete
+    // ⚠⚠ **EVERY VALUE THE LAMBDA READS IS A KEY, AND THE COLOURS WERE MISSING** — found by the user
+    // on 2026-09-08, and only because M15.6c made a recolour reach a live widget at all (ADR-130 §7).
+    // With `habitColor` read but not keyed, changing a habit's colour recomposed `Header` — so the
+    // badge went green immediately — while `Grid` handed back the bitmap it had already drawn. The
+    // grid caught up only on a **resize**, because that moves `fit`. ⭐ `tint` is keyed for the same
+    // rule even though it cannot move today: v1 is dark-only, and a light theme is deferred rather
+    // than cancelled (`CLAUDE.md` §1), which is exactly when an unkeyed read becomes a second bug.
     val bitmap =
-        remember(days, fit, density) {
+        remember(days, fit, density, habitColor, tint) {
             dotGridBitmap(
                 days = days,
                 metrics =
