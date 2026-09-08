@@ -25,6 +25,7 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -107,7 +108,18 @@ private fun WidgetBody(state: HabitWidgetState) {
             is HabitWidgetState.Content -> {
                 Header(state)
                 Spacer(GlanceModifier.height(HEADER_GAP))
-                Grid(state)
+                // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
+                // choice of 2026-09-08, made against measured numbers. A seven-row grid cannot fill
+                // a tall widget and keep small dots: at 492x225dp the dot wants to be 25dp, which
+                // fills but buys only 15 weeks. They kept the ~31-week view, so the spare height is
+                // split above and below rather than dumped at the bottom, where it read as a broken
+                // layout rather than as padding.
+                Box(
+                    modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Grid(state)
+                }
             }
         }
     }

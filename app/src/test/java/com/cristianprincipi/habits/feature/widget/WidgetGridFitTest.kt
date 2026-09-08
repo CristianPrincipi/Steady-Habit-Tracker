@@ -17,6 +17,15 @@ import org.junit.Test
  *
  * `USER_*` below are that card, measured off their screenshot rather than imagined, and
  * [theGridFillsTheSpaceItIsGivenAtTheSizeMeasuredOnTheUsersPhone] is the regression.
+ *
+ * ### ⚠⚠ Two regimes, and both are correct
+ *
+ * A small widget **fills**; a large one **deliberately does not**. That is not an inconsistency —
+ * it is the user's decision of 2026-09-08, taken against numbers read off their phone by a probe
+ * (`avail=492x225`, dot capped from 25dp to 12dp). Seven rows cannot fill a tall widget and keep
+ * small dots, and they chose the ~31-week view over a filled 15-week one. The leftover height is
+ * **centred** by `HabitGridWidget`, not left at the bottom. See
+ * [aLargeWidgetKeepsTheLongViewAndLeavesSpaceForTheLayoutToCentre].
  */
 class WidgetGridFitTest {
     @Test
@@ -41,6 +50,25 @@ class WidgetGridFitTest {
             "grid fills only ${100 * fit.widthDp / USER_AVAILABLE_WIDTH_DP}% of the width",
             fit.widthDp >= USER_AVAILABLE_WIDTH_DP * FILL,
         )
+    }
+
+    @Test
+    fun aLargeWidgetKeepsTheLongViewAndLeavesSpaceForTheLayoutToCentre() {
+        // ⭐⭐ The user's call of 2026-09-08, taken against these exact numbers, and the reason the
+        // two regimes below are BOTH correct rather than one being a bug. A seven-row grid cannot
+        // fill a tall widget and keep small dots: at this size the dot wants 25dp, which fills the
+        // height exactly and buys only 15 weeks. They kept ~31 weeks; HabitGridWidget centres the
+        // leftover height in a weighted Box so it reads as padding, not as a broken layout.
+        val fit = fitGrid(LARGE_AVAILABLE_WIDTH_DP, LARGE_AVAILABLE_HEIGHT_DP)
+
+        assertEquals("the dot caps rather than growing to fill", MAX_DOT_DP, fit.dotDp, TOLERANCE)
+        assertTrue("should keep the long view, got ${fit.columns} weeks", fit.columns >= LONG_VIEW_WEEKS)
+        assertTrue(
+            "so it deliberately does NOT fill the height (${fit.heightDp} of $LARGE_AVAILABLE_HEIGHT_DP)",
+            fit.heightDp < LARGE_AVAILABLE_HEIGHT_DP,
+        )
+        // Width still fills — only the height is capped, and this is what proved that on the device.
+        assertEquals(LARGE_AVAILABLE_WIDTH_DP, fit.widthDp, fit.dotDp + fit.gapDp)
     }
 
     @Test
@@ -128,5 +156,12 @@ class WidgetGridFitTest {
 
         /** 107dp tall, less that padding, the 36dp badge row and the 10dp gap under it. */
         const val USER_AVAILABLE_HEIGHT_DP = 37f
+
+        /** Their LARGE widget, read straight off the device: `avail=492x225`. */
+        const val LARGE_AVAILABLE_WIDTH_DP = 492f
+        const val LARGE_AVAILABLE_HEIGHT_DP = 225f
+
+        /** Roughly seven months. What capping the dot buys, and what they chose to keep. */
+        const val LONG_VIEW_WEEKS = 28
     }
 }

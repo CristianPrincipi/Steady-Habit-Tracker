@@ -73,5 +73,14 @@ internal const val WEEKS_IN_YEAR = 53
 /** A 6dp dot gets a 2dp gap — the reference's own proportion, held at every size. */
 private const val GAP_RATIO = 3f
 private const val MIN_DOT_DP = 2.5f
-private const val MAX_DOT_DP = 12f
+
+/**
+ * ⚠⚠ **The cap the user chose to keep, knowingly (2026-09-08).** Removing it would let a large
+ * widget fill its height exactly — at 492x225dp the dot wants 25dp — but a 7-row grid can only do
+ * that by showing **fewer weeks**: 15 instead of ~31. They kept the longer view and asked for the
+ * spare height to be **centred** instead, which `HabitGridWidget` does with a weighted `Box`.
+ *
+ * `internal` so the test can assert the trade-off rather than restate the number.
+ */
+internal const val MAX_DOT_DP = 12f
 private const val MIN_GAP_DP = 0.75f
