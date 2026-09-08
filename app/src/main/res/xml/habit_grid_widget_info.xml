@@ -2,26 +2,34 @@
 <!--
   The "Habit grid" entry in the widget picker - M15.6b.
 
-  targetCellWidth/Height are the API 31+ way to say "four cells by two", which is the reference's
-  large footprint; minWidth/minHeight are the pre-31 fallback and must stay in agreement with them.
-  minResizeWidth is the SMALL size from HabitGridWidget, so the user can drag it down to the
-  reference's square shape and no further - below two cells the header has nowhere to go.
+  ⚠⚠ targetCellWidth WAS 4 AND THE USER ASKED FOR SMALLER. On their phone (360dp wide, an 8-column
+  launcher grid) four cells came out 176dp - just over half the screen - so two habits could not sit
+  side by side with any spacing between them. Three cells is comfortably under half, which is what
+  they asked for; minResizeWidth then lets them go smaller still by hand.
 
-  resizeMode is horizontal only. Vertical resizing would leave empty space under a grid whose
-  height is fixed at seven rows by definition, so offering it would promise something the design
-  cannot use.
+  minWidth/minHeight are the pre-31 fallback for targetCellWidth/Height and must stay in agreement
+  with them.
 
-  initialLayout is Glance's own loading layout - what shows in the instant between the widget being
-  dropped and provideGlance returning.
+  ⚠ resizeMode gained "vertical", and only because the drawing changed. It used to be horizontal
+  only, on the sound argument that the grid's height is seven rows by definition - so vertical space
+  had nothing to do. Since fitGrid() derives the DOT SIZE from the available height, a taller widget
+  now draws a bigger grid, and vertical resizing does something the user can see.
+
+  initialLayout is Glance's own loading layout - what shows between the widget being dropped and
+  provideGlance returning.
+
+  ⚠ No previewImage/previewLayout yet, so the picker shows a generic icon rather than a picture of
+  the widget. Known gap; it needs a real drawable and the layout had to settle first.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.cristianprincipi.habits.feature.widget.HabitWidgetConfigActivity"
     android:description="@string/widget_habit_description"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:minHeight="120dp"
-    android:minResizeWidth="160dp"
-    android:minWidth="320dp"
-    android:resizeMode="horizontal"
+    android:minHeight="80dp"
+    android:minResizeHeight="80dp"
+    android:minResizeWidth="110dp"
+    android:minWidth="110dp"
+    android:resizeMode="horizontal|vertical"
     android:targetCellHeight="2"
-    android:targetCellWidth="4"
+    android:targetCellWidth="3"
     android:widgetCategory="home_screen" />

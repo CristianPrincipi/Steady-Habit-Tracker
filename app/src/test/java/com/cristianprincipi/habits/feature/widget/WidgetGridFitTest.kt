@@ -6,46 +6,98 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * M15.6b — the reference's "firmer fact", asserted instead of eyeballed.
+ * M15.6b — how the dot grid is fitted to the space a widget actually got.
  *
- * `docs/widget-reference/README.md` records the reference's column counts as "~30 and ~15, counted
- * off the image by eye", and says the **ratio** is the reliable part: same dot size, half the
- * history in half the width. ADR-128 §4 measured it and agreed.
+ * ### The defect these were rewritten for
  *
- * ⚠⚠ **Our large widget holds MORE than the reference's ~31 columns, and that is correct.** The
- * counts were never the specification — the pitch was. The reference's large widget is about 255pt
- * wide; a four-cell Android widget is wider, so at the same 8dp pitch it fits more weeks. Matching
- * 31 exactly would mean growing the dots on Android, which breaks the one thing the reference
- * actually holds constant between its two sizes.
+ * The first version fixed the dot at 6dp and derived only the column count, and on the user's phone
+ * it drew a grid sized for a **160×120dp** bucket inside a **176×107dp** card: too narrow across,
+ * and taller than the space it had. Two causes, one visible symptom — `SizeMode.Responsive` reports
+ * the matched *bucket* rather than the real size, and nothing sized the dots to the height at all.
+ *
+ * `USER_*` below are that card, measured off their screenshot rather than imagined, and
+ * [theGridFillsTheSpaceItIsGivenAtTheSizeMeasuredOnTheUsersPhone] is the regression.
  */
 class WidgetGridFitTest {
     @Test
-    fun `half the width holds about half the history at the same dot size`() {
-        val wide = widgetGridColumns(availableDp = WIDE_DP, dotDp = DOT, gapDp = GAP)
-        val narrow = widgetGridColumns(availableDp = NARROW_DP, dotDp = DOT, gapDp = GAP)
+    fun theGridFillsTheSpaceItIsGivenAtTheSizeMeasuredOnTheUsersPhone() {
+        val fit = fitGrid(USER_AVAILABLE_WIDTH_DP, USER_AVAILABLE_HEIGHT_DP)
 
-        assertEquals(37, wide)
-        assertEquals(17, narrow)
-        // The reference's actual claim: halving the width roughly halves the history. Asserted as
-        // a relationship, because the absolute counts move with the device and the ratio does not.
-        assertTrue("narrow ($narrow) should be about half of wide ($wide)", narrow * 2 in (wide - 4)..(wide + 4))
+        // ⚠ The height assertion is the one that would have caught the original bug: the old grid
+        // wanted 54dp of a 37dp slot, so it did not merely look sparse — it did not fit.
+        assertTrue(
+            "grid is ${fit.heightDp}dp tall in ${USER_AVAILABLE_HEIGHT_DP}dp",
+            fit.heightDp <= USER_AVAILABLE_HEIGHT_DP + TOLERANCE,
+        )
+        assertTrue(
+            "grid fills only ${100 * fit.heightDp / USER_AVAILABLE_HEIGHT_DP}% of the height",
+            fit.heightDp >= USER_AVAILABLE_HEIGHT_DP * FILL,
+        )
+        assertTrue(
+            "grid is ${fit.widthDp}dp wide in ${USER_AVAILABLE_WIDTH_DP}dp",
+            fit.widthDp <= USER_AVAILABLE_WIDTH_DP + TOLERANCE,
+        )
+        assertTrue(
+            "grid fills only ${100 * fit.widthDp / USER_AVAILABLE_WIDTH_DP}% of the width",
+            fit.widthDp >= USER_AVAILABLE_WIDTH_DP * FILL,
+        )
     }
 
     @Test
-    fun `a wider widget stops at a year rather than padding itself out`() {
-        // There is no more history to show. Without the cap a tablet-width widget would ask for
-        // more columns than the year has, and the extra blanks would read as missed days.
-        assertEquals(WEEKS_IN_YEAR, widgetGridColumns(availableDp = 4000f, dotDp = DOT, gapDp = GAP))
+    fun aGridNeverOverflowsTheSpaceItIsGivenAtAnyPlausibleWidgetSize() {
+        // Swept rather than sampled, because the failure above was at one specific size and a
+        // single example would have missed it. Every size a launcher could hand us must fit.
+        for (width in 90..400 step 10) {
+            for (height in 30..260 step 10) {
+                val fit = fitGrid(width.toFloat(), height.toFloat())
+                assertTrue("$width x $height overflowed across", fit.widthDp <= width + TOLERANCE)
+                assertTrue("$width x $height overflowed down", fit.heightDp <= height + TOLERANCE)
+                assertTrue("$width x $height had no columns", fit.columns >= 1)
+            }
+        }
     }
 
     @Test
-    fun `an impossibly narrow widget still asks for one column, never zero`() {
+    fun halfTheWidthHoldsAboutHalfTheHistoryAtTheSameDotSize() {
+        // The reference's own claim (docs/widget-reference/README.md): same dot size, half the
+        // history. Asserted as a relationship, because the absolute counts move with the device
+        // and the ratio does not.
+        val wide = fitGrid(availableWidthDp = 296f, availableHeightDp = 60f)
+        val narrow = fitGrid(availableWidthDp = 136f, availableHeightDp = 60f)
+
+        assertEquals("same height means the same dot size", wide.dotDp, narrow.dotDp, TOLERANCE)
+        assertTrue(
+            "narrow (${narrow.columns}) should be about half of wide (${wide.columns})",
+            narrow.columns * 2 in (wide.columns - 4)..(wide.columns + 4),
+        )
+    }
+
+    @Test
+    fun aTallerWidgetDrawsBiggerDotsRatherThanMoreRows() {
+        // Seven rows is the one count that never changes — that is what makes a column a week. So
+        // vertical space can only buy dot size, which is also why the provider allows a vertical
+        // resize at all.
+        val short = fitGrid(availableWidthDp = 200f, availableHeightDp = 40f)
+        val tall = fitGrid(availableWidthDp = 200f, availableHeightDp = 90f)
+
+        assertTrue("taller should mean bigger dots", tall.dotDp > short.dotDp)
+        assertTrue("and therefore fewer weeks in the same width", tall.columns < short.columns)
+    }
+
+    @Test
+    fun aVeryWideWidgetStopsAtAYearRatherThanPaddingItselfOut() {
+        // There is no more history to show, and the extra blanks would read as missed days.
+        assertEquals(WEEKS_IN_YEAR, fitGrid(availableWidthDp = 4000f, availableHeightDp = 40f).columns)
+    }
+
+    @Test
+    fun anImpossiblyThinWidgetStillAsksForOneColumnNeverZero() {
         // Zero columns would size the Bitmap at a negative width — see DotGridGeometryTest.
-        assertEquals(1, widgetGridColumns(availableDp = 0f, dotDp = DOT, gapDp = GAP))
+        assertEquals(1, fitGrid(availableWidthDp = 0f, availableHeightDp = 40f).columns)
     }
 
     @Test
-    fun `the slice is always a whole number of weeks, taken from the recent end`() {
+    fun theSliceIsAlwaysAWholeNumberOfWeeksTakenFromTheRecentEnd() {
         // ⚠ The alignment is the point. The year arrives column-major and Monday-aligned, so a
         // slice that was not a multiple of seven would shift every day into the wrong row — and
         // would still draw a perfectly plausible-looking grid.
@@ -58,7 +110,7 @@ class WidgetGridFitTest {
     }
 
     @Test
-    fun `asking for more weeks than exist yields what there is`() {
+    fun askingForMoreWeeksThanExistYieldsWhatThereIs() {
         // A habit tracked for a fortnight, on a wide widget. Fewer dots — not a crash, not padding.
         val fortnight = List(14) { DayStatus.COMPLETED }
 
@@ -66,13 +118,15 @@ class WidgetGridFitTest {
     }
 
     private companion object {
-        const val DOT = 6f
-        const val GAP = 2f
+        const val TOLERANCE = 0.01f
 
-        /** A four-cell widget (320dp) less the card's 12dp padding on each side. */
-        const val WIDE_DP = 296f
+        /** How much of each axis a fitted grid must cover. One dot's worth of slack, no more. */
+        const val FILL = 0.85f
 
-        /** The two-cell widget (160dp), same padding. */
-        const val NARROW_DP = 136f
+        /** The card measured on the user's OnePlus 12: 176dp wide, less 12dp padding each side. */
+        const val USER_AVAILABLE_WIDTH_DP = 152f
+
+        /** 107dp tall, less that padding, the 36dp badge row and the 10dp gap under it. */
+        const val USER_AVAILABLE_HEIGHT_DP = 37f
     }
 }

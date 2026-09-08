@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -61,7 +60,12 @@ import com.cristianprincipi.habits.core.ui.resolveIn
  * here to carry one, and v1 is dark-only by decision (`CLAUDE.md` §1).
  */
 internal class HabitGridWidget : GlanceAppWidget() {
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, LARGE))
+    // ⚠⚠ Exact, NOT Responsive — and this was a real defect on the user's phone, not a
+    // preference. Responsive hands the composition the matched BUCKET size, so a 176x107dp widget
+    // was laid out as the 160x120dp bucket and left a third of the card empty. Responsive earns its
+    // keep when the layout must change SHAPE between sizes; this one does not — it holds more or
+    // fewer weeks at whatever size it is given, so the real size is the only useful input.
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(
         context: Context,
@@ -78,10 +82,6 @@ internal class HabitGridWidget : GlanceAppWidget() {
     internal companion object {
         /** The configured subject. Written by the configuration activity, read above. */
         val HABIT_ID = stringPreferencesKey("habit_id")
-
-        /** Roughly 2x2 and 4x2 home-screen cells — the reference's two footprints. */
-        val SMALL = DpSize(160.dp, 120.dp)
-        val LARGE = DpSize(320.dp, 120.dp)
     }
 }
 
@@ -190,21 +190,24 @@ private fun Header(state: HabitWidgetState.Content) {
 @Composable
 private fun Grid(state: HabitWidgetState.Content) {
     val density = LocalContext.current.resources.displayMetrics.density
-    val availableDp = LocalSize.current.width.value - (CARD_PADDING.value * 2)
-    val columns = widgetGridColumns(availableDp, DOT_SIZE.value, DOT_GAP.value)
-    val days = state.year.lastWeeks(columns)
+    val size = LocalSize.current
+    // What is left after the card's padding and the header above this.
+    val availableWidth = size.width.value - (CARD_PADDING.value * 2)
+    val availableHeight = size.height.value - (CARD_PADDING.value * 2) - BADGE_SIZE.value - HEADER_GAP.value
+    val fit = fitGrid(availableWidth, availableHeight)
+    val days = state.year.lastWeeks(fit.columns)
 
     val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
     val tint = HabitsDarkColors.tint.yearDotIncomplete
     val bitmap =
-        remember(days, density) {
+        remember(days, fit, density) {
             dotGridBitmap(
                 days = days,
                 metrics =
                     DotGridMetrics(
-                        dotPx = DOT_SIZE.value * density,
-                        gapPx = DOT_GAP.value * density,
-                        radiusPx = DOT_CORNER.value * density,
+                        dotPx = fit.dotDp * density,
+                        gapPx = fit.gapDp * density,
+                        radiusPx = (fit.dotDp / DOT_CORNER_RATIO) * density,
                     ),
             ) { status: DayStatus -> habitColor.yearDayColor(status, tint).toArgb() }
         }
@@ -217,9 +220,9 @@ private val HEADER_GAP = 10.dp
 private val BADGE_SIZE = 36.dp
 private val BADGE_CORNER = 18.dp
 private val BADGE_GAP = 8.dp
-private val DOT_SIZE = 6.dp
-private val DOT_GAP = 2.dp
-private val DOT_CORNER = 1.dp
+
+/** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
+private const val DOT_CORNER_RATIO = 6f
 private val TITLE_SIZE = 15.sp
 private val SUBTITLE_SIZE = 12.sp
 private val BADGE_EMOJI_SIZE = 16.sp

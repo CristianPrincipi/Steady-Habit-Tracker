@@ -112,7 +112,20 @@ class HabitWidgetConfigActivity : ComponentActivity() {
         habit: Habit,
     ) {
         lifecycleScope.launch {
-            val glanceId = GlanceAppWidgetManager(this@HabitWidgetConfigActivity).getGlanceIdBy(appWidgetId)
+            // ⚠⚠ getGlanceIdBy THROWS for an id the system no longer knows, and this crashed on a
+            // real device. The id is handed to us by the launcher and is valid when the screen
+            // opens — but the widget can be removed while the screen is still up, and then a tap
+            // takes the whole app down instead of quietly backing out. The result is already
+            // RESULT_CANCELED, which is exactly the right answer for a widget that no longer
+            // exists, so there is nothing to report and nothing to say.
+            val glanceId =
+                runCatching {
+                    GlanceAppWidgetManager(this@HabitWidgetConfigActivity).getGlanceIdBy(appWidgetId)
+                }.getOrNull()
+            if (glanceId == null) {
+                finish()
+                return@launch
+            }
             updateAppWidgetState(
                 context = this@HabitWidgetConfigActivity,
                 definition = PreferencesGlanceStateDefinition,
