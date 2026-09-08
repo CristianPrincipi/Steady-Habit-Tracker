@@ -69,8 +69,15 @@ internal fun drawDotGrid(
  * oversized bitmap silently and a short one leaves a gap nothing reports.
  *
  * ⚠ **`ARGB_8888` and not `RGB_565`**: [DayStatus.PADDING] must leave the wallpaper showing, which
- * needs a real alpha channel. A year at widget scale is well inside the ~1MB the `RemoteViews`
- * Binder transaction allows, so the cheaper config would buy a transparency bug for nothing.
+ * needs a real alpha channel, so the cheaper config would buy a transparency bug.
+ *
+ * ⚠⚠ **This used to justify itself with "well inside the ~1MB the `RemoteViews` Binder transaction
+ * allows", and a capture on the user's phone measured that claim wrong by 3.5x** (ADR-129 §18).
+ * The largest bitmap a real home screen asked for was **2032x432px = 3,511,296 B**, and it drew
+ * correctly — `RemoteViews` moves large bitmaps out of the transaction rather than failing at 1MB.
+ * ⭐ The size is bounded by the widget, not by us: seven rows at [GridFit]'s capped dot size against
+ * a launcher's largest cell. **The number is recorded because the old one was invented**, not
+ * because there is a limit to stay under; if one is ever found, it belongs here with its source.
  */
 internal fun dotGridBitmap(
     days: List<DayStatus>,
