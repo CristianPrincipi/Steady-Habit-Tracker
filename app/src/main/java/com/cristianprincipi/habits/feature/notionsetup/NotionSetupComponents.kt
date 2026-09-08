@@ -1,29 +1,36 @@
 package com.cristianprincipi.habits.feature.notionsetup
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -290,42 +297,87 @@ fun SetupMeasureRow(
             )
             RowLabel(label = label, caption = null)
         }
-        OutlinedTextField(
+        // ⚠⚠ **A `BasicTextField` with M3's own decoration box, not an `OutlinedTextField`, and
+        // the reason is a screenshot.** The plain component has a 56dp minimum height, which made
+        // each measure row 96dp against the habit rows' 64dp — on screen the list stopped reading
+        // as one list and the two numbers looked like a different kind of thing. This is the same
+        // container and the same colours with a height we choose and tighter content padding.
+        //
+        // ⭐ That height is [Sizing.minimumTouchTarget] rather than a number picked to look right:
+        // it is a text field, so it must be tappable at 48dp anyway (`CLAUDE.md` §2), and taking
+        // the floor as the height satisfies the guideline and the rhythm with one value.
+        val interactions = remember { MutableInteractionSource() }
+        val fieldColors =
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = HabitsTheme.colors.text.primary,
+                unfocusedTextColor = HabitsTheme.colors.text.primary,
+                disabledTextColor = HabitsTheme.colors.text.tertiary,
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedBorderColor = HabitsTheme.colors.focus.border,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                cursorColor = MaterialTheme.colorScheme.primary,
+            )
+        BasicTextField(
             value = unit,
             onValueChange = onUnitChange,
             enabled = checked,
-            // M13.1's finding, applied before it can happen again: an eyebrow or a neighbouring
-            // label is a sibling, not this field's name, so a screen reader would announce the
-            // contents and never the purpose. Naming it after the column is what makes two unit
-            // boxes on one screen distinguishable without sight.
-            modifier = Modifier.width(Sizing.measureUnitField).semantics { contentDescription = unitLabel },
-            textStyle = HabitsTheme.textStyles.mono,
-            placeholder = {
-                Text(
-                    text = stringResource(R.string.setup_mapping_measure_unit_hint),
-                    style = HabitsTheme.textStyles.mono,
-                    color = HabitsTheme.colors.text.placeholder,
-                )
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, autoCorrectEnabled = false),
-            // ADR-022's correction, for SetupTextField's reason: Material routes a text field to a
-            // shape tier that is not the design's 14dp.
-            shape = MaterialTheme.shapes.large,
-            colors =
-                TextFieldDefaults.colors(
-                    focusedTextColor = HabitsTheme.colors.text.primary,
-                    unfocusedTextColor = HabitsTheme.colors.text.primary,
-                    disabledTextColor = HabitsTheme.colors.text.tertiary,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    focusedIndicatorColor = HabitsTheme.colors.focus.border,
-                    unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
-                    disabledIndicatorColor = MaterialTheme.colorScheme.outline,
-                    cursorColor = MaterialTheme.colorScheme.primary,
+            // M13.1's finding, applied before it could recur: an eyebrow or a neighbouring label is
+            // a sibling, not this field's name, so a screen reader would announce the contents and
+            // never the purpose. Naming it after the column is also what makes two unit boxes on
+            // one screen distinguishable without sight.
+            modifier =
+                Modifier
+                    .width(Sizing.measureUnitField)
+                    .height(Sizing.minimumTouchTarget)
+                    .semantics { contentDescription = unitLabel },
+            textStyle =
+                HabitsTheme.textStyles.mono.copy(
+                    color =
+                        if (checked) {
+                            HabitsTheme.colors.text.primary
+                        } else {
+                            HabitsTheme.colors.text.tertiary
+                        },
                 ),
-        )
+            singleLine = true,
+            interactionSource = interactions,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, autoCorrectEnabled = false),
+        ) { innerTextField ->
+            OutlinedTextFieldDefaults.DecorationBox(
+                value = unit,
+                innerTextField = innerTextField,
+                enabled = checked,
+                singleLine = true,
+                visualTransformation = VisualTransformation.None,
+                interactionSource = interactions,
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.setup_mapping_measure_unit_hint),
+                        style = HabitsTheme.textStyles.mono,
+                        color = HabitsTheme.colors.text.placeholder,
+                    )
+                },
+                colors = fieldColors,
+                // The default is 16dp all round, which is what forces the 56dp. Vertical defaults
+                // to zero here, so the box centres its single line in the height set above.
+                contentPadding = PaddingValues(horizontal = Spacing.cardGap),
+                container = {
+                    OutlinedTextFieldDefaults.Container(
+                        enabled = checked,
+                        isError = false,
+                        interactionSource = interactions,
+                        colors = fieldColors,
+                        // ADR-022's correction, for `SetupTextField`'s reason: Material routes a
+                        // text field to a shape tier that is not the design's 14dp.
+                        shape = MaterialTheme.shapes.large,
+                    )
+                },
+            )
+        }
     }
 }
 
