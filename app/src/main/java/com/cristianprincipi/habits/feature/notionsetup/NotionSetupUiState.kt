@@ -156,8 +156,18 @@ data class NotionSetupUiState(
     /**
      * The habit ids to save, **in candidate order rather than tick order**.
      *
-     * The user reads the list top to bottom and expects their habits in that order, and this
-     * becomes `HabitEntity.sortOrder`.
+     * The user reads the list top to bottom, so this is the order they saw when they ticked.
+     *
+     * ⚠⚠ **This used to say "and this becomes `HabitEntity.sortOrder`", which M15.5 made false
+     * and which was the reason the habit order could not be the user's.** Candidate order is
+     * `loadProperties`' name sort — alphabetical by Notion property name, which for names that
+     * begin with an emoji means sorted by that emoji's code point. Every save wrote that over
+     * whatever order the mapping held.
+     *
+     * `sortOrder` is now app-local, carried forward by `HabitImporter` the way `color` is, and
+     * changed on the manage-habits screen (ADR-127). So this decides the **seed** position of a
+     * habit ticked for the first time and nothing else: an existing habit keeps where the user put
+     * it, whatever this returns.
      */
     val habitPropertyIdsInOrder: List<String>
         get() = habitCandidates.map(NotionProperty::id).filter { it in habitPropertyIds }

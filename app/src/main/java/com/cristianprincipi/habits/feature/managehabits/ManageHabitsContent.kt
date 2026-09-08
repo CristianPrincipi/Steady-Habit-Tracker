@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.managehabits
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,17 +16,23 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.ColorSwatchRow
 import com.cristianprincipi.habits.core.designsystem.component.HabitIcon
 import com.cristianprincipi.habits.core.designsystem.component.HabitsCard
 import com.cristianprincipi.habits.core.designsystem.component.SecondaryButton
+import com.cristianprincipi.habits.core.designsystem.component.pressScale
 import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.icon.Lucide
 import com.cristianprincipi.habits.core.designsystem.icon.LucideIcon
@@ -262,9 +269,16 @@ private fun HabitRow(
  * 18dp of glyph inside a 48dp target, matching the Month and Week nav arrows: the same gesture
  * ("move by one") should not have two different targets in one app.
  *
- * ⚠ **Disabled rather than hidden at the ends**, and `clickable(enabled = false)` is what tells a
- * screen reader so — announcing "Move Read up, disabled" is the whole reason not to hand-roll the
- * semantics here.
+ * ⚠⚠ **The label is a `contentDescription`, not `clickable`'s `onClickLabel`, and the difference
+ * is whether the button has a name at all.** `onClickLabel` names the *action* — a screen reader
+ * says "button, double tap to move Read up", so the node itself is announced as an anonymous
+ * button, and touch exploration lands on it with nothing to say. A `contentDescription` names the
+ * node: "Move Read up, button", and "disabled" after it when it is. This is `ChevronButton`'s own
+ * pattern in `NavArrows`, and M13.1 found the same defect on `SetupTextField` — twice is enough to
+ * treat it as the house rule.
+ *
+ * ⚠ **Disabled rather than hidden at the ends**, and `clickable(enabled = false)` is what carries
+ * that into the semantics, which is the reason not to hand-roll them.
  */
 @Composable
 private fun MoveButton(
@@ -278,16 +292,21 @@ private fun MoveButton(
             MoveDirection.Up -> stringResource(R.string.habits_move_up, habitName)
             MoveDirection.Down -> stringResource(R.string.habits_move_down, habitName)
         }
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
             Modifier
                 .size(Sizing.minimumTouchTarget)
-                .clickable(
+                .semantics {
+                    role = Role.Button
+                    this.contentDescription = label
+                    if (!enabled) disabled()
+                }.clickable(
                     enabled = enabled,
-                    onClickLabel = label,
-                    role = Role.Button,
+                    interactionSource = interactionSource,
+                    indication = null,
                     onClick = onClick,
-                ),
+                ).pressScale(interactionSource, ARROW_PRESSED_SCALE),
         contentAlignment = Alignment.Center,
     ) {
         LucideIcon(
@@ -306,6 +325,16 @@ private fun MoveButton(
 
 /** Clockwise, which turns a left chevron into an up one and a right chevron into a down one. */
 private const val QUARTER_TURN = 90f
+
+/**
+ * `active:scale-90`, the same press feedback the Month and Week nav arrows use.
+ *
+ * ⚠ **It is not decoration here, it is the replacement for the ripple.** `indication = null` on
+ * the `clickable` above follows `ChevronButton`, and a bare 48dp box with no ripple and no scale
+ * would give a tap no acknowledgement at all — on a control whose whole job is to be tapped
+ * repeatedly.
+ */
+private const val ARROW_PRESSED_SCALE = 0.90f
 
 /**
  * The word for a colour, for a screen reader.
