@@ -132,7 +132,7 @@ private fun WidgetBody(state: HabitWidgetState) {
 
             is HabitWidgetState.Content -> {
                 WidgetHeader(
-                    emoji = state.emoji,
+                    badge = state.emoji,
                     name = state.name,
                     subtitle =
                         LocalContext.current.getString(

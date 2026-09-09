@@ -29,6 +29,15 @@ internal sealed interface MeasureWidgetState {
     data object MeasureMissing : MeasureWidgetState
 
     /**
+     * ⚠⚠ **There is no emoji here, and its absence is load-bearing (M15.6g).** [HabitWidgetState]
+     * carries one because a habit's Notion property is named with a leading emoji; a number's is
+     * named plainly — `Weight`, `Sleep` — so this badge drew an empty circle. The user's ruling was
+     * to put the [average] in it instead and take the figure off the line below, which makes the
+     * badge the widget's **only** printing of the number. A measure that later acquired an emoji in
+     * Notion must therefore still not draw one here: doing so would not add an icon, it would delete
+     * the value. The field is gone rather than ignored so that cannot come back as a plausible
+     * one-line change.
+     *
      * @param average the mean over the days that had a reading, or **null when there were none** —
      *   never `0.0`. It moves together with [points] being empty, because both come from
      *   `MeasureSeries`, where the pairing is an invariant rather than a convention.
@@ -40,7 +49,6 @@ internal sealed interface MeasureWidgetState {
      */
     data class Content(
         val name: String,
-        val emoji: String,
         val color: HabitColor,
         val average: Double?,
         val unit: String,

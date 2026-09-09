@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.widget
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
@@ -60,18 +61,27 @@ private const val BADGE_TINT = 0.15f
 private const val MESSAGE_LINES = 3
 
 /**
- * The emoji badge, the name, and one line under it.
+ * The badge, the name, and one line under it.
+ *
+ * ⚠⚠ **The badge is not always an emoji, and that is M15.6g.** A habit's Notion property carries
+ * one; a number's does not — `Weight` and `Sleep` are plain words — so the measure widget drew an
+ * empty tinted circle while the picker that placed it drew `W`. The user's ruling was to put the
+ * **average** in it instead, and to take the figure out of the subtitle so it is printed once. This
+ * therefore takes a string and a size: the header does not know which of the two it is holding.
  *
  * @param subtitle already formatted by the caller, because the two widgets say different things
- *   there — *"3 of 7 this week"* against *"84.3 kg · last 30 days"* — and neither sentence is the
+ *   there — *"3 of 7 this week"* against *"kg · last 30 days"* — and neither sentence is the
  *   header's business to build.
+ * @param badgeTextSize defaulted for the emoji case, where one glyph at 16sp clears a 36dp circle at
+ *   every font scale Android offers. A number does not — see `fitBadgeSp`.
  */
 @Composable
 internal fun WidgetHeader(
-    emoji: String,
+    badge: String,
     name: String,
     subtitle: String,
     color: HabitColor,
+    badgeTextSize: TextUnit = BADGE_EMOJI_SIZE,
 ) {
     val resolved = color.resolveIn(HabitsDarkColors.habit)
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -83,7 +93,9 @@ internal fun WidgetHeader(
                     .background(ColorProvider(resolved.copy(alpha = BADGE_TINT))),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text = emoji, style = TextStyle(fontSize = BADGE_EMOJI_SIZE))
+            // maxLines so a value too long for its circle clips rather than stacking into two
+            // half-height rows, which reads as a rendering fault. fitBadgeSp keeps it rare.
+            Text(text = badge, style = TextStyle(fontSize = badgeTextSize), maxLines = 1)
         }
         Spacer(GlanceModifier.width(BADGE_GAP))
         Column {

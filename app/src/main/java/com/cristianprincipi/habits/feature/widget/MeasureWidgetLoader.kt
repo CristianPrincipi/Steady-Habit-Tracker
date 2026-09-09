@@ -66,7 +66,6 @@ internal suspend fun loadMeasureWidgetState(
 private fun MeasureSeries.toContent(): MeasureWidgetState.Content =
     MeasureWidgetState.Content(
         name = measure.name,
-        emoji = measure.emoji,
         color = measure.color,
         average = average.value,
         unit = measure.unit,

@@ -681,15 +681,20 @@
       vocabulary for these is "numbers" (setup_mapping_measures_eyebrow: ANY NUMBERS TO AVERAGE?),
       and "trend" is what the line actually shows - the average is the figure beside it.
 
-      ⚠⚠ widget_measure_summary DELIBERATELY REPEATS stats_measure_window's shape rather than
-      reusing it. The two put different things in slot 1: on Stats the tile is labelled with the
-      measure NAME and prints the value large beneath, while the widget already has the name on the
-      line above and so puts the VALUE here. Sharing one format would leave a translator guessing
-      which, and would break the day either surface reworded its half.
+      ⚠⚠ widget_measure_summary's SLOT 1 IS THE UNIT, NOT THE VALUE - changed at M15.6g, when the
+      average moved into the badge circle a number property has no emoji to fill. The figure is
+      printed once, so this line carries what is left of the sentence: "kg · last 30 days". A
+      measure the user gave no unit has nothing left to put in slot 1 at all, which is why
+      widget_measure_window exists as a separate string rather than as this one with a blank - the
+      leading separator would be visible, and "Last" has to capitalise when it starts the line.
 
-      ⚠ The window is named on both, for the same reason: thirty days is the only span in this app
-      that is not the trailing year, and a bare "84.3 kg" reads as today's weight - which is exactly
-      what it is not.
+      It still DELIBERATELY REPEATS stats_measure_window's shape rather than reusing it, for the
+      original reason: the two put different things in slot 1, and sharing one format would leave a
+      translator guessing which and would break the day either surface reworded its half.
+
+      ⚠ The window is named on both, and that outlived the value moving out of this line: thirty
+      days is the only span in this app that is not the trailing year, and a badge reading "84.3"
+      above a bare "kg" reads as today's weight - which is exactly what it is not.
 
       ⚠ widget_measure_no_readings is a plain fact and NOT a warning. An empty window is a user who
       has not weighed themselves this month, which is ordinary; the header beside it already prints
@@ -702,6 +707,7 @@
     <string name="widget_measure_label">Number trend</string>
     <string name="widget_measure_description">One number\'s last 30 days, as a line.</string>
     <string name="widget_measure_summary" tools:ignore="PluralsCandidate">%1$s · last %2$d days</string>
+    <string name="widget_measure_window" tools:ignore="PluralsCandidate">Last %1$d days</string>
     <string name="widget_measure_unconfigured">Remove this widget and add it again to pick a number.</string>
     <string name="widget_measure_missing">Tick this number again in Settings, or remove the widget.</string>
     <string name="widget_measure_no_readings">No readings in the last 30 days.</string>
