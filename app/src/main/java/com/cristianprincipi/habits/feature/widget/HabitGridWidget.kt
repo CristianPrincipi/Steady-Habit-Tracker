@@ -6,8 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -25,18 +23,12 @@ import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
-import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.layout.width
 import androidx.glance.state.PreferencesGlanceStateDefinition
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.DayStatus
@@ -131,15 +123,25 @@ private fun WidgetBody(state: HabitWidgetState) {
     ) {
         when (state) {
             HabitWidgetState.Unconfigured -> {
-                Message(R.string.widget_unconfigured)
+                WidgetMessage(R.string.widget_unconfigured)
             }
 
             HabitWidgetState.HabitMissing -> {
-                Message(R.string.widget_habit_missing)
+                WidgetMessage(R.string.widget_habit_missing)
             }
 
             is HabitWidgetState.Content -> {
-                Header(state)
+                WidgetHeader(
+                    emoji = state.emoji,
+                    name = state.name,
+                    subtitle =
+                        LocalContext.current.getString(
+                            R.string.habit_card_summary,
+                            state.completedThisWeek,
+                            state.daysThisWeek,
+                        ),
+                    color = state.color,
+                )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
                 // choice of 2026-09-08, made against measured numbers. A seven-row grid cannot fill
@@ -154,72 +156,6 @@ private fun WidgetBody(state: HabitWidgetState) {
                     Grid(state)
                 }
             }
-        }
-    }
-}
-
-/**
- * ⚠ **Both empty states are sentences, not blank space.** A widget outlives the screen that made
- * it, so an empty grid would read as a habit with no history rather than as a widget with no habit.
- */
-@Composable
-private fun Message(textRes: Int) {
-    Text(
-        text = LocalContext.current.getString(textRes),
-        style =
-            TextStyle(
-                color = ColorProvider(HabitsDarkColors.text.secondary),
-                fontSize = SUBTITLE_SIZE,
-            ),
-        maxLines = MESSAGE_LINES,
-    )
-}
-
-@Composable
-private fun Header(state: HabitWidgetState.Content) {
-    val context = LocalContext.current
-    val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier =
-                GlanceModifier
-                    .size(BADGE_SIZE)
-                    .cornerRadius(BADGE_CORNER)
-                    // The same wash the app's habit icon sits on, so the badge reads as the habit's
-                    // colour without competing with the grid drawn in it at full strength.
-                    .background(ColorProvider(habitColor.copy(alpha = BADGE_TINT))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = state.emoji, style = TextStyle(fontSize = BADGE_EMOJI_SIZE))
-        }
-        Spacer(GlanceModifier.width(BADGE_GAP))
-        Column {
-            Text(
-                text = state.name,
-                style =
-                    TextStyle(
-                        color = ColorProvider(HabitsDarkColors.text.primary),
-                        fontSize = TITLE_SIZE,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                // Ellipsised rather than wrapped: the narrow widget has one line's room, and the
-                // reference truncates there too.
-                maxLines = 1,
-            )
-            Text(
-                text =
-                    context.getString(
-                        R.string.habit_card_summary,
-                        state.completedThisWeek,
-                        state.daysThisWeek,
-                    ),
-                style =
-                    TextStyle(
-                        color = ColorProvider(HabitsDarkColors.text.secondary),
-                        fontSize = SUBTITLE_SIZE,
-                    ),
-                maxLines = 1,
-            )
         }
     }
 }
@@ -266,17 +202,5 @@ private fun Grid(state: HabitWidgetState.Content) {
     Image(provider = ImageProvider(bitmap), contentDescription = null)
 }
 
-private val CARD_PADDING = 12.dp
-private val CARD_CORNER = 16.dp
-private val HEADER_GAP = 10.dp
-private val BADGE_SIZE = 36.dp
-private val BADGE_CORNER = 18.dp
-private val BADGE_GAP = 8.dp
-
 /** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
 private const val DOT_CORNER_RATIO = 6f
-private val TITLE_SIZE = 15.sp
-private val SUBTITLE_SIZE = 12.sp
-private val BADGE_EMOJI_SIZE = 16.sp
-private const val BADGE_TINT = 0.15f
-private const val MESSAGE_LINES = 3

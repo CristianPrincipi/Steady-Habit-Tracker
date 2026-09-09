@@ -63,14 +63,10 @@ class GetMeasureAverages
             ) { allMeasures, readings ->
                 val byMeasure = readings.groupBy { it.measureId }
                 allMeasures.map { measure ->
-                    val values = byMeasure[measure.id].orEmpty().map { it.value }
-                    MeasureAverage(
-                        measure = measure,
-                        // `average()` on an empty list is NaN, not zero, and NaN would render as
-                        // "NaN kg". Neither is the answer: there is no average, so there is none.
-                        value = if (values.isEmpty()) null else values.average(),
-                        readings = values.size,
-                    )
+                    // `MeasureAverage.of` holds the "no readings is not an average of zero" rule,
+                    // shared with the home-screen widget (M15.6d) so the two surfaces cannot answer
+                    // an empty window differently.
+                    MeasureAverage.of(measure, byMeasure[measure.id].orEmpty().map { it.value })
                 }
             }
         }

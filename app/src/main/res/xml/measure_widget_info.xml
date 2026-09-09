@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The "Number trend" entry in the widget picker - M15.6d, the second of two.
+
+  The cell sizes match habit_grid_widget_info.xml deliberately: the two widgets are siblings and
+  should drop onto a home screen at the same size, so a user placing both gets a matched pair rather
+  than two cards that need resizing to line up. Three cells was the user's own call at M15.6b - four
+  came out just over half the width of their phone, so two widgets could not sit side by side.
+
+  minWidth/minHeight are the pre-31 fallback for targetCellWidth/Height and must stay in agreement
+  with them.
+
+  ⚠ resizeMode is both ways, and here it earns it more directly than on the grid: a sparkline has no
+  natural height, so it simply fills whatever it is given. A taller widget is a taller curve.
+
+  initialLayout is Glance's own loading layout - what shows between the widget being dropped and
+  provideGlance returning.
+
+  ⚠ No previewImage/previewLayout yet - the same known gap the habit widget has. Both need a real
+  drawable, and the picker showing a preview is the whole reason these are two entries rather than
+  one.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.cristianprincipi.habits.feature.widget.MeasureWidgetConfigActivity"
+    android:description="@string/widget_measure_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minHeight="80dp"
+    android:minResizeHeight="80dp"
+    android:minResizeWidth="110dp"
+    android:minWidth="110dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellHeight="2"
+    android:targetCellWidth="3"
+    android:widgetCategory="home_screen" />

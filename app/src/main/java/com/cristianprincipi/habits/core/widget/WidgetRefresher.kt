@@ -31,7 +31,7 @@ fun interface WidgetRefresher {
  * `SyncWorker`, where it would become a WorkManager retry of a sync that had already succeeded.
  *
  * ⭐ **Here rather than inside the implementation, deliberately.** Swallowing in
- * `HabitWidgetRefresher` would make the guarantee a property of one class that a second
+ * `AppWidgetRefresher` would make the guarantee a property of one class that a second
  * implementation could quietly drop; as an extension it holds for every implementation, including
  * the fakes, and it is the call sites that carry the risk.
  *
