@@ -8,6 +8,7 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceRefDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDatabaseDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionListDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
+import com.cristianprincipi.habits.data.remote.notion.dto.NotionRequestStatusDto
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.io.IOException
@@ -87,6 +88,17 @@ class FakeNotionApi(
      * Counted per **run**: the counter resets whenever a query arrives with no cursor.
      */
     var failQueryAfterPages: Int? = null
+
+    /**
+     * Serve this many pages, then answer as Notion does at its 10,000-result ceiling: `has_more`
+     * **false** with a `request_status` of `incomplete` (`docs/notion-api.md` §5).
+     *
+     * ⚠ ADR-118's lesson applied a second time. A fake that could only fail a whole query could not
+     * prove a run resumes in the right place; a fake that can only end a query *cleanly* cannot
+     * prove anything about the one case where `has_more` lies. The backfill (ADR-132) is the first
+     * code path where that lie has no watermark to correct it.
+     */
+    var truncateAfterPages: Int? = null
 
     /** Fails only `updatePage`. The `404` case is how a deleted page is discovered (§14). */
     var failUpdateWith: NotionError? = null
@@ -248,13 +260,20 @@ class FakeNotionApi(
         val from = startCursor?.toInt() ?: 0
         val window = visible.drop(from).take(pageSize)
         val next = from + window.size
-        val hasMore = next < visible.size
         pagesServedThisRun++
+        val cutShort = truncateAfterPages?.let { pagesServedThisRun >= it } == true
+        val hasMore = next < visible.size && !cutShort
         return NotionResult.Success(
             NotionListDto(
                 results = window,
                 hasMore = hasMore,
                 nextCursor = if (hasMore) next.toString() else null,
+                requestStatus =
+                    if (cutShort) {
+                        NotionRequestStatusDto(type = "incomplete", incompleteReason = "query_result_limit_reached")
+                    } else {
+                        null
+                    },
             ),
         )
     }

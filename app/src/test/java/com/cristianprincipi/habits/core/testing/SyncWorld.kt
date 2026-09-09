@@ -14,6 +14,7 @@ import com.cristianprincipi.habits.data.preferences.NotionMeasure
 import com.cristianprincipi.habits.data.preferences.NotionPropertyId
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
 import com.cristianprincipi.habits.data.preferences.SettingsDataStore
+import com.cristianprincipi.habits.data.preferences.readablePropertyIds
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionParentDto
@@ -22,6 +23,7 @@ import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.HabitImporter
 import com.cristianprincipi.habits.data.sync.MeasureImporter
+import com.cristianprincipi.habits.data.sync.PullFormatStore
 import com.cristianprincipi.habits.data.sync.SyncEngine
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -247,6 +249,16 @@ fun dateProperty(date: LocalDate): JsonObject =
 class SyncWorld(
     schema: NotionDataSourceDto = defaultSchema,
     clock: Clock = syncTestClock,
+    /**
+     * Whether this world stands for an install that **upgraded across a pull-format change** and
+     * therefore owes a backfill (ADR-132).
+     *
+     * ⚠ **Default false, which is "an install that is already up to date"**, and that is the honest
+     * default rather than a convenience: every test here is about incremental sync, and a world that
+     * silently owed a backfill would make the second run of each one re-read everything — quietly
+     * turning assertions about the watermark into assertions about nothing.
+     */
+    private val upgradedInstall: Boolean = false,
 ) {
     val api = FakeNotionApi(schema)
     val habits = FakeHabitDao()
@@ -258,6 +270,7 @@ class SyncWorld(
     val mappingStore = NotionMappingStore(preferences)
     val settings = SettingsDataStore(preferences)
     val discardedEdits = DiscardedEditStore(preferences)
+    val pullFormat = PullFormatStore(preferences)
 
     val engine =
         SyncEngine(
@@ -277,6 +290,7 @@ class SyncWorld(
             measureDao = measures,
             transactionRunner = TestTransactionRunner(),
             discardedEdits = discardedEdits,
+            pullFormat = pullFormat,
             settings = SettingsRepositoryImpl(settings),
             clock = clock,
         )
@@ -292,6 +306,11 @@ class SyncWorld(
 
     suspend fun connect(mapping: NotionPropertyMapping = defaultMapping) {
         mappingStore.save(mapping)
+        // ⚠⚠ Recorded HERE and not in `init`, because a backfill is owed against a *mapping* and
+        // there is none until now (ADR-132). Without this every world would owe one, and the second
+        // `sync()` of every test would silently re-read everything — turning each assertion about
+        // the watermark into an assertion about nothing.
+        if (!upgradedInstall) pullFormat.recordBackfill(mapping.readablePropertyIds())
     }
 
     /**

@@ -11,6 +11,7 @@ import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDatabaseId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
 import com.cristianprincipi.habits.data.preferences.NotionPropertyMapping
+import com.cristianprincipi.habits.data.preferences.readablePropertyIds
 import com.cristianprincipi.habits.data.remote.notion.NotionApi
 import com.cristianprincipi.habits.data.remote.notion.NotionError
 import com.cristianprincipi.habits.data.remote.notion.NotionResult
@@ -107,6 +108,7 @@ class SyncEngine
         private val measureDao: MeasureDao,
         private val transactionRunner: TransactionRunner,
         private val discardedEdits: DiscardedEditStore,
+        private val pullFormat: PullFormatStore,
         private val settings: SettingsRepository,
         private val clock: Clock,
     ) {
@@ -186,12 +188,25 @@ class SyncEngine
             measures: MappedMeasures,
             discarded: MutableList<DiscardedEdit>,
         ): NotionResult<PullReport> {
+            // ⚠⚠ **The watermark is skipped entirely when this build reads more of a page than
+            // the one that filled Room did** (M15.6e, ADR-132). The incremental filter is right for
+            // keeping up and wrong exactly once per new property: every page older than the
+            // watermark is already "seen", so a field we have only just learned to read would never
+            // be read for any of them. The user found this as a sparkline pinned to the right-hand
+            // edge of its widget — two readings against a month that had never been fetched.
+            // ⚠ Everything `applyPage` looks at, so the mapping gaining a column counts as
+            // "this build reads more than the one that filled Room did" — which for the user is the
+            // same event and the more likely one (`CLAUDE.md` §3.4: the mapping is user data).
+            val readableIds = mapping.readablePropertyIds()
+            val backfilling = pullFormat.needsBackfill(readableIds)
             // Read once, before the first request. The filter has to stay identical across a
             // paginated run, and it would otherwise move as this loop's own writes land.
-            val editedAtOrAfter = dayDao.latestRemoteEditMillis()?.let(Instant::ofEpochMilli)
+            val editedAtOrAfter =
+                if (backfilling) null else dayDao.latestRemoteEditMillis()?.let(Instant::ofEpochMilli)
             var cursor: String? = null
             var applied = 0
             var skipped = 0
+            var truncated = false
 
             do {
                 val query =
@@ -213,8 +228,14 @@ class SyncEngine
                 // rather than an oversight: at the 10,000 ceiling an ascending run has applied the
                 // oldest-edited 10,000, the watermark now sits on the last of them, and the next
                 // run continues from exactly there (`docs/notion-api.md` §5 and §14).
+                truncated = truncated || page.isTruncated
                 cursor = page.cursorForNextPage
             } while (cursor != null)
+
+            // ⚠ Only after a pass that reached the end. A truncated backfill has read the oldest
+            // 10,000 and has no watermark to resume from — recording it would strand the rest with
+            // nothing to say so, where leaving it unrecorded simply tries again next run.
+            if (backfilling && !truncated) pullFormat.recordBackfill(readableIds)
 
             return NotionResult.Success(PullReport(applied = applied, skipped = skipped))
         }

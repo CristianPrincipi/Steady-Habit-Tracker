@@ -207,3 +207,18 @@ data class NotionPropertyMapping(
         }
     }
 }
+
+/**
+ * Every property id this mapping causes a pull to read — the day key, the habits, the measures.
+ *
+ * ⭐ **Its own function because the backfill compares sets of these** (`PullFormatStore`,
+ * ADR-132), and the comparison is only as honest as the list is complete. A property added to a
+ * mapping and forgotten here would be one whose history silently never arrives — which is the exact
+ * defect that store exists to prevent, reintroduced one level up.
+ */
+fun NotionPropertyMapping.readablePropertyIds(): Set<String> =
+    buildSet {
+        add(dayKeyPropertyId.value)
+        habitPropertyIds.forEach { add(it.value) }
+        measures.forEach { add(it.id.value) }
+    }
