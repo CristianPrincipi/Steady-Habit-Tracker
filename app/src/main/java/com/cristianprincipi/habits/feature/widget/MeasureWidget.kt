@@ -124,6 +124,12 @@ private fun MeasureWidgetBody(state: MeasureWidgetState) {
                 val badge = state.badge()
                 WidgetHeader(
                     badge = badge,
+                    // ⚠ White, NOT the measure's colour, and that is measured rather than chosen:
+                    // the number is the widget's only printing of the value, so it is text and owes
+                    // AA — and the colour on its own 15% wash is 3.38:1 for purple and 3.24:1 for
+                    // red. The circle still carries the colour; the figure on it has to be legible.
+                    // See ContrastTest.theMeasureBadgesNumberTakesTheWhiteThatPasses.
+                    badgeColor = ColorProvider(HabitsDarkColors.text.primary),
                     name = state.name,
                     subtitle = state.summary(),
                     color = state.color,

@@ -74,6 +74,7 @@ private const val MESSAGE_LINES = 3
  *   header's business to build.
  * @param badgeTextSize defaulted for the emoji case, where one glyph at 16sp clears a 36dp circle at
  *   every font scale Android offers. A number does not — see `fitBadgeSp`.
+ * @param badgeColor required, not defaulted — see the note above [Text] in the body.
  */
 @Composable
 internal fun WidgetHeader(
@@ -81,6 +82,7 @@ internal fun WidgetHeader(
     name: String,
     subtitle: String,
     color: HabitColor,
+    badgeColor: ColorProvider,
     badgeTextSize: TextUnit = BADGE_EMOJI_SIZE,
 ) {
     val resolved = color.resolveIn(HabitsDarkColors.habit)
@@ -93,9 +95,26 @@ internal fun WidgetHeader(
                     .background(ColorProvider(resolved.copy(alpha = BADGE_TINT))),
             contentAlignment = Alignment.Center,
         ) {
+            // ⚠⚠ **EVERY `Text` IN A WIDGET MUST STATE ITS COLOUR, AND THIS ONE SHIPPED WITHOUT
+            // ONE.** Glance compiles to `RemoteViews`, and `glance_text.xml` is a bare `TextView`
+            // with no `android:textColor` — so a null `TextStyle.color` inherits the **host
+            // launcher's** theme, which follows the system light/dark setting, while this card is
+            // forced dark at every hour of the day. M15.6g's first attempt drew the average in the
+            // launcher's default: on a light-mode phone that is near-black on #1C1C1F, and the user
+            // saw a blank circle in the measure's colour. The three `Text`s below always set one;
+            // this was the only one that did not, because an emoji does not need it.
+            //
+            // ⭐ So `badgeColor` is **required rather than defaulted**. An emoji ignores it — colour
+            // emoji are drawn from their own font — so the habit widget loses nothing by stating it,
+            // and no future caller can reach this line without having thought about it.
+            //
             // maxLines so a value too long for its circle clips rather than stacking into two
             // half-height rows, which reads as a rendering fault. fitBadgeSp keeps it rare.
-            Text(text = badge, style = TextStyle(fontSize = badgeTextSize), maxLines = 1)
+            Text(
+                text = badge,
+                style = TextStyle(color = badgeColor, fontSize = badgeTextSize),
+                maxLines = 1,
+            )
         }
         Spacer(GlanceModifier.width(BADGE_GAP))
         Column {

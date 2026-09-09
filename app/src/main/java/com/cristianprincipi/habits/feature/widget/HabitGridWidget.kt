@@ -133,6 +133,9 @@ private fun WidgetBody(state: HabitWidgetState) {
             is HabitWidgetState.Content -> {
                 WidgetHeader(
                     badge = state.emoji,
+                    // Stated though an emoji ignores it — WidgetChrome requires it so no widget can
+                    // draw text in whatever colour the launcher's theme happens to hand it.
+                    badgeColor = ColorProvider(HabitsDarkColors.text.primary),
                     name = state.name,
                     subtitle =
                         LocalContext.current.getString(

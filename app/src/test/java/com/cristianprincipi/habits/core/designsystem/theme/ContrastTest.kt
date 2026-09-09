@@ -274,6 +274,49 @@ class ContrastTest {
     }
 
     /**
+     * ⚠⚠ **The measure widget's badge prints the average, so it is TEXT and owes 4.5, not 3.0.**
+     *
+     * M15.6g put the figure inside the icon circle and took it off the line below, which makes this
+     * the widget's **only** printing of the number. The tempting colour is the measure's own — it is
+     * what `HabitIcon` gives the initial it draws for a habit with no emoji, and the circle it sits
+     * on is that colour at [HabitsTints.iconCircle].
+     *
+     * ⭐ **It was measured instead of chosen, and the measurement rejected it**: on its own wash the
+     * colour is fine for green and orange and **fails for purple and red**, which is the worst kind
+     * of palette rule — one that works for the colour you tested with. White clears AA on all five,
+     * and the circle still carries the colour.
+     */
+    @Test
+    fun theMeasureBadgesNumberTakesTheWhiteThatPasses() {
+        val washes =
+            colors.habit.assignable.map {
+                over(
+                    it.copy(alpha = colors.tint.iconCircle),
+                    scheme.surfaceContainer,
+                )
+            }
+
+        val failures =
+            washes.mapNotNull { wash ->
+                val r = contrast(colors.text.primary, wash)
+                "the average is %.2f:1 on its badge".format(r).takeIf { r < AA_TEXT }
+            }
+        assertTrue(failures.joinToString(), failures.isEmpty())
+
+        // ⚠ The rejected alternative, on the record as a number rather than as a sentence. If this
+        // ever passes for every colour the choice above is worth revisiting — and until it does,
+        // "draw it in the measure's colour" is a change that would fail two of five habits.
+        val worstInColour =
+            colors.habit.assignable
+                .zip(washes) { colour, wash -> contrast(colour, wash) }
+                .min()
+        assertTrue(
+            "the measure's own colour is %.2f:1 on its badge — AA now, so revisit the white".format(worstInColour),
+            worstInColour < AA_TEXT,
+        )
+    }
+
+    /**
      * ⚠⚠ **One level is deliberately below AA, and this is where that is on the record.**
      *
      * WCAG 1.4.3 exempts "inactive user interface components" by name. `disabled` is the design's
