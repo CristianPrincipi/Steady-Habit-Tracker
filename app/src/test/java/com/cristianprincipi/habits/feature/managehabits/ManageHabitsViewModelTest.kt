@@ -2,15 +2,20 @@ package com.cristianprincipi.habits.feature.managehabits
 
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
+import com.cristianprincipi.habits.core.testing.FakeMeasureRepository
 import com.cristianprincipi.habits.core.testing.FakeNotionSetupRepository
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
 import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.usecase.GetHabits
+import com.cristianprincipi.habits.domain.usecase.GetMeasures
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
 import com.cristianprincipi.habits.domain.usecase.MoveHabit
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
+import com.cristianprincipi.habits.domain.usecase.SetMeasureColor
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -35,12 +40,62 @@ class ManageHabitsViewModelTest {
 
     private val connection = FakeNotionSetupRepository()
 
-    private fun viewModel(habits: FakeHabitRepository) =
-        ManageHabitsViewModel(
-            getHabits = GetHabits(habits),
-            getNotionDatabaseUrl = GetNotionDatabaseUrl(connection),
-            setHabitColor = SetHabitColor(habits),
-            moveHabit = MoveHabit(habits),
+    private fun viewModel(
+        habits: FakeHabitRepository,
+        measures: FakeMeasureRepository = FakeMeasureRepository(),
+    ) = ManageHabitsViewModel(
+        getHabits = GetHabits(habits),
+        getMeasures = GetMeasures(measures),
+        getNotionDatabaseUrl = GetNotionDatabaseUrl(connection),
+        setHabitColor = SetHabitColor(habits),
+        setMeasureColor = SetMeasureColor(measures),
+        moveHabit = MoveHabit(habits),
+    )
+
+    @Test
+    fun aMeasureColourIsSavedAndTheHabitsAreLeftAlone() =
+        runTest {
+            // M15.6f. The two lists are separate all the way down (`Measure`'s KDoc), and the thing
+            // worth asserting is that the write lands on the right one — a screen holding both is
+            // exactly where a measure id and a habit id get confused.
+            val habits = FakeHabitRepository(habits = listOf(testHabit()))
+            val measures = FakeMeasureRepository(measures = listOf(testMeasure()))
+            val viewModel = viewModel(habits, measures)
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.onEvent(
+                    ManageHabitsEvent.MeasureColorPicked(
+                        measureId = MeasureId("weight"),
+                        color = HabitColor.ORANGE,
+                    ),
+                )
+                val state = awaitItem() as ManageHabitsUiState.Content
+                assertEquals(HabitColor.ORANGE, state.measures.single().color)
+                assertEquals(testHabit().color, state.habits.single().color)
+            }
+        }
+
+    @Test
+    fun measuresAreListedSeparatelyFromHabits() =
+        runTest {
+            val habits = FakeHabitRepository(habits = listOf(testHabit()))
+            val measures = FakeMeasureRepository(measures = listOf(testMeasure()))
+
+            viewModel(habits, measures).uiState.test {
+                val state = awaitItem() as ManageHabitsUiState.Content
+                assertEquals(listOf("Weight"), state.measures.map { it.name })
+                assertEquals(1, state.habits.size)
+            }
+        }
+
+    private fun testMeasure() =
+        Measure(
+            id = MeasureId("weight"),
+            name = "Weight",
+            emoji = "⚖️",
+            unit = "kg",
+            color = HabitColor.GREEN,
         )
 
     @Test

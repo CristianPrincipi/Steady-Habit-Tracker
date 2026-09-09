@@ -216,6 +216,14 @@ class FakeMeasureDao(
 
     override suspend fun findAll(): List<MeasureEntity> = measures.value.values.toList()
 
+    override suspend fun setColor(
+        measureId: String,
+        color: String,
+    ) {
+        val existing = measures.value[measureId] ?: return
+        measures.value = measures.value + (measureId to existing.copy(color = color))
+    }
+
     override fun observeBetween(
         from: Long,
         to: Long,

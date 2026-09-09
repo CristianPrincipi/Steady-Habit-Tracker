@@ -1,6 +1,8 @@
 package com.cristianprincipi.habits.core.testing
 
+import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.model.MeasureReading
 import com.cristianprincipi.habits.domain.repository.MeasureRepository
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +41,16 @@ class FakeMeasureRepository(
         requestedRanges += from to to
         // Inclusive at both ends, as the interface promises and as SQLite's BETWEEN does.
         return readingFlow.map { all -> all.filter { it.date >= from && it.date <= to } }
+    }
+
+    override suspend fun setColor(
+        measureId: MeasureId,
+        color: HabitColor,
+    ) {
+        measureFlow.value =
+            measureFlow.value.map { measure ->
+                if (measure.id == measureId) measure.copy(color = color) else measure
+            }
     }
 
     fun setMeasures(measures: List<Measure>) {

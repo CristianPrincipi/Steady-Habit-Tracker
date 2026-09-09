@@ -74,7 +74,7 @@ class HabitReorderTest {
         composeTestRule.setContent {
             HabitsTheme {
                 ManageHabitsContent(
-                    state = ManageHabitsUiState.Content(habits = habits, notionUrl = null),
+                    state = ManageHabitsUiState.Content(habits = habits, measures = emptyList(), notionUrl = null),
                     onEvent = { event ->
                         if (event is ManageHabitsEvent.Moved) {
                             moves += event.habitId to event.direction

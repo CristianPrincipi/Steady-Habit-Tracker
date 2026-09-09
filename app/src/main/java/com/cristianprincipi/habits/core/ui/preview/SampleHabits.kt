@@ -8,6 +8,8 @@ import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.usecase.CalculateStreak
 import com.cristianprincipi.habits.domain.usecase.GetCompletionRate
 import com.cristianprincipi.habits.domain.usecase.HabitStats
@@ -62,6 +64,19 @@ object SampleHabits {
             sample("quote", "📜 Quote", HabitColor.GREEN, reference.minusDays(260)),
             sample("diet", "🥕 Diet", HabitColor.ORANGE, reference.minusDays(180)),
             sample("focus", "🎯 Focus", HabitColor.RED, reference.minusDays(95)),
+        )
+
+    /**
+     * The two tracked numbers, as the user's own database names them (M15.6f).
+     *
+     * ⚠ Their colours overlap the habits' on purpose: green and purple are each used twice in this
+     * app, which `Measure`'s KDoc records as the user's decision rather than a collision. A preview
+     * that quietly avoided the overlap would be previewing a palette nobody has.
+     */
+    fun measures(): List<Measure> =
+        listOf(
+            Measure(id = MeasureId("weight"), name = "Weight", emoji = "⚖️", unit = "kg", color = HabitColor.GREEN),
+            Measure(id = MeasureId("sleep"), name = "Sleep", emoji = "😴", unit = "h", color = HabitColor.PURPLE),
         )
 
     /**

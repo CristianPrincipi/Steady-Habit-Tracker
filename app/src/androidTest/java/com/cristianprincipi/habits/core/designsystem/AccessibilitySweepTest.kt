@@ -221,7 +221,12 @@ class AccessibilitySweepTest {
             },
             "Habit list" to {
                 ManageHabitsContent(
-                    state = ManageHabitsUiState.Content(habits = SampleHabits.habits(), notionUrl = null),
+                    state =
+                        ManageHabitsUiState.Content(
+                            habits = SampleHabits.habits(),
+                            measures = SampleHabits.measures(),
+                            notionUrl = null,
+                        ),
                     onEvent = {},
                     onOpenInNotion = {},
                     onEditMapping = {},

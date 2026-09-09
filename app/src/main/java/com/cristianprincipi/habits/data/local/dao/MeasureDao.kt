@@ -31,6 +31,20 @@ interface MeasureDao {
     suspend fun findAll(): List<MeasureEntity>
 
     /**
+     * Gives a measure its colour — M15.6f, and `HabitDao.setColor`'s twin in every respect.
+     *
+     * ⭐ **App-local, and that is what makes it allowed here at all.** Everything else about a
+     * measure is Notion's: the name, the readings, whether it exists. A colour is in neither the
+     * schema nor any page, so there is nothing to push and nothing a pull can overwrite —
+     * `MeasureImporter` already carries it forward on every sync for exactly that reason.
+     */
+    @Query("UPDATE measures SET color = :color WHERE id = :measureId")
+    suspend fun setColor(
+        measureId: String,
+        color: String,
+    )
+
+    /**
      * Every reading in `[from, to]`, both bounds inclusive, across all measures.
      *
      * `BETWEEN` is inclusive at both ends in SQLite — [CompletionDao.observeBetween]'s contract, and

@@ -517,6 +517,22 @@
       this to disagree with.
     -->
     <string name="habits_colour_body">Tap a colour to change how a habit looks, or the arrows to reorder the list. Both stay on this phone — Notion never sees them.</string>
+
+    <!--
+      The tracked numbers on the manage screen - M15.6f, the user's own request after seeing the
+      measure widget: "I would add the possibility to change sleep and Weight colour."
+
+      ⚠ measures_heading says "numbers" rather than "measures". "Measure" is our word for the type;
+      theirs is the one the mapping screen already uses (ANY NUMBERS TO AVERAGE?).
+
+      ⚠ measures_colour_body says what a colour DOES rather than repeating that it is app-local -
+      habits_colour_body above already makes that point for the screen. What is worth saying here is
+      that these are read from Notion and only their colour is yours, so nobody looks for a way to
+      edit a weight.
+    -->
+    <string name="measures_heading">Numbers</string>
+    <string name="measures_colour_body">These come from Notion and the app never changes them — only the colour is yours, and the widget follows it.</string>
+    <string name="measures_name_with_unit">%1$s (%2$s)</string>
     <!--
       Named per habit, so five rows of two buttons are ten distinguishable stops for a screen
       reader rather than ten identical "Move up"s. Passed as onClickLabel, so TalkBack reads it as

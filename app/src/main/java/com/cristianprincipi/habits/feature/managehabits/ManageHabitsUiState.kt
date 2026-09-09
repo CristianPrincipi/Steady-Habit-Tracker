@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.managehabits
 
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.Measure
 
 /**
  * What the habit list renders.
@@ -33,6 +34,18 @@ sealed interface ManageHabitsUiState {
      */
     data class Content(
         val habits: List<Habit>,
+        /**
+         * The tracked numbers — Weight, Sleep — listed under the habits so their colour can be
+         * chosen too (M15.6f, the user's request after seeing the measure widget).
+         *
+         * ⚠ **A separate list and not merged into [habits]**, which is `Measure`'s whole KDoc: the
+         * two are alike enough to invite merging and must not be merged. A measure has no streak, no
+         * completion rate and no check-off, so a screen that held one list would have to filter it
+         * back apart at every use — and the day someone forgets, a body weight grows a streak.
+         *
+         * Empty is the normal state: a user who maps no number columns has none.
+         */
+        val measures: List<Measure>,
         val notionUrl: String?,
     ) : ManageHabitsUiState
 }

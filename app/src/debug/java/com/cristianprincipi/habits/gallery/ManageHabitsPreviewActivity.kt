@@ -90,11 +90,15 @@ private fun SampleHabitList(
     modifier: Modifier = Modifier,
 ) {
     var habits by remember { mutableStateOf(habitsFor(variant)) }
+    // M15.6f. Empty for the "no habits" variant too, so the harness can show the screen a user with
+    // no number columns mapped actually gets.
+    var measures by remember { mutableStateOf(if (variant == "empty") emptyList() else SampleHabits.measures()) }
 
     ManageHabitsContent(
         state =
             ManageHabitsUiState.Content(
                 habits = habits,
+                measures = measures,
                 // The disabled-button case is the one worth being able to ask for: it is what every
                 // connection looks like until its first sync lands, and no screenshot would ever
                 // catch it by accident.
@@ -114,6 +118,16 @@ private fun SampleHabitList(
                 // with it - including the no-op at either end.
                 is ManageHabitsEvent.Moved -> {
                     habits = habits.moved(event.habitId, event.direction) ?: habits
+                }
+
+                // M15.6f, and it recolours here for the reason ColorPicked does: a swatch that did
+                // not move under the finger would make every screenshot of this row a screenshot of
+                // the same selection.
+                is ManageHabitsEvent.MeasureColorPicked -> {
+                    measures =
+                        measures.map { measure ->
+                            if (measure.id == event.measureId) measure.copy(color = event.color) else measure
+                        }
                 }
             }
         },

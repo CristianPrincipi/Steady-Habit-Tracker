@@ -43,6 +43,7 @@ import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.domain.model.Habit
 import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.Measure
 import com.cristianprincipi.habits.domain.usecase.MoveDirection
 
 /**
@@ -147,6 +148,84 @@ fun ManageHabitsContent(
                 modifier = Modifier.animateItem(),
             )
         }
+
+        // ⭐ M15.6f — the tracked numbers, under the habits and clearly not among them.
+        //
+        // ⚠ **A heading and a sentence of its own, rather than more cards in the list above.** A
+        // measure has no streak, no completion rate and no check-off (`Measure`'s KDoc), and a row
+        // that looked identical to a habit's would be inviting the reader to expect all three.
+        if (state.measures.isNotEmpty()) {
+            item(key = "measures-heading") {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.chipGap)) {
+                    Text(
+                        text = stringResource(R.string.measures_heading),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = HabitsTheme.colors.text.primary,
+                    )
+                    Text(
+                        text = stringResource(R.string.measures_colour_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HabitsTheme.colors.text.secondary,
+                    )
+                }
+            }
+
+            items(items = state.measures, key = { measure -> measure.id.value }) { measure ->
+                MeasureRow(
+                    measure = measure,
+                    onColorPicked = { color ->
+                        onEvent(
+                            ManageHabitsEvent.MeasureColorPicked(measureId = measure.id, color = color),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One tracked number: its badge, its name with the unit beside it, and the palette.
+ *
+ * ⚠ **No move buttons, unlike [HabitRow]**, and that is a fact about where the order comes from
+ * rather than a feature not yet built. A habit's order is app-local and the user's since M15.5; a
+ * measure's is the mapping's, so the control that changes it is the mapping screen.
+ */
+@Composable
+private fun MeasureRow(
+    measure: Measure,
+    onColorPicked: (HabitColor) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = HabitColor.entries
+    HabitsCard(modifier = modifier.fillMaxWidth()) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.cardGap),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            HabitIcon(
+                emoji = measure.emoji,
+                name = measure.name,
+                habitColor = measure.color.resolve(),
+            )
+            Text(
+                text =
+                    if (measure.unit.isBlank()) {
+                        measure.name
+                    } else {
+                        stringResource(R.string.measures_name_with_unit, measure.name, measure.unit)
+                    },
+                style = MaterialTheme.typography.titleMedium,
+                color = HabitsTheme.colors.text.primary,
+            )
+        }
+        ColorSwatchRow(
+            colors = palette.map { color -> color.resolve() },
+            selectedIndex = palette.indexOf(measure.color),
+            contentDescriptions = palette.map { color -> stringResource(color.labelRes()) },
+            onSelect = { index -> onColorPicked(palette[index]) },
+        )
     }
 }
 
@@ -359,6 +438,7 @@ private fun ManageHabitsPreview() {
             state =
                 ManageHabitsUiState.Content(
                     habits = SampleHabits.habits(),
+                    measures = SampleHabits.measures(),
                     notionUrl = "https://www.notion.so/0123456789abcdef0123456789abcdef",
                 ),
             onEvent = {},
@@ -373,7 +453,7 @@ private fun ManageHabitsPreview() {
 private fun ManageHabitsEmptyPreview() {
     HabitsTheme {
         ManageHabitsContent(
-            state = ManageHabitsUiState.Content(habits = emptyList(), notionUrl = null),
+            state = ManageHabitsUiState.Content(habits = emptyList(), measures = emptyList(), notionUrl = null),
             onEvent = {},
             onOpenInNotion = {},
             onEditMapping = {},

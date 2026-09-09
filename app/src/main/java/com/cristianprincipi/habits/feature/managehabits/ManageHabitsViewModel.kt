@@ -5,11 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.usecase.GetHabits
+import com.cristianprincipi.habits.domain.usecase.GetMeasures
 import com.cristianprincipi.habits.domain.usecase.GetNotionDatabaseUrl
 import com.cristianprincipi.habits.domain.usecase.MoveDirection
 import com.cristianprincipi.habits.domain.usecase.MoveHabit
 import com.cristianprincipi.habits.domain.usecase.SetHabitColor
+import com.cristianprincipi.habits.domain.usecase.SetMeasureColor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Everything the user can do on the habit list. Which is two things (ADR-010). */
+/** Everything the user can do on this list. Which is three things, none of them a schema change. */
 sealed interface ManageHabitsEvent {
     /**
      * Give a habit a colour.
@@ -42,12 +45,24 @@ sealed interface ManageHabitsEvent {
         val habitId: HabitId,
         val direction: MoveDirection,
     ) : ManageHabitsEvent
+
+    /**
+     * Give a tracked number a colour — M15.6f.
+     *
+     * ⭐ **Its own event rather than a nullable id on [ColorPicked]**, because a `HabitId` and a
+     * `MeasureId` are separate types for a reason (`Measure`'s KDoc): one event carrying either
+     * would need a branch at the far end, and a branch is where the two get confused.
+     */
+    data class MeasureColorPicked(
+        val measureId: MeasureId,
+        val color: HabitColor,
+    ) : ManageHabitsEvent
 }
 
 /**
  * Drives the habit list.
  *
- * ⭐ **Four use cases and no repository, and that is the point.** `SetHabitColor`'s KDoc asks for
+ * ⭐ **Six use cases and no repository, and that is the point.** `SetHabitColor`'s KDoc asks for
  * exactly this: a screen that can set a colour should not be holding something that can also write
  * completions, and `GetNotionDatabaseUrl` keeps `disconnect()` out of reach for the same reason. The
  * classes are thin; the reach they deny is not.
@@ -61,13 +76,15 @@ class ManageHabitsViewModel
     @Inject
     constructor(
         getHabits: GetHabits,
+        getMeasures: GetMeasures,
         getNotionDatabaseUrl: GetNotionDatabaseUrl,
         private val setHabitColor: SetHabitColor,
+        private val setMeasureColor: SetMeasureColor,
         private val moveHabit: MoveHabit,
     ) : ViewModel() {
         val uiState: StateFlow<ManageHabitsUiState> =
-            combine(getHabits(), getNotionDatabaseUrl()) { habits, url ->
-                ManageHabitsUiState.Content(habits = habits, notionUrl = url)
+            combine(getHabits(), getMeasures(), getNotionDatabaseUrl()) { habits, measures, url ->
+                ManageHabitsUiState.Content(habits = habits, measures = measures, notionUrl = url)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
@@ -86,6 +103,13 @@ class ManageHabitsViewModel
                     // immediate, unambiguous feedback for a change that is decoration: the habit,
                     // its history and its sync are all untouched by it.
                     launchWrite { setHabitColor(habitId = event.habitId, color = event.color) }
+                }
+
+                is ManageHabitsEvent.MeasureColorPicked -> {
+                    // Quiet on failure for `ColorPicked`'s reason, which holds here word for word:
+                    // the swatch is drawn from Room with no optimistic overlay, so a write that did
+                    // not land leaves the old colour selected in front of the user.
+                    launchWrite { setMeasureColor(measureId = event.measureId, color = event.color) }
                 }
 
                 is ManageHabitsEvent.Moved -> {
