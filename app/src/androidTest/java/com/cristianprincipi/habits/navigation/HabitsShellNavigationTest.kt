@@ -257,4 +257,62 @@ class HabitsShellNavigationTest {
         tab(R.string.tab_settings).performClick()
         heading(R.string.screen_title_settings).assertIsDisplayed()
     }
+
+    // --- landing from a widget (M15.8) -------------------------------------------------------
+
+    @Test
+    fun aLandingRequestReturnsToWeekFromAnotherTab() {
+        // ⭐ M15.8, and the case the whole mechanism exists for. Week is already the start
+        // destination, so a COLD start needs nothing — what needs code is the app already open on
+        // another tab, where a tap on a widget would otherwise resume exactly where it was left.
+        tab(R.string.tab_stats).performClick()
+        heading(R.string.screen_title_stats).assertIsDisplayed()
+
+        requestLanding()
+
+        weekIsShowing().assertIsDisplayed()
+        tab(R.string.tab_week).assertIsSelected()
+    }
+
+    @Test
+    fun aSecondLandingRequestStillWorksAfterTheFirst() {
+        // ⚠⚠ The failure this pins is invisible to the test above and would have shipped. `landing`
+        // is state, not an event, so two taps asking for the same tab are the same value — and an
+        // effect keyed on it does not run twice. It works only because the shell CLEARS the request
+        // through `onLandingHandled`; drop that call and this test fails while its neighbour passes.
+        tab(R.string.tab_stats).performClick()
+        requestLanding()
+        weekIsShowing().assertIsDisplayed()
+
+        tab(R.string.tab_month).performClick()
+        heading(R.string.screen_title_month).assertIsDisplayed()
+
+        requestLanding()
+
+        weekIsShowing().assertIsDisplayed()
+        tab(R.string.tab_week).assertIsSelected()
+    }
+
+    @Test
+    fun aLandingRequestLeavesNothingStackedOverWeek() {
+        // ⚠ From a PUSHED destination, not a tab. `switchTab` pops to the start destination on the
+        // way, so the tap has to end on Week with the bar back — a bare `navigate(Week)` would leave
+        // sync status underneath and system back would walk into it.
+        tab(R.string.tab_settings).performClick()
+        composeTestRule.onNodeWithText(string(R.string.settings_notion_sync)).performClick()
+        composeTestRule.onNodeWithText(string(R.string.sync_not_connected)).assertIsDisplayed()
+
+        requestLanding()
+
+        weekIsShowing().assertIsDisplayed()
+        // The bar is hidden on sync status, so its return is what says the push was popped rather
+        // than merely covered.
+        tab(R.string.tab_week).assertIsSelected()
+    }
+
+    /** What a widget tap amounts to once the intent has been read — see `MainActivity.landOnWeek`. */
+    private fun requestLanding() {
+        composeTestRule.runOnUiThread { composeTestRule.activity.landing = Week }
+        composeTestRule.waitForIdle()
+    }
 }

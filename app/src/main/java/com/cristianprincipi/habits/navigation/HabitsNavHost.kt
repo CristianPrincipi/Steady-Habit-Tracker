@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,11 +63,18 @@ import javax.inject.Inject
 @Composable
 fun HabitsNavHost(
     modifier: Modifier = Modifier,
+    landing: TopLevelRoute? = null,
+    onLandingHandled: () -> Unit = {},
     viewModel: HabitsNavHostViewModel = hiltViewModel(),
 ) {
     val isConfigured by viewModel.isConfigured.collectAsStateWithLifecycle()
 
-    HabitsShell(isConfigured = isConfigured, modifier = modifier)
+    HabitsShell(
+        isConfigured = isConfigured,
+        modifier = modifier,
+        landing = landing,
+        onLandingHandled = onLandingHandled,
+    )
 }
 
 /**
@@ -82,6 +90,8 @@ fun HabitsNavHost(
 fun HabitsShell(
     isConfigured: Boolean,
     modifier: Modifier = Modifier,
+    landing: TopLevelRoute? = null,
+    onLandingHandled: () -> Unit = {},
 ) {
     if (!isConfigured) {
         NotionSetupScreen(modifier = modifier)
@@ -91,6 +101,22 @@ fun HabitsShell(
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val selectedTab = backStackEntry?.destination?.tab()
+
+    // ⭐ M15.8. A home-screen widget asks for Week, and this is where the asking lands.
+    //
+    // ⚠ It is [switchTab] rather than a bare navigate, which is what makes the request work from a
+    // PUSHED destination too: `popUpTo` the start destination clears About or the habit list on the
+    // way, so the tap ends on Week with nothing stacked over it. From Week itself it is a no-op,
+    // because `launchSingleTop` refuses to re-add what is already on top.
+    //
+    // ⚠ An unconfigured app never reaches this line — the gate above returns first — so a tap
+    // during setup is simply dropped, which is right: there is one screen and it is not a tab.
+    LaunchedEffect(landing) {
+        if (landing != null) {
+            navController.switchTab(landing)
+            onLandingHandled()
+        }
+    }
 
     Scaffold(
         modifier = modifier,

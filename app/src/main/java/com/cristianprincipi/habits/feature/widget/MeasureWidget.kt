@@ -19,19 +19,14 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
-import androidx.glance.layout.Column
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.padding
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.unit.ColorProvider
 import com.cristianprincipi.habits.R
@@ -39,7 +34,6 @@ import com.cristianprincipi.habits.core.designsystem.component.SparklineColors
 import com.cristianprincipi.habits.core.designsystem.component.SparklineMetrics
 import com.cristianprincipi.habits.core.designsystem.component.sparklineBitmap
 import com.cristianprincipi.habits.core.designsystem.theme.ChartOpacity
-import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColorScheme
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColors
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.ui.resolveIn
@@ -103,14 +97,7 @@ internal class MeasureWidget : GlanceAppWidget() {
 
 @Composable
 private fun MeasureWidgetBody(state: MeasureWidgetState) {
-    Column(
-        modifier =
-            GlanceModifier
-                .fillMaxSize()
-                .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer))
-                .cornerRadius(CARD_CORNER)
-                .padding(CARD_PADDING),
-    ) {
+    WidgetCard {
         when (state) {
             MeasureWidgetState.Unconfigured -> {
                 WidgetMessage(R.string.widget_measure_unconfigured)

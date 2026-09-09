@@ -6,19 +6,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
+import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ColumnScope
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.cristianprincipi.habits.MainActivity
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColorScheme
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColors
 import com.cristianprincipi.habits.core.ui.resolveIn
 import com.cristianprincipi.habits.domain.model.HabitColor
@@ -59,6 +66,41 @@ private val BADGE_EMOJI_SIZE = 16.sp
 private const val BADGE_TINT = 0.15f
 
 private const val MESSAGE_LINES = 3
+
+/**
+ * The card every widget in this app is drawn on, and the tap that opens the app on **Week**.
+ *
+ * ⭐⭐ **The tap is the user's request of 2026-09-09** — *"I would like to land on the Week page of
+ * the app (the primary page), when I click on every widget. So I can have a quick opening directly
+ * from the widgets."* ⚠ Before this there was no click handler on either widget at all: a tapped
+ * card did nothing, rather than opening the app somewhere unhelpful.
+ *
+ * ⚠⚠ **It is on the shared card and not on the two widgets, for the reason this whole file exists.**
+ * Two copies of a `clickable` would agree on the day they were written; the drift would show up as
+ * one widget on a home screen opening the app while its sibling beside it does nothing, which reads
+ * as a broken widget rather than as a missing line. ⭐ And a third widget cannot forget — it is the
+ * same argument `NavGraphBuilder.screen<T>` makes for opaque destinations (ADR-122).
+ *
+ * ⚠ **The whole card is the target, including the two empty states.** A widget pointed at a habit
+ * that has left the mapping is exactly when a user wants the app, and a message with no way into it
+ * would be a dead end.
+ *
+ * @see MainActivity.landOnWeek for why the intent carries `CLEAR_TOP or SINGLE_TOP` rather than the
+ *   one-line `CLEAR_TASK`.
+ */
+@Composable
+internal fun WidgetCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier =
+            GlanceModifier
+                .fillMaxSize()
+                .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer))
+                .cornerRadius(CARD_CORNER)
+                .clickable(actionStartActivity(MainActivity.landOnWeek(LocalContext.current)))
+                .padding(CARD_PADDING),
+        content = content,
+    )
+}
 
 /**
  * The badge, the name, and one line under it.

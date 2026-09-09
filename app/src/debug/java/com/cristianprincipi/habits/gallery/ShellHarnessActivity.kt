@@ -9,9 +9,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.navigation.HabitsShell
+import com.cristianprincipi.habits.navigation.TopLevelRoute
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -53,6 +57,17 @@ import dagger.hilt.android.AndroidEntryPoint
  */
 @AndroidEntryPoint
 class ShellHarnessActivity : ComponentActivity() {
+    /**
+     * The landing request `MainActivity` builds from a widget tap, exposed so a test can make one.
+     *
+     * ⚠ **The intent half is deliberately not reproduced here.** `MainActivity` turns an intent into
+     * this value and clears it again; what has navigation logic in it — and what a widget tap is
+     * actually asking for — is the shell's half, and that is what this harness can drive. The intent
+     * flags themselves are the platform's behaviour, not ours, and a test of them would be a test of
+     * Android.
+     */
+    var landing by mutableStateOf<TopLevelRoute?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Matching MainActivity rather than taking the default, for the reason in ADR-019: the
         // default follows the system light/dark setting and would render dark-on-dark system bars.
@@ -67,7 +82,11 @@ class ShellHarnessActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    HabitsShell(isConfigured = true)
+                    HabitsShell(
+                        isConfigured = true,
+                        landing = landing,
+                        onLandingHandled = { landing = null },
+                    )
                 }
             }
         }
