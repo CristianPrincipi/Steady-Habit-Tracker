@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The same nine cells for Android 13+ themed icons — same geometry as ic_launcher_foreground, see
-  the note there for why the grid is 46 across and not 60.
+  The same four cells for Android 13+ themed icons — same geometry as ic_launcher_foreground, see
+  the note there for why the span is 62 and how it was computed.
 
-  A monochrome layer is a mask: the system supplies the colour from the user's wallpaper theme and
-  keeps only our alpha. So the kept days are opaque and the three unkept ones hold the same 0.28
-  that separates them in the colour version — the shape survives the recolour, the meaning with it.
+  ONE DIFFERENCE, AND IT IS DELIBERATE: THE FADE IS FLATTENED TO SOLID.
 
-  Kept as its own file rather than aliasing the foreground: that one names a colour resource, and a
-  themed icon must not carry the app's blue into the user's palette.
+  A monochrome layer is a mask — the system supplies the colour from the user's wallpaper theme and
+  keeps only our alpha. The colour version's 30 / 52 / 76 / 100% ramp is what makes the row read as
+  an acceleration, but on a tinted ground the two faintest cells disappear, and a four-cell mark
+  missing its first two is just a bar and a dash. The design that specifies this mark flags exactly
+  that and supplies a solid variant for the themed layer.
+
+  Flattening costs less than it looks. The lengths alone carry the meaning: 5 -> 9 -> 14 -> 22 still
+  accelerates into the hold without any help from opacity.
+
+  Kept as its own file rather than aliasing the foreground, because that one names a colour resource
+  and a themed icon must not carry any of the app's own colour into the user's palette.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -18,11 +25,6 @@
 
     <path
         android:fillColor="#FF000000"
-        android:pathData="M67.5,31 H74.5 A2.5,2.5 0 0 1 77,33.5 V40.5 A2.5,2.5 0 0 1 74.5,43 H67.5 A2.5,2.5 0 0 1 65,40.5 V33.5 A2.5,2.5 0 0 1 67.5,31 Z M50.5,48 H57.5 A2.5,2.5 0 0 1 60,50.5 V57.5 A2.5,2.5 0 0 1 57.5,60 H50.5 A2.5,2.5 0 0 1 48,57.5 V50.5 A2.5,2.5 0 0 1 50.5,48 Z M67.5,48 H74.5 A2.5,2.5 0 0 1 77,50.5 V57.5 A2.5,2.5 0 0 1 74.5,60 H67.5 A2.5,2.5 0 0 1 65,57.5 V50.5 A2.5,2.5 0 0 1 67.5,48 Z M33.5,65 H40.5 A2.5,2.5 0 0 1 43,67.5 V74.5 A2.5,2.5 0 0 1 40.5,77 H33.5 A2.5,2.5 0 0 1 31,74.5 V67.5 A2.5,2.5 0 0 1 33.5,65 Z M50.5,65 H57.5 A2.5,2.5 0 0 1 60,67.5 V74.5 A2.5,2.5 0 0 1 57.5,77 H50.5 A2.5,2.5 0 0 1 48,74.5 V67.5 A2.5,2.5 0 0 1 50.5,65 Z M67.5,65 H74.5 A2.5,2.5 0 0 1 77,67.5 V74.5 A2.5,2.5 0 0 1 74.5,77 H67.5 A2.5,2.5 0 0 1 65,74.5 V67.5 A2.5,2.5 0 0 1 67.5,65 Z" />
-
-    <path
-        android:fillAlpha="0.28"
-        android:fillColor="#FF000000"
-        android:pathData="M33.5,31 H40.5 A2.5,2.5 0 0 1 43,33.5 V40.5 A2.5,2.5 0 0 1 40.5,43 H33.5 A2.5,2.5 0 0 1 31,40.5 V33.5 A2.5,2.5 0 0 1 33.5,31 Z M50.5,31 H57.5 A2.5,2.5 0 0 1 60,33.5 V40.5 A2.5,2.5 0 0 1 57.5,43 H50.5 A2.5,2.5 0 0 1 48,40.5 V33.5 A2.5,2.5 0 0 1 50.5,31 Z M33.5,48 H40.5 A2.5,2.5 0 0 1 43,50.5 V57.5 A2.5,2.5 0 0 1 40.5,60 H33.5 A2.5,2.5 0 0 1 31,57.5 V50.5 A2.5,2.5 0 0 1 33.5,48 Z" />
+        android:pathData="M25.5,48 H25.5 A2.5,2.5 0 0 1 28,50.5 V57.5 A2.5,2.5 0 0 1 25.5,60 H25.5 A2.5,2.5 0 0 1 23,57.5 V50.5 A2.5,2.5 0 0 1 25.5,48 Z M34.5,48 H38.5 A2.5,2.5 0 0 1 41,50.5 V57.5 A2.5,2.5 0 0 1 38.5,60 H34.5 A2.5,2.5 0 0 1 32,57.5 V50.5 A2.5,2.5 0 0 1 34.5,48 Z M47.5,48 H56.5 A2.5,2.5 0 0 1 59,50.5 V57.5 A2.5,2.5 0 0 1 56.5,60 H47.5 A2.5,2.5 0 0 1 45,57.5 V50.5 A2.5,2.5 0 0 1 47.5,48 Z M65.5,48 H82.5 A2.5,2.5 0 0 1 85,50.5 V57.5 A2.5,2.5 0 0 1 82.5,60 H65.5 A2.5,2.5 0 0 1 63,57.5 V50.5 A2.5,2.5 0 0 1 65.5,48 Z" />
 
 </vector>

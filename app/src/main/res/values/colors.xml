@@ -13,15 +13,27 @@
     <color name="window_background">#FF111113</color>
 
     <!--
-      The launcher icon's two colours. Same problem as above: a resource XML cannot read Color.kt.
+      The launcher icon's two colours. Same problem as the window background above: a resource XML
+      cannot read Color.kt.
 
-      The background is an alias, not a second copy of the hex — the icon's ground IS the app's
-      background, and aliasing means it cannot drift from window_background or from Compose.
+      The GROUND is an alias, not a second copy of the hex — the icon's ground IS the app's
+      background, so aliasing means it cannot drift from window_background or from Compose. The
+      final identity asks for #111113 and window_background already is #FF111113, so the design and
+      the app agreed here without anyone changing anything.
 
-      The accent has to be a literal, because Primary lives only in Kotlin. ThemeTest asserts it
-      equals HabitsDarkColorScheme.primary, so if the palette ever moves, a test fails rather than
-      the launcher quietly showing last season's blue.
+      THE MARK IS WHITE, AND IT IS DELIBERATELY *NOT* A PALETTE COLOUR.
+
+      Until M14.1 this was the app's primary blue, with a test asserting it stayed equal to
+      HabitsDarkColorScheme.primary. The final identity reverses that on purpose: a habit-coloured
+      icon ties the launcher to the interface, but it also picks a favourite among four equals — blue
+      is one of the four habit colours the user assigns — and it dates the identity to whatever the
+      palette happens to be. Monochrome white stays true at every density and gives the themed-icon
+      layer away for free.
+
+      So the invariant inverted rather than disappeared. ThemeTest now asserts this is NOT primary,
+      which is what stops a later session from "fixing" the icon back to blue and quietly undoing a
+      decision the design made with its eyes open.
     -->
     <color name="ic_launcher_background">@color/window_background</color>
-    <color name="ic_launcher_accent">#FF4A9EFF</color>
+    <color name="ic_launcher_mark">#FFFFFFFF</color>
 </resources>

@@ -112,20 +112,34 @@ class ThemeTest {
     }
 
     @Test
-    fun theLauncherIconColoursMatchThePalette() {
+    fun theLauncherIconGroundFollowsThePaletteAndTheMarkDeliberatelyDoesNot() {
         // The adaptive icon is XML all the way down and cannot read Color.kt, so its two colours are
         // resources. Nothing about a wrong launcher icon fails a build or shows up in a screenshot of
         // the app itself — it is only ever seen on the home screen, where nobody is looking for a bug.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
 
-        assertEquals(
-            HabitsDarkColorScheme.primary.toArgb(),
-            context.getColor(R.color.ic_launcher_accent),
-        )
-        // An alias today. The assertion is what keeps it one.
+        // The ground is an alias today. This assertion is what keeps it one.
         assertEquals(
             HabitsDarkColorScheme.background.toArgb(),
             context.getColor(R.color.ic_launcher_background),
+        )
+
+        // The mark is white, and THIS ASSERTION RUNS THE OTHER WAY ROUND ON PURPOSE.
+        //
+        // It was the app's primary blue until M14.1, asserted equal to it. The final identity
+        // reversed that: a habit-coloured icon ties the launcher to the interface, but it picks a
+        // favourite among four equals — blue is one of the four habit colours — and it dates the
+        // identity to whatever the palette happens to be.
+        //
+        // So the thing worth guarding is no longer that the two agree. It is that they stay apart:
+        // without this, a later session reads colors.xml, sees a hardcoded white next to a palette
+        // alias, "fixes" the inconsistency, and silently undoes a decision the design made with its
+        // eyes open. The equality check below it pins the exact colour, so a drift off one flat
+        // white fails too.
+        assertEquals(Color.White.toArgb(), context.getColor(R.color.ic_launcher_mark))
+        assertNotEquals(
+            HabitsDarkColorScheme.primary.toArgb(),
+            context.getColor(R.color.ic_launcher_mark),
         )
     }
 }

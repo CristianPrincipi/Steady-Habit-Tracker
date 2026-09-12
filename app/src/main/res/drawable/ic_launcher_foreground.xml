@@ -1,21 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The launcher mark: nine days of a habit, six of them kept.
+  The launcher mark: "the stream" — four cells that lengthen and gain weight across a row.
 
-  The prototype designs no app icon — it is a web mock in a phone frame — so this is invented,
-  but not from nothing: it is MonthDotGrid, the app's most distinctive component, at 3x3. The
-  staircase rising to the right reads as progress at 48dp, which a checkmark would not have
-  distinguished from every other habit app on the drawer.
+  It replaces the 3x3 dot grid that stood here from M2 until M14.1. That mark was invented because
+  the Figma prototype designs no icon; this one comes from the final identity the user delivered as
+  a design (`Steady.dc.html`, Sept 2026), where it is drawn from the Week strip — so the identity is
+  still the interface at 48dp rather than a picture placed on top of it, which is the property the
+  old mark had and the reason the replacement keeps the same principle.
 
-  THE SAFE ZONE IS A CIRCLE, NOT A SQUARE, and that is what sizes this mark. An adaptive icon is
-  108x108 with an inner 66x66 nominally guaranteed — but a launcher may mask it to a circle, and a
-  square inscribed in a 66 circle has a side of only 46.7, not 66. A first cut at 60 lost all four
-  corner cells to the circle mask on a Pixel. The grid is now 46 across (12 cell, 5 gap, corner
-  2.5, spanning 31..77), whose 65.1 diagonal fits inside the 66 circle with room for an
-  OEM squircle. The corner ratio is HabitsCorners.monthDot's 3-on-14, scaled.
+  It reads as flow: a beginning, a direction, an end. Four beats accelerating into one long hold.
 
-  The path data below was computed from those four numbers, not drawn. To change the mark,
-  recompute from them rather than nudging coordinates by eye.
+  THE SAFE ZONE IS A CIRCLE, NOT A SQUARE. An adaptive icon is 108x108 with an inner 66x66
+  nominally guaranteed, but a launcher may mask it to a circle, so the real guarantee is a 66dp
+  DIAMETER circle — radius 33 from (54,54). This mark spans 62dp horizontally and 12dp vertically,
+  a 63.15dp diagonal, which puts its corners 31.58 from the centre: 1.42dp of margin.
+
+  That is deliberately tight. The mark is meant to run nearly the full width of the tile, and the
+  design's own geometry table says so ("62dp - 63dp diag - fits"). A circular mask is where to
+  check it, not a square one.
+
+  The path data below was COMPUTED from six numbers, not drawn:
+
+      y 48 - height 12 - corner 2.5 - x 23 / 32 / 45 / 63 - width 5 / 9 / 14 / 22
+
+  To change the mark, recompute from those rather than nudging coordinates by eye. Each cell is the
+  same rounded-rectangle formula; the first one's `H25.5` is a zero-length top edge, because a width
+  of 5 with a corner of 2.5 rounds that cell into a vertical capsule. It is left in so the formula
+  stays visible across all four.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -23,22 +34,28 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- The six kept days, in the app's primary blue. -->
-    <path
-        android:fillColor="@color/ic_launcher_accent"
-        android:pathData="M67.5,31 H74.5 A2.5,2.5 0 0 1 77,33.5 V40.5 A2.5,2.5 0 0 1 74.5,43 H67.5 A2.5,2.5 0 0 1 65,40.5 V33.5 A2.5,2.5 0 0 1 67.5,31 Z M50.5,48 H57.5 A2.5,2.5 0 0 1 60,50.5 V57.5 A2.5,2.5 0 0 1 57.5,60 H50.5 A2.5,2.5 0 0 1 48,57.5 V50.5 A2.5,2.5 0 0 1 50.5,48 Z M67.5,48 H74.5 A2.5,2.5 0 0 1 77,50.5 V57.5 A2.5,2.5 0 0 1 74.5,60 H67.5 A2.5,2.5 0 0 1 65,57.5 V50.5 A2.5,2.5 0 0 1 67.5,48 Z M33.5,65 H40.5 A2.5,2.5 0 0 1 43,67.5 V74.5 A2.5,2.5 0 0 1 40.5,77 H33.5 A2.5,2.5 0 0 1 31,74.5 V67.5 A2.5,2.5 0 0 1 33.5,65 Z M50.5,65 H57.5 A2.5,2.5 0 0 1 60,67.5 V74.5 A2.5,2.5 0 0 1 57.5,77 H50.5 A2.5,2.5 0 0 1 48,74.5 V67.5 A2.5,2.5 0 0 1 50.5,65 Z M67.5,65 H74.5 A2.5,2.5 0 0 1 77,67.5 V74.5 A2.5,2.5 0 0 1 74.5,77 H67.5 A2.5,2.5 0 0 1 65,74.5 V67.5 A2.5,2.5 0 0 1 67.5,65 Z" />
-
     <!--
-      The three that are not. Same blue, held back — the design's own way of saying "this day,
-      not done" (MonthDotGrid multiplies a tint by an opacity for exactly this).
-
-      The alpha is 0.28, NOT the grid's own 0.045. That value is tuned for a 14dp cell read at
-      arm's length inside a lit card; at launcher size on an unknown wallpaper it is invisible,
-      and three invisible cells make this a six-cell mark with a hole in it.
+      The fade is doing work the geometry cannot at this scale: 30 / 52 / 76 / 100% is what turns
+      four bars into an acceleration. Each cell needs its own path because fillAlpha is per-path.
     -->
     <path
-        android:fillAlpha="0.28"
-        android:fillColor="@color/ic_launcher_accent"
-        android:pathData="M33.5,31 H40.5 A2.5,2.5 0 0 1 43,33.5 V40.5 A2.5,2.5 0 0 1 40.5,43 H33.5 A2.5,2.5 0 0 1 31,40.5 V33.5 A2.5,2.5 0 0 1 33.5,31 Z M50.5,31 H57.5 A2.5,2.5 0 0 1 60,33.5 V40.5 A2.5,2.5 0 0 1 57.5,43 H50.5 A2.5,2.5 0 0 1 48,40.5 V33.5 A2.5,2.5 0 0 1 50.5,31 Z M33.5,48 H40.5 A2.5,2.5 0 0 1 43,50.5 V57.5 A2.5,2.5 0 0 1 40.5,60 H33.5 A2.5,2.5 0 0 1 31,57.5 V50.5 A2.5,2.5 0 0 1 33.5,48 Z" />
+        android:fillAlpha="0.3"
+        android:fillColor="@color/ic_launcher_mark"
+        android:pathData="M25.5,48 H25.5 A2.5,2.5 0 0 1 28,50.5 V57.5 A2.5,2.5 0 0 1 25.5,60 H25.5 A2.5,2.5 0 0 1 23,57.5 V50.5 A2.5,2.5 0 0 1 25.5,48 Z" />
+
+    <path
+        android:fillAlpha="0.52"
+        android:fillColor="@color/ic_launcher_mark"
+        android:pathData="M34.5,48 H38.5 A2.5,2.5 0 0 1 41,50.5 V57.5 A2.5,2.5 0 0 1 38.5,60 H34.5 A2.5,2.5 0 0 1 32,57.5 V50.5 A2.5,2.5 0 0 1 34.5,48 Z" />
+
+    <path
+        android:fillAlpha="0.76"
+        android:fillColor="@color/ic_launcher_mark"
+        android:pathData="M47.5,48 H56.5 A2.5,2.5 0 0 1 59,50.5 V57.5 A2.5,2.5 0 0 1 56.5,60 H47.5 A2.5,2.5 0 0 1 45,57.5 V50.5 A2.5,2.5 0 0 1 47.5,48 Z" />
+
+    <!-- The hold. The only cell at full weight, and the one the eye lands on. -->
+    <path
+        android:fillColor="@color/ic_launcher_mark"
+        android:pathData="M65.5,48 H82.5 A2.5,2.5 0 0 1 85,50.5 V57.5 A2.5,2.5 0 0 1 82.5,60 H65.5 A2.5,2.5 0 0 1 63,57.5 V50.5 A2.5,2.5 0 0 1 65.5,48 Z" />
 
 </vector>
