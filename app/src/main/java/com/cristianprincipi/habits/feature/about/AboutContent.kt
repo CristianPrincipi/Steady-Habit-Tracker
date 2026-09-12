@@ -168,6 +168,6 @@ private fun Licence(
 @Composable
 private fun AboutPreview() {
     HabitsTheme {
-        AboutContent(versionName = "0.1.0", versionCode = 1)
+        AboutContent(versionName = "1.0.0", versionCode = 1)
     }
 }

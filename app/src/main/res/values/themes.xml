@@ -11,7 +11,7 @@
       @color/window_background mirrors HabitsDarkColorScheme.background; ThemeTest asserts they
       are equal so they cannot drift apart.
     -->
-    <style name="Theme.MyHabitApp" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Steady" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

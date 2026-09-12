@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">My Habit App</string>
+    <!--
+      The launcher label, and the only place the app's name exists as text.
+
+      A BARE WORD ON PURPOSE. The identity's own note is that "Steady" is a common adjective, so the
+      Play Store entry will need a qualifier to be findable — but the STORE TITLE and this are
+      different fields. Launchers truncate a label at roughly twelve characters, so a qualifier here
+      would reach the home screen as "Steady — Ha…" and cost the name its whole point.
+
+      Nothing else in this file names the app. Every other string says "this app", which is why
+      renaming it needed no copy rewritten — and is worth preserving if the name ever changes again.
+    -->
+    <string name="app_name">Steady</string>
 
     <!--
       The Notion connection wizard (M4.12).

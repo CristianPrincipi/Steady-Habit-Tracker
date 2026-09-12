@@ -72,8 +72,18 @@ android {
         applicationId = "com.cristianprincipi.habits"
         minSdk = 26
         targetSdk = 37
+        // THE VERSION SCHEME, settled at M14.2.
+        //
+        // versionName is semver, MAJOR.MINOR.PATCH, and is the only version a human ever reads —
+        // the About screen prints it. versionCode is a plain monotonic integer that exists for
+        // Play's benefit alone: it must increase on every upload and never otherwise matters, so it
+        // is NOT derived from the name. Deriving it (10000*major + 100*minor + patch and the like)
+        // buys nothing here and makes a hotfix upload awkward the one time it counts.
+        //
+        // Bump versionCode on every build that leaves this machine. Bump versionName when the
+        // change is worth a user noticing.
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

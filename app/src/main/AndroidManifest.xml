@@ -63,12 +63,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.MyHabitApp">
+        android:theme="@style/Theme.Steady">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp"
+            android:theme="@style/Theme.Steady"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -130,7 +130,7 @@
         <activity
             android:name=".feature.widget.HabitWidgetConfigActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp">
+            android:theme="@style/Theme.Steady">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
@@ -151,7 +151,7 @@
         <activity
             android:name=".feature.widget.MeasureWidgetConfigActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp">
+            android:theme="@style/Theme.Steady">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>

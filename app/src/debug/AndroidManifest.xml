@@ -17,7 +17,7 @@
             android:name=".gallery.GalleryActivity"
             android:exported="true"
             android:label="@string/gallery_launcher_label"
-            android:theme="@style/Theme.MyHabitApp">
+            android:theme="@style/Theme.Steady">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -52,7 +52,7 @@
         <activity
             android:name=".gallery.WeekPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The habit list against sample data (M7.5). Same reason and same safety as the Week preview
@@ -64,7 +64,7 @@
         <activity
             android:name=".gallery.ManageHabitsPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
             M7.8's mapping screen. It reads the live schema on open, so without a connection the real
@@ -78,7 +78,7 @@
         <activity
             android:name=".gallery.EditMappingPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The Month view against sample data (M8.1). Same reason and same safety as the Week
@@ -93,7 +93,7 @@
         <activity
             android:name=".gallery.MonthPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The Year view against sample data (M8.3). Same reason and same safety as the previews
@@ -108,7 +108,7 @@
         <activity
             android:name=".gallery.YearPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The Stats view against sample data (M9.1). Same reason and same safety as the previews
@@ -123,7 +123,7 @@
         <activity
             android:name=".gallery.StatsPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The Settings hub against a made-up connection (M11.1). Same safety as the previews above:
@@ -142,7 +142,7 @@
         <activity
             android:name=".gallery.SettingsPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           The About screen at the build's real version (M11.8). Same safety as the previews above:
@@ -156,7 +156,7 @@
         <activity
             android:name=".gallery.AboutPreviewActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <!--
           M9.8. Seeds SampleHabits into the REAL database and opens the shell on top of it, which is
@@ -174,12 +174,12 @@
         <activity
             android:name=".gallery.SeedActivity"
             android:exported="true"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
 
         <activity
             android:name=".gallery.ShellHarnessActivity"
             android:exported="false"
-            android:theme="@style/Theme.MyHabitApp" />
+            android:theme="@style/Theme.Steady" />
     </application>
 
 </manifest>
