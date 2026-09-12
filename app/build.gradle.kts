@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.PathSensitivity
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -64,6 +65,42 @@ tasks.matching { it.name.startsWith("compile") && it.name.endsWith("Kotlin") }.c
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
+/**
+ * The release signing key (M14.4).
+ *
+ * ⚠ THE USER CREATES AND HOLDS THE KEYSTORE. Nothing in this repository generates one, and
+ * `.gitignore` covers `keystore.properties`, `*.jks` and `*.keystore` so none can be committed —
+ * verified with `git check-ignore`, not assumed.
+ *
+ * `keystore.properties` sits at the repository root, is gitignored, and names four things:
+ *
+ *     storeFile=C:/Users/you/keystores/steady-release.jks
+ *     storePassword=...
+ *     keyAlias=steady
+ *     keyPassword=...
+ *
+ * See `keystore.properties.template`, which is committed and holds no secrets.
+ *
+ * ⚠⚠ WHEN THE FILE IS ABSENT THE RELEASE BUILD STAYS UNSIGNED. It never falls back to the debug
+ * key, and that is the entire safety property of this block rather than an oversight:
+ *
+ *   Google Play binds a package name to the first upload key it sees, permanently. An APK
+ *   accidentally signed with the debug key and uploaded once would take `com.cristianprincipi.habits`
+ *   with it, and no real key could ever sign an update for that listing again. An unsigned APK
+ *   fails loudly at `adb install`; a wrongly-signed one succeeds and destroys the listing.
+ *
+ * AGP's own default for a release build with no `signingConfig` is already unsigned — M14.3 relied
+ * on exactly that, signing by hand with the debug key to test R8 without involving this file.
+ */
+private val keystorePropertiesFile = rootProject.file("keystore.properties")
+
+private val keystoreProperties =
+    Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use(::load)
+        }
+    }
+
 android {
     namespace = "com.cristianprincipi.habits"
     compileSdk = 37
@@ -88,6 +125,45 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Created only when the properties file is there. `buildTypes.release` below looks it up by
+        // name and gets null otherwise, which is what leaves the build unsigned rather than wrong.
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                // Every failure below names the fix rather than the fault — the same rule the app's
+                // own error copy follows (`strings.xml`). A half-filled properties file is the most
+                // likely mistake here and "keystore.properties is missing: keyAlias" is actionable
+                // in a way that a NullPointerException three tasks later is not.
+                val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+                val missing = required.filter { keystoreProperties.getProperty(it).isNullOrBlank() }
+                require(missing.isEmpty()) {
+                    "keystore.properties is missing or has blank values for: " +
+                        missing.joinToString(", ") +
+                        ". See keystore.properties.template for the four keys it needs."
+                }
+
+                val store = file(keystoreProperties.getProperty("storeFile"))
+                require(store.exists()) {
+                    "keystore.properties points storeFile at " + store.absolutePath +
+                        ", which does not exist. Use an absolute path with forward slashes, and " +
+                        "keep the keystore OUTSIDE this repository."
+                }
+
+                storeFile = store
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        } else {
+            logger.warn(
+                "\n" +
+                    "  keystore.properties not found - the release build will be UNSIGNED.\n" +
+                    "  That is safe (it never falls back to the debug key) but not installable.\n" +
+                    "  To sign: copy keystore.properties.template to keystore.properties and fill it in.\n",
+            )
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -96,6 +172,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // findByName, not getByName: absent keystore -> null -> unsigned. See the block above
+            // for why that is the deliberate outcome and not a gap.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
