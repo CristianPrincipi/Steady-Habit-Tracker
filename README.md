@@ -230,3 +230,12 @@ DM Sans and DM Mono (SIL Open Font License 1.1) and Lucide icons (ISC License). 
 ship inside the app. See [`docs/attributions.md`](docs/attributions.md).
 
 Steady is not affiliated with or endorsed by Notion Labs, Inc.
+
+---
+
+## Copyright
+
+Copyright © 2026 Cristian Principi. **All rights reserved.**
+
+The source is visible here, but no licence is granted: you may not copy, modify, redistribute or
+publish this code or the app without written permission.
