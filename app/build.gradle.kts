@@ -15,6 +15,8 @@ plugins {
     // M13.8 — measures what `domain/` is actually covered by, rather than what reading it suggests.
     // Build-only: it instruments the JVM test run and writes a report; nothing reaches the APK.
     alias(libs.plugins.kover)
+    // M14.9 — consumes what `:baselineprofile` generates. See the `baselineProfile` block below.
+    alias(libs.plugins.baselineprofile)
 }
 
 /**
@@ -274,6 +276,32 @@ ktlint {
     android.set(true)
 }
 
+/*
+ * M14.9 — the Baseline Profile. ADR-113 and ADR-143.
+ *
+ * ⚠⚠ `automaticGenerationDuringBuild` stays false. True would make every `assembleRelease` boot a
+ * managed emulator and drive the app for minutes; the profile is regenerated deliberately, with
+ * `./gradlew :app:generateBaselineProfile`, and the result is committed like any other source.
+ */
+baselineProfile {
+    automaticGenerationDuringBuild = false
+}
+
+/*
+ * ⚠⚠ `src/nonMinifiedRelease/AndroidManifest.xml` is IGNORED by convention, while the Kotlin beside
+ * it is compiled — so the seeder built, and `am start` then found no such activity.
+ *
+ * Read out of the plugin's bytecode rather than guessed: `BuildTypesKt.copyBuildTypeSources` gives the
+ * build type it creates `release`'s source directories *added to* its own, and `release`'s manifest
+ * *instead of* its own, via `manifest.srcFile(...)`. Directories accumulate; a manifest is one file.
+ * The Variant API adds ours back after the DSL is final, so this does not depend on callback order.
+ */
+androidComponents {
+    onVariants(selector().withBuildType("nonMinifiedRelease")) { variant ->
+        variant.sources.manifests.addStaticManifestFile("src/nonMinifiedRelease/AndroidManifest.xml")
+    }
+}
+
 // Room's own Gradle plugin, not a `ksp { arg(...) }` string: it registers the schema directory as
 // a real task output, which is what makes the exported JSON reproducible under the configuration
 // cache. CLAUDE.md §6 requires these schemas to be committed and migration-tested.
@@ -327,6 +355,9 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
+
+    // M14.9 — not a library: this is where the generated profile comes from.
+    baselineProfile(project(":baselineprofile"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -22,3 +22,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "MyHabitApp"
 include(":app")
+
+// M14.9 — generates the Baseline Profile and ships nothing. Approved as this project's second module
+// (ADR-113); `CLAUDE.md` §5's single-module rule still holds for everything the APK contains.
+include(":baselineprofile")

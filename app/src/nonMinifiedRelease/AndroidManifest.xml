@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      M14.9 — the Baseline Profile generator's seeder, in the `nonMinifiedRelease` source set only.
+
+      That build type is created by the baselineprofile plugin for the generator to install, and no
+      other variant sees these sources: not `release`, which ships, and not `debug`, which is on the
+      user's phone. The same reasoning as `src/debug`'s gallery — nothing to strip, nothing to get
+      wrong — and ADR-143 records the release APK being checked for it rather than trusting this.
+
+      ⚠ Exported because it has to be: the generator starts it with `am start` as the shell uid, which
+      cannot open a non-exported activity (`src/debug/AndroidManifest.xml` records the same wall).
+      It refuses to seed when a Notion token is stored — see its KDoc.
+    -->
+    <application>
+        <activity
+            android:name=".profileseed.ProfileSeedActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Steady" />
+    </application>
+
+</manifest>

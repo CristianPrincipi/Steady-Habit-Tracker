@@ -65,6 +65,12 @@ ktlintGradle = "14.2.0"
 # Build-only: Kover instruments the JVM test run and writes a report. Nothing reaches the APK.
 kover = "0.9.9"
 
+# M14.9 — the Baseline Profile generator. Resolved live 2026-09-13: 1.5.0 is `<release>`, and its plugin's
+# own bytecode says MAX_AGP_VERSION_RECOMMENDED_EXCLUSIVE = 10.0.0-alpha1, which our 9.4.0 sits inside.
+# ⚠ The plugin and the macro-benchmark library share this version by construction, like ktor's modules.
+# UiAutomator is NOT declared: benchmark-macro 1.5.0 brings 2.4.0 (the newest stable) with it.
+benchmark = "1.5.0"
+
 junit = "4.13.2"
 turbine = "1.2.1"
 mockk = "1.14.11"
@@ -128,9 +134,12 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "androidxTestEspresso" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmark" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-test = { id = "com.android.test", version.ref = "agp" }
+baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -15,7 +15,9 @@ captures/
 *.aab
 *.ap_
 *.dex
-release/
+# Android Studio's "Generate Signed App Bundle / APK" output. Anchored (M14.9): the bare `release/` this
+# used to be also swallowed `app/src/release/`, where the Baseline Profile is generated and committed.
+/app/release/
 
 # --- IDE ---
 .idea/
