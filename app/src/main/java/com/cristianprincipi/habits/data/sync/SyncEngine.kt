@@ -21,6 +21,8 @@ import com.cristianprincipi.habits.data.remote.notion.mapper.NotionMappingValida
 import com.cristianprincipi.habits.data.remote.notion.mapper.NotionPropertyValue
 import com.cristianprincipi.habits.data.remote.notion.mapper.property
 import com.cristianprincipi.habits.domain.repository.SettingsRepository
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -113,14 +115,32 @@ class SyncEngine
         private val clock: Clock,
     ) {
         /**
-         * One full reconciliation.
+         * ⚠⚠ **One run at a time, per process — M14.10, and not optional.** Adoption by date makes a
+         * *killed* run safe; it does nothing for two *live* ones. Both pull before either creates the
+         * page, both find a day with no page, and Notion gets two pages for one date
+         * (`SyncOverlapTest`). Three things can start a run — the periodic schedule, an on-demand or
+         * app-open request, and the setup wizard's first import — and WorkManager only de-duplicates
+         * within one unique name.
          *
+         * Held here rather than in `SyncWorker` because the wizard calls this method directly. A
+         * field on a `@Singleton` is enough: every worker runs in the app's own process.
+         *
+         * A second run **waits** rather than being skipped. What it was asked for — a pull after the
+         * user edited Notion, a push of a check-off made during the first run — may not be in the
+         * first run's results, and an incremental run after it costs a few requests.
+         */
+        private val oneRunAtATime = Mutex()
+
+        /** One full reconciliation, after any run already in progress has finished. */
+        suspend fun sync(): SyncOutcome = oneRunAtATime.withLock { reconcile() }
+
+        /**
          * ReturnCount: there is one exit per phase that can stop the run, and each is the honest
          * end of the sync rather than a branch to fold away. Nesting them into a single expression
          * would bury the order this class's KDoc calls load-bearing.
          */
         @Suppress("ReturnCount")
-        suspend fun sync(): SyncOutcome {
+        private suspend fun reconcile(): SyncOutcome {
             val mapping = mappingStore.read() ?: return SyncOutcome.NotConfigured
 
             val schema =
