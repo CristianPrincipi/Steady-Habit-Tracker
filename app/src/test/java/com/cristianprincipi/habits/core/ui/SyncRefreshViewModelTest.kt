@@ -35,16 +35,34 @@ class SyncRefreshViewModelTest {
     private fun viewModel() = SyncRefreshViewModel(syncStatus)
 
     @Test
-    fun `a running sync raises the indicator`() =
+    fun `a sync the user asked for raises the indicator`() =
         runTest {
             viewModel().isRefreshing.test {
                 assertEquals(false, awaitItem())
 
                 status.value = SyncStatus.Syncing(lastSyncedAt = null)
+                syncStatus.requestedSyncRunning.value = true
                 assertEquals(true, awaitItem())
 
+                syncStatus.requestedSyncRunning.value = false
                 status.value = SyncStatus.Idle(lastSyncedAt = Instant.EPOCH)
                 assertEquals(false, awaitItem())
+            }
+        }
+
+    /**
+     * ⚠⚠ **M14.10 — the case the old reading got wrong.** ADR-125: only a sync the user reached for
+     * draws. A periodic or app-open run is `Syncing` too, and reading `Syncing` spun the indicator
+     * for it; with a sync on every app open, that would have been every launch.
+     */
+    @Test
+    fun `a sync the app started on its own does not raise the indicator`() =
+        runTest {
+            viewModel().isRefreshing.test {
+                assertEquals(false, awaitItem())
+
+                status.value = SyncStatus.Syncing(lastSyncedAt = null)
+                expectNoEvents()
             }
         }
 

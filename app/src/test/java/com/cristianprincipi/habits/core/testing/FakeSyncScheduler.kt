@@ -25,10 +25,16 @@ class FakeSyncScheduler : SyncScheduler {
      */
     val queued = MutableStateFlow(false)
 
+    /** A run someone asked for is running. Independent of [running] for [queued]'s reason. */
+    val requestedRunning = MutableStateFlow(false)
+
     var scheduleRequests = 0
         private set
 
     var syncRequests = 0
+        private set
+
+    var appOpenRequests = 0
         private set
 
     override fun ensureScheduled() {
@@ -39,7 +45,13 @@ class FakeSyncScheduler : SyncScheduler {
         syncRequests++
     }
 
+    override fun syncOnAppOpen() {
+        appOpenRequests++
+    }
+
     override fun observeRunning(): Flow<Boolean> = running
+
+    override fun observeRequestedRunning(): Flow<Boolean> = requestedRunning
 
     override fun observeQueued(): Flow<Boolean> = queued
 }

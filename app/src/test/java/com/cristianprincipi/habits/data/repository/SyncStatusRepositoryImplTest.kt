@@ -378,9 +378,40 @@ class SyncStatusRepositoryImplTest {
     @Test
     fun askingForASyncGoesToTheScheduler() =
         runTest {
-            // The "offer a retry" half of CLAUDE.md §3.5, and the only write this interface has.
+            // The "offer a retry" half of CLAUDE.md §3.5.
             repository.requestSync()
 
             assertEquals(1, scheduler.syncRequests)
+            assertEquals(0, scheduler.appOpenRequests)
+        }
+
+    // ------------------------------------------------------------------ M14.10
+
+    @Test
+    fun anAppOpenSyncIsItsOwnRequestAndNotTheOneAPersonIsWaitingOn() =
+        runTest {
+            // ⚠⚠ ADR-057's hazard. `syncNow()` is the request `observeQueued()` counts, so routing app
+            // open through it would put "will sync when you're back online" up on every offline
+            // launch. The separate name is what keeps an offline launch Idle.
+            repository.requestAppOpenSync()
+
+            assertEquals(1, scheduler.appOpenRequests)
+            assertEquals(0, scheduler.syncRequests)
+        }
+
+    @Test
+    fun theIndicatorFollowsOnlyARunSomeoneAskedFor() =
+        runTest {
+            // ADR-125: a periodic or app-open run is `Syncing` on the status card, and silent on the
+            // pull indicator. Two different flows, so neither can stand in for the other.
+            repository.observeRequestedSyncRunning().test {
+                assertEquals(false, awaitItem())
+
+                scheduler.running.value = true
+                expectNoEvents()
+
+                scheduler.requestedRunning.value = true
+                assertEquals(true, awaitItem())
+            }
         }
 }

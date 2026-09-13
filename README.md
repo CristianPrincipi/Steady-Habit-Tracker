@@ -89,15 +89,17 @@ flowchart LR
   render.
 - **A check-off succeeds immediately and locally**, online or not. The day is marked `PENDING_PUSH`
   and sent at the next sync. Writes are coalesced rather than sent per tap.
-- **Sync runs in WorkManager**: every 15 minutes, and on demand (pull-to-refresh, or *Sync now*),
-  with a network constraint and exponential backoff. It **pulls incrementally** (only pages edited since the last
+- **Sync runs in WorkManager**: every time the app comes to the front, every 15 minutes, and on
+  demand (pull-to-refresh, or *Sync now*), with a network constraint and exponential backoff.
+  **One run at a time**: a second request waits for the first, so two runs can never create the same
+  day's page twice. It **pulls incrementally** (only pages edited since the last
   successful sync) and **pushes** pending days.
 - **Conflicts resolve last-write-wins per day**, comparing the local edit time with Notion's
   last-edited time. If your local edit loses, the sync screen says so.
 - **The mapping is validated before every sync.** A property that was renamed, retyped or deleted in
   Notion pauses sync with an actionable message; the app never writes a null over real data.
-- **Sync is invisible until it fails.** A failure is a state on screen with a retry, never a crash or
-  a modal. Requests go through a client-side throttle, and a 429's retry delay is honoured.
+- **Sync is invisible until it fails.** Only a sync you asked for (a pull) shows a spinner. A failure
+  is a state on screen with a retry, never a crash or a modal. Requests go through a client-side throttle, and a 429's retry delay is honoured.
 - **The Notion API version is pinned** to `2026-03-11`, the data-sources API
   ([`docs/notion-api.md`](docs/notion-api.md), ADR-037).
 

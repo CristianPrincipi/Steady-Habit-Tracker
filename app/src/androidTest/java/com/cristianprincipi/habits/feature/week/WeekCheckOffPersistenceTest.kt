@@ -290,6 +290,10 @@ private object IdleSyncStatus : SyncStatusRepository {
 
     override fun requestSync() = Unit
 
+    override fun requestAppOpenSync() = Unit
+
+    override fun observeRequestedSyncRunning(): Flow<Boolean> = flowOf(false)
+
     override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = flowOf(emptyList())
 
     override suspend fun dismissDiscardedEdits() = Unit

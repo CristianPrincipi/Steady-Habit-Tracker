@@ -25,13 +25,29 @@ interface SyncStatusRepository {
     fun observeStatus(): Flow<SyncStatus>
 
     /**
-     * Asks for a sync as soon as the network allows. Returns straight away — the run happens on
-     * WorkManager, and its progress arrives through [observeStatus].
+     * Asks for a sync as soon as the network allows, **because the user asked** — pull-to-refresh or
+     * *Sync now*. Returns straight away: the run happens on WorkManager, and its progress arrives
+     * through [observeStatus] and [observeRequestedSyncRunning].
      *
-     * This is the "offer a retry" half of `CLAUDE.md` §3.5, and also the app-open trigger. **Not for
-     * a check-off**: §3.5 asks for writes to be batched rather than fired one per checkbox tap.
+     * This is the "offer a retry" half of `CLAUDE.md` §3.5. **Not for a check-off**: §3.5 asks for
+     * writes to be batched rather than fired one per checkbox tap.
      */
     fun requestSync()
+
+    /**
+     * Asks for a sync because the app came to the front — M14.10, `CLAUDE.md` §9.10.
+     *
+     * **Silent by construction**, which is why it is not [requestSync]: it neither raises the pull
+     * indicator nor, when offline, the *"will sync when you're back online"* line (ADR-057, ADR-125).
+     * The user did not ask for this one, so nothing on screen may answer as if they had.
+     */
+    fun requestAppOpenSync()
+
+    /**
+     * Whether a sync the user asked for through [requestSync] is running. The pull indicator's one
+     * input: [observeStatus]'s `Syncing` also covers the periodic and app-open runs, which stay silent.
+     */
+    fun observeRequestedSyncRunning(): Flow<Boolean>
 
     /**
      * Edits that conflict resolution destroyed and has not been forgiven for, newest first.

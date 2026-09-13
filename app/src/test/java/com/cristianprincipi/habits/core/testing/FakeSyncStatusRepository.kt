@@ -17,8 +17,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class FakeSyncStatusRepository(
     private val status: MutableStateFlow<SyncStatus> = MutableStateFlow(SyncStatus.Idle(lastSyncedAt = null)),
     private val notices: MutableStateFlow<List<DiscardedEditNotice>> = MutableStateFlow(emptyList()),
+    /** Whether a sync the user asked for is running. Separate from [status], as in the real one. */
+    val requestedSyncRunning: MutableStateFlow<Boolean> = MutableStateFlow(false),
 ) : SyncStatusRepository {
     var syncRequests = 0
+        private set
+
+    var appOpenSyncRequests = 0
         private set
 
     var dismissals = 0
@@ -29,6 +34,12 @@ class FakeSyncStatusRepository(
     override fun requestSync() {
         syncRequests++
     }
+
+    override fun requestAppOpenSync() {
+        appOpenSyncRequests++
+    }
+
+    override fun observeRequestedSyncRunning(): Flow<Boolean> = requestedSyncRunning
 
     override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = notices
 

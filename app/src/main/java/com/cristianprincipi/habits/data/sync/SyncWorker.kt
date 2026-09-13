@@ -48,9 +48,9 @@ class SyncWorker
             // a failure that reached no further than this method is a failure nobody can be told
             // about (`CLAUDE.md` §3.5). A success clears whatever the last failure was.
             lastFailure.record(outcome)
-            // M15.6c. This is the app's only sync boundary — both the periodic and the on-demand
-            // paths enqueue this worker (`SyncScheduler`) — so one call here covers pull-to-refresh
-            // and the background pass alike.
+            // M15.6c. This is the app's only background sync boundary — the periodic, on-demand and
+            // app-open paths all enqueue this worker (`SyncScheduler`) — so one call here covers
+            // pull-to-refresh, opening the app and the background pass alike.
             if (outcome.changedLocalData) widgets.refreshQuietly()
             return if (outcome.isWorthRetrying) Result.retry() else Result.success()
         }

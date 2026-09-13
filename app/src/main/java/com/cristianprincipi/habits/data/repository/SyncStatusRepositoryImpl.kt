@@ -120,6 +120,12 @@ class SyncStatusRepositoryImpl
             scheduler.syncNow()
         }
 
+        override fun requestAppOpenSync() {
+            scheduler.syncOnAppOpen()
+        }
+
+        override fun observeRequestedSyncRunning(): Flow<Boolean> = scheduler.observeRequestedRunning()
+
         /**
          * The stored notices, with their habit ids turned into the names those habits have **now**.
          *

@@ -17,8 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
+import com.cristianprincipi.habits.core.ui.AppOpenSync
 import com.cristianprincipi.habits.core.widget.WidgetRefresher
 import com.cristianprincipi.habits.core.widget.refreshQuietly
+import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.navigation.HabitsNavHost
 import com.cristianprincipi.habits.navigation.TopLevelRoute
 import com.cristianprincipi.habits.navigation.Week
@@ -61,6 +63,14 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var widgets: WidgetRefresher
 
+    /** Asked for a silent sync each time the app comes to the front — M14.10, see [AppOpenSync]. */
+    @Inject
+    lateinit var syncStatus: SyncStatusRepository
+
+    // The lambda reads `syncStatus` when a start happens, which is always after Hilt injected it in
+    // `super.onCreate`.
+    private val appOpenSync = AppOpenSync { syncStatus.requestAppOpenSync() }
+
     /**
      * The tab something outside the composition has asked the app to land on, or `null`.
      *
@@ -100,6 +110,9 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        appOpenSync.onCreate(
+            recreatedForConfigurationChange = savedInstanceState?.getBoolean(KEY_CONFIGURATION_CHANGE) == true,
+        )
         landingClaimed = savedInstanceState?.getBoolean(KEY_LANDING_CLAIMED) == true
         claimLanding(intent)
         // Only on a real creation: a rotation re-runs onCreate, and repainting every widget on
@@ -139,9 +152,17 @@ class MainActivity : ComponentActivity() {
         claimLanding(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        appOpenSync.onStart()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_LANDING_CLAIMED, landingClaimed)
+        // True only when this instance is being destroyed to be recreated — so the new one's first
+        // start is not mistaken for the user opening the app.
+        outState.putBoolean(KEY_CONFIGURATION_CHANGE, isChangingConfigurations)
     }
 
     private fun claimLanding(intent: Intent) {
@@ -182,5 +203,6 @@ class MainActivity : ComponentActivity() {
 
         private const val ACTION_LAND_ON_WEEK = "com.cristianprincipi.habits.action.LAND_ON_WEEK"
         private const val KEY_LANDING_CLAIMED = "landing_claimed"
+        private const val KEY_CONFIGURATION_CHANGE = "recreated_for_configuration_change"
     }
 }

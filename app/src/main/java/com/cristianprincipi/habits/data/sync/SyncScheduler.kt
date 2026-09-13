@@ -43,13 +43,28 @@ interface SyncScheduler {
     fun ensureScheduled()
 
     /**
-     * Asks for a sync as soon as the network allows.
+     * Asks for a sync as soon as the network allows, **because a person asked**.
      *
-     * For app-open and for the manual refresh M4.13 offers. **Not for a check-off** — `CLAUDE.md`
-     * §3.5 asks for writes to be batched and coalesced rather than fired one per checkbox tap, and
-     * the day stays `PENDING_PUSH` until some run picks it up.
+     * For pull-to-refresh and M4.13's *Sync now*. **Not for a check-off**: `CLAUDE.md` §3.5 asks for
+     * writes to be batched and coalesced rather than fired one per checkbox tap, and the day stays
+     * `PENDING_PUSH` until some run picks it up. **Not for app-open either** — see [syncOnAppOpen].
      */
     fun syncNow()
+
+    /**
+     * Asks for a sync because the app came to the front — M14.10.
+     *
+     * ⚠⚠ **A separate request from [syncNow], under its own unique name, and both halves of that
+     * matter.** ADR-057 left the warning for whoever built this: [observeQueued] is what turns a held
+     * request into *"will sync when you're back online"*, and that line is only honest for a request
+     * someone is waiting on. Opening the app offline is the app's normal condition (`CLAUDE.md` §1),
+     * so an app-open request that counted would put the line up on every offline launch — the
+     * standing nag the user rejected. And [observeRequestedRunning] leaves it out, so the pull
+     * indicator does not spin on every launch (ADR-125: a sync the app starts does not draw).
+     *
+     * `KEEP`, like [syncNow]: coming back to the app twice in a second is one sync.
+     */
+    fun syncOnAppOpen()
 
     /**
      * Whether a run is happening **right now**.
@@ -63,6 +78,20 @@ interface SyncScheduler {
      * for fifteen minutes at a time.
      */
     fun observeRunning(): Flow<Boolean>
+
+    /**
+     * ⭐ Whether a sync **someone asked for** is running — the pull indicator, and nothing else.
+     *
+     * ADR-125's ruling: pull-to-refresh draws because *"the distinction is the finger"*; background
+     * and periodic syncs stay silent. [observeRunning] could not say that, since it answers for every
+     * run, and until M14.10 the gap hid because a periodic run rarely lands while the user is looking.
+     * A sync on every app open would have made it land every time.
+     *
+     * ⚠ A requested run that is **waiting for another run to finish** (`SyncEngine` runs one at a
+     * time) counts as running here: WorkManager has started it, and the user's sync really is under
+     * way — it simply begins with a wait.
+     */
+    fun observeRequestedRunning(): Flow<Boolean>
 
     /**
      * ⭐ Whether an **on-demand** sync has been asked for and has not run yet.
@@ -112,7 +141,11 @@ class WorkManagerSyncScheduler
             )
         }
 
-        override fun syncNow() {
+        override fun syncNow() = enqueueOneRun(ON_DEMAND_WORK)
+
+        override fun syncOnAppOpen() = enqueueOneRun(APP_OPEN_WORK)
+
+        private fun enqueueOneRun(uniqueName: String) {
             val request =
                 OneTimeWorkRequestBuilder<SyncWorker>()
                     .setConstraints(constraints)
@@ -120,21 +153,22 @@ class WorkManagerSyncScheduler
                     .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
-                ON_DEMAND_WORK,
-                // KEEP, so a burst of check-offs or a jabbed refresh button is one sync rather than
-                // a queue of them. Nothing is lost by dropping the extra request: a day owed stays
-                // `PENDING_PUSH` until some run takes it, and the periodic schedule is right there.
+                uniqueName,
+                // KEEP, so a jabbed refresh button or a quick back-and-forth into the app is one
+                // sync rather than a queue of them. Nothing is lost by dropping the extra request: a
+                // day owed stays `PENDING_PUSH` until some run takes it, and the periodic schedule is
+                // right there.
                 ExistingWorkPolicy.KEEP,
                 request,
             )
         }
 
         /**
-         * Both unique names, folded into one boolean.
+         * Every unique name, folded into one boolean.
          *
-         * The two are asked for separately because `getWorkInfosForUniqueWorkFlow` takes one name,
-         * and either can be the run in progress: the periodic schedule fires on its own, and
-         * [syncNow] enqueues beside it rather than replacing it.
+         * Asked for separately because `getWorkInfosForUniqueWorkFlow` takes one name, and any of
+         * them can be the run in progress: the periodic schedule fires on its own, and [syncNow] and
+         * [syncOnAppOpen] enqueue beside it rather than replacing it.
          *
          * **`getInstance` is called on collection, not when the flow is built.** The same
          * initialisation-order trap the constructor comment describes — a caller could otherwise
@@ -148,8 +182,20 @@ class WorkManagerSyncScheduler
                     combine(
                         workManager.getWorkInfosForUniqueWorkFlow(PERIODIC_WORK),
                         workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK),
-                    ) { periodic, onDemand ->
-                        (periodic + onDemand).any { it.state == WorkInfo.State.RUNNING }
+                        workManager.getWorkInfosForUniqueWorkFlow(APP_OPEN_WORK),
+                    ) { periodic, onDemand, appOpen ->
+                        (periodic + onDemand + appOpen).any { it.state == WorkInfo.State.RUNNING }
+                    },
+                )
+            }.distinctUntilChanged()
+
+        /** [ON_DEMAND_WORK] only. `getInstance` on collection, for [observeRunning]'s reason. */
+        override fun observeRequestedRunning(): Flow<Boolean> =
+            flow {
+                val workManager = WorkManager.getInstance(context)
+                emitAll(
+                    workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK).map { infos ->
+                        infos.any { it.state == WorkInfo.State.RUNNING }
                     },
                 )
             }.distinctUntilChanged()
@@ -193,12 +239,13 @@ class WorkManagerSyncScheduler
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
-        private companion object {
+        // Internal rather than private so `AppOpenSyncDeviceTest` can read the real queue by name.
+        internal companion object {
             /**
              * 15 minutes, which is also WorkManager's floor for periodic work.
              *
-             * `CLAUDE.md` §9.10 says 15–30; the floor is not worth fighting, and the real cadence is
-             * set by app-open and by check-offs, not by this.
+             * `CLAUDE.md` §9.10 says 15–30; the floor is not worth fighting, and while the app is in
+             * use the real cadence is set by app-open (M14.10) and pull-to-refresh, not by this.
              */
             val PERIOD = 15.minutes
 
@@ -214,6 +261,7 @@ class WorkManagerSyncScheduler
 
             const val PERIODIC_WORK = "notion-sync-periodic"
             const val ON_DEMAND_WORK = "notion-sync-now"
+            const val APP_OPEN_WORK = "notion-sync-app-open"
         }
     }
 

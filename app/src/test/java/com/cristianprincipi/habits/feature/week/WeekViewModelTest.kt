@@ -877,6 +877,10 @@ private object SilentSyncStatus : SyncStatusRepository {
 
     override fun requestSync() = Unit
 
+    override fun requestAppOpenSync() = Unit
+
+    override fun observeRequestedSyncRunning(): Flow<Boolean> = emptyFlow()
+
     override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> = emptyFlow()
 
     override suspend fun dismissDiscardedEdits() = Unit

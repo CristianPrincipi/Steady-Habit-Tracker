@@ -8,12 +8,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.cristianprincipi.habits.core.designsystem.component.PullToSyncBox
-import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -72,17 +70,21 @@ class SyncRefreshViewModel
         private val syncStatus: SyncStatusRepository,
     ) : ViewModel() {
         /**
-         * ⚠ **`Syncing` only, not "anything that is not `Idle`".**
+         * ⚠⚠ **A sync the user asked for, running — not `SyncStatus.Syncing`. M14.10 narrowed it.**
          *
-         * `WaitingForNetwork` is not a sync in flight — it is a sync that cannot start — and holding
-         * the indicator up through it would spin for as long as the device is offline, which is the
-         * opposite of telling the user something. `Failed` is likewise not running, and it already
-         * has a surface of its own that says more than a spinner could.
+         * `Syncing` is true for *every* run, and ADR-125's ruling is that only the one the user
+         * reached for draws: *"the distinction is the finger"*. Reading `Syncing` let a periodic run
+         * spin the indicator whenever it happened to land on screen — rare enough to hide — and a sync
+         * on every app open would have spun it on every launch.
+         *
+         * ⚠ **Still running only, not "anything that is not `Idle`".** A request held for a network
+         * is not a sync in flight, and holding the indicator up through it would spin for as long as
+         * the device is offline. A failure is likewise not running, and already has a surface of its
+         * own that says more than a spinner could.
          */
         val isRefreshing: StateFlow<Boolean> =
             syncStatus
-                .observeStatus()
-                .map { status -> status is SyncStatus.Syncing }
+                .observeRequestedSyncRunning()
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
