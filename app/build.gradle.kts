@@ -121,7 +121,17 @@ android {
         //
         // Bump versionCode on every build that leaves this machine. Bump versionName when the
         // change is worth a user noticing.
-        versionCode = 1
+        //
+        // 1 -> 2 at M15.9, discharging the rule above: four builds had reached the user's phone at
+        // code 1, the last three of them today.
+        //
+        // ⚠⚠ IT WAS BUMPED AS A FIX FOR SOMETHING ELSE AND IT DID NOT WORK — recorded here so the
+        // next session does not spend the idea twice (ADR-147 §7). The user's launcher draws the
+        // PRE-M14.1 app icon in its widget picker, and the guess was that its icon cache is keyed
+        // on versionCode. It is not, or not only: the row was unchanged after the bump, as it was
+        // after two reinstalls and after force-stopping the launcher. `versionCode` is Play's
+        // counter and nothing more.
+        versionCode = 2
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
