@@ -179,24 +179,35 @@ private const val SAMPLE_MEASURE_ANCHOR = 72.0
  * Written as deviations rather than values so the same shape works for a body weight, a sleep
  * duration or a step count without a second table.
  *
+ * ### ⚠⚠ The rallies are spaced irregularly, and the first table got exactly this wrong
+ *
+ * A first cut alternated up and down at **every** step. On the phone it drew a **sawtooth** —
+ * fourteen even teeth across 108dp — which is the hairball [samplePoints] warns about wearing a
+ * tidier suit: perfectly regular, and telling a viewer nothing about what the widget is for.
+ *
+ * ⭐ So there are **two rallies in fourteen readings**, each two steps wide so it draws as a rounded
+ * bump rather than a spike, and both smaller than the fall around them. That is a line going down
+ * with the occasional good night in it, which is what a month of a real number looks like.
+ * ⚠ `theSampleSeriesIsATrendRatherThanAComb` is what keeps it that way if this is ever retuned.
+ *
  * Suppressed for `NICE_STEPS`' reason: these fourteen numbers **are** the drawing. Naming each one
  * would be fourteen constants used once, and the shape would be harder to read, not easier.
  */
 @Suppress("MagicNumber")
 private val SAMPLE_MEASURE_DEVIATIONS =
     listOf(
+        0.015,
         0.012,
+        0.008,
+        0.010,
+        0.013,
+        0.009,
         0.004,
-        -0.006,
-        0.002,
-        -0.014,
+        -0.001,
+        -0.005,
+        -0.003,
         -0.008,
-        -0.019,
-        -0.011,
-        -0.023,
-        -0.016,
-        -0.027,
-        -0.020,
-        -0.031,
-        -0.025,
+        -0.015,
+        -0.021,
+        -0.026,
     )

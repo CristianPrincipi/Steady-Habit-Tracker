@@ -102,6 +102,23 @@ class WidgetPreviewSamplesTest {
     }
 
     @Test
+    fun theSampleSeriesIsATrendRatherThanAComb() {
+        // ⚠⚠ A regression caught on the phone, not by a gate. The first deviation table alternated
+        // up and down at EVERY step, which drew fourteen even teeth across 108dp — a sawtooth is a
+        // hairball with better manners, and says just as little. This is the property that was
+        // missing: a trend changes direction occasionally, a comb changes it constantly.
+        val y = samplePoints(anchor = 84.0).map { it.y }
+        val steps = y.zipWithNext { from, to -> to - from }
+        val reversals = steps.zipWithNext { before, after -> (before > 0) != (after > 0) }.count { it }
+
+        assertTrue(
+            "The sample changes direction at $reversals of ${steps.size - 1} turns, which draws a " +
+                "comb rather than a trend",
+            reversals * 2 < steps.size,
+        )
+    }
+
+    @Test
     fun theSampleSeriesStaysPlausibleForWhateverIsBeingMeasured() {
         // The badge prints the mean of these, so a sample that wandered far from the anchor would
         // print a figure that is not a weight, or not a night's sleep. Both ends are checked,
