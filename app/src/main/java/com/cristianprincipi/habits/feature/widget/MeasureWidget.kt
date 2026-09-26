@@ -89,6 +89,25 @@ internal class MeasureWidget : GlanceAppWidget() {
         }
     }
 
+    // HabitGridWidget's reason: Exact has no widget to be exact about when the picker asks.
+    override val previewSizeMode = SizeMode.Responsive(setOf(PREVIEW_SIZE))
+
+    /**
+     * What the **widget picker** draws — M15.9, and `HabitGridWidget.providePreview`'s twin.
+     *
+     * The same argument holds here and one thing more: this widget's badge prints a **number**, so a
+     * hand-drawn preview could not have shown one at all — a vector has no text. See
+     * `sampleMeasureWidgetState` for why that number is anchored on the real average rounded to a
+     * whole unit rather than on a constant.
+     */
+    override suspend fun providePreview(
+        context: Context,
+        widgetCategory: Int,
+    ) {
+        val sample = sampleMeasureWidgetState(context)
+        provideContent { MeasureWidgetBody(sample) }
+    }
+
     internal companion object {
         /** The configured subject. Written by the configuration activity, read above. */
         val MEASURE_ID = stringPreferencesKey("measure_id")

@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.AppOpenSync
+import com.cristianprincipi.habits.core.widget.WidgetPreviewPublisher
 import com.cristianprincipi.habits.core.widget.WidgetRefresher
+import com.cristianprincipi.habits.core.widget.publishQuietly
 import com.cristianprincipi.habits.core.widget.refreshQuietly
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.navigation.HabitsNavHost
@@ -62,6 +64,19 @@ class MainActivity : ComponentActivity() {
      */
     @Inject
     lateinit var widgets: WidgetRefresher
+
+    /**
+     * The picker's pictures, refreshed on the same cold start that repaints the placed ones — M15.9.
+     *
+     * ⭐ **Here because it is the only moment both things are true**: the process is alive, so Glance
+     * can compose, and Room is readable, so the preview can borrow the user's own first habit. A
+     * preview pushed at install time could do neither.
+     *
+     * ⚠ It is not part of [widgets]. A repaint fires on every check-off; this must not — see
+     * `WidgetPreviewPublisher` on the platform's rate limit.
+     */
+    @Inject
+    lateinit var widgetPreviews: WidgetPreviewPublisher
 
     /** Asked for a silent sync each time the app comes to the front — M14.10, see [AppOpenSync]. */
     @Inject
@@ -119,7 +134,10 @@ class MainActivity : ComponentActivity() {
         // every rotation would be work nobody asked for. A cold start after an install is the case
         // this is here for, and that always arrives with a null bundle.
         if (savedInstanceState == null) {
-            lifecycleScope.launch { widgets.refreshQuietly() }
+            lifecycleScope.launch {
+                widgets.refreshQuietly()
+                widgetPreviews.publishQuietly()
+            }
         }
         setContent {
             HabitsTheme {

@@ -18,8 +18,18 @@
   initialLayout is Glance's own loading layout - what shows between the widget being dropped and
   provideGlance returning.
 
-  ⚠ No previewImage/previewLayout yet, so the picker shows a generic icon rather than a picture of
-  the widget. Known gap; it needs a real drawable and the layout had to settle first.
+  ⚠⚠ THERE IS STILL NO previewImage OR previewLayout HERE, AND THAT IS NOW A DECISION — M15.9.
+  This comment used to call it a known gap needing "a real drawable". That was the wrong instrument.
+  A drawable cannot know which habit is the user's first and cannot render text at all, so it would
+  have been a wireframe of the card that also had to be redrawn by hand every time WidgetChrome
+  moved — the drift that file's KDoc exists to prevent.
+
+  ⭐ HabitGridWidget.providePreview draws the picker's picture instead, by composing the REAL
+  WidgetBody over a sample state (WidgetPreviewSamples). AppWidgetPreviewPublisher pushes it on each
+  cold start. The preview cannot fall out of step with the widget, because it is the widget.
+
+  ⚠ That path is API 35+. Below it the picker falls back to the receiver's android:icon, which the
+  manifest now states explicitly rather than inheriting.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.cristianprincipi.habits.feature.widget.HabitWidgetConfigActivity"

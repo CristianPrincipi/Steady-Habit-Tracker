@@ -725,4 +725,23 @@
     <string name="widget_measure_config_title">Choose a number</string>
     <string name="widget_measure_config_empty">Tick a number column in Settings, then add this widget.</string>
 
+    <!--
+      The stand-ins the PICKER PREVIEW falls back to - M15.9, and only when there is nothing real.
+
+      A preview normally borrows the user's own first habit and first number (WidgetPreviewSamples),
+      because a picker entry carrying their own name is what makes it recognisable. These four are
+      reached only on a phone that has never been connected to Notion, which is also exactly when
+      someone is deciding whether the widget is worth adding - so it shows a sample rather than the
+      "nothing to show" card a placed widget would draw.
+
+      ⚠⚠ widget_preview_measure_name IS NOT A PROPERTY LOOKUP. CLAUDE.md §3.4 forbids hardcoding a
+      Notion property name, and "Weight" is one of the user's - but nothing resolves this string
+      against a schema. It is a word drawn on a picture, next to a number that was never recorded,
+      and it is paired with widget_preview_measure_unit so the sample reads coherently.
+    -->
+    <string name="widget_preview_habit_name">Read</string>
+    <string name="widget_preview_habit_emoji">📖</string>
+    <string name="widget_preview_measure_name">Weight</string>
+    <string name="widget_preview_measure_unit">kg</string>
+
 </resources>

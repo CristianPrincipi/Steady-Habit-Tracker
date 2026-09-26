@@ -99,6 +99,34 @@ internal class HabitGridWidget : GlanceAppWidget() {
         }
     }
 
+    // See [providePreview]. Exact cannot serve a preview — there is no widget to be exact about.
+    override val previewSizeMode = SizeMode.Responsive(setOf(PREVIEW_SIZE))
+
+    /**
+     * What the **widget picker** draws — M15.9.
+     *
+     * ⭐⭐ **It is the real [WidgetBody], handed a sample state.** That is the whole reason this
+     * exists rather than a drawable: a picture of the widget would have to be redrawn by hand every
+     * time the card, the badge or the grid moved, and the drift would be invisible until someone
+     * opened the picker. There is no second drawing here to fall out of step — the preview *is* the
+     * widget, with `sampleHabitWidgetState` in place of `loadHabitWidgetState`.
+     *
+     * ⚠ **The default implementation is a silent no-op, not an error** (checked against the Glance
+     * 1.2.0 AAR, `providePreview$suspendImpl` returns `Unit`). A widget that forgets to override this
+     * previews nothing at all and says nothing about it, which is precisely how both of these
+     * shipped in M15.6 with the picker falling back to the app icon.
+     *
+     * @param widgetCategory deliberately unused: this app declares `home_screen` only, so there is
+     *   no second category to draw differently for.
+     */
+    override suspend fun providePreview(
+        context: Context,
+        widgetCategory: Int,
+    ) {
+        val sample = sampleHabitWidgetState(context)
+        provideContent { WidgetBody(sample) }
+    }
+
     internal companion object {
         /** The configured subject. Written by the configuration activity, read above. */
         val HABIT_ID = stringPreferencesKey("habit_id")

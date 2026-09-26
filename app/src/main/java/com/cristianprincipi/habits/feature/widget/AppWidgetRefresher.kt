@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.widget
 
 import android.content.Context
 import androidx.glance.appwidget.updateAll
+import com.cristianprincipi.habits.core.widget.WidgetPreviewPublisher
 import com.cristianprincipi.habits.core.widget.WidgetRefresher
 import dagger.Binds
 import dagger.Module
@@ -48,4 +49,7 @@ class AppWidgetRefresher
 internal interface WidgetModule {
     @Binds
     fun refresher(impl: AppWidgetRefresher): WidgetRefresher
+
+    @Binds
+    fun previewPublisher(impl: AppWidgetPreviewPublisher): WidgetPreviewPublisher
 }

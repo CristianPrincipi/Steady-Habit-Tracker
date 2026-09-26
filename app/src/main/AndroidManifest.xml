@@ -110,6 +110,16 @@
           android:label is the row the user sees in the widget picker. The description and the
           footprint live in @xml/habit_grid_widget_info.
 
+          ⚠⚠ android:icon IS STATED RATHER THAN INHERITED, AND M15.9 IS WHY. A receiver with no icon
+          reports the APPLICATION's, which sounds identical and is not: the picker resolves that
+          through the launcher's own preview cache, and on the user's phone that cache was still
+          serving the pre-M14.1 mark months after the icon had been replaced — *"when I want to add a
+          widget I notice that the icon is the old one"*. Naming the resource here is what makes the
+          answer come from this build rather than from whatever the launcher remembers.
+
+          ⭐ On API 35+ it is not what they will see at all: AppWidgetPreviewPublisher pushes a real
+          composed preview of the widget, and that wins. This is the floor beneath it.
+
           ⚠ The configuration activity IS exported, and it has to be: the launcher starts it, from
           another process, when a widget is dropped. It is safe to export because it does nothing
           on its own - it reads EXTRA_APPWIDGET_ID and finishes immediately when that is absent,
@@ -118,6 +128,7 @@
         <receiver
             android:name=".feature.widget.HabitGridWidgetReceiver"
             android:exported="false"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/widget_habit_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -139,6 +150,7 @@
         <receiver
             android:name=".feature.widget.MeasureWidgetReceiver"
             android:exported="false"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/widget_measure_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

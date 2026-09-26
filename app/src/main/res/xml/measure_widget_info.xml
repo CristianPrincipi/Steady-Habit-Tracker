@@ -16,9 +16,14 @@
   initialLayout is Glance's own loading layout - what shows between the widget being dropped and
   provideGlance returning.
 
-  ⚠ No previewImage/previewLayout yet - the same known gap the habit widget has. Both need a real
-  drawable, and the picker showing a preview is the whole reason these are two entries rather than
-  one.
+  ⚠⚠ STILL NO previewImage OR previewLayout, AND THAT IS NOW A DECISION - M15.9, the same one
+  habit_grid_widget_info.xml records. MeasureWidget.providePreview composes the real
+  MeasureWidgetBody over a sample series, so the picker draws the widget rather than a picture of it.
+
+  ⭐ The old comment's closing claim was right and is now discharged: the picker showing a preview IS
+  the whole reason these are two entries rather than one, and until M15.9 both entries drew the same
+  fallback icon. ⚠ A drawable could never have finished the job here - this widget's badge prints a
+  NUMBER, and a vector has no text.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:configure="com.cristianprincipi.habits.feature.widget.MeasureWidgetConfigActivity"

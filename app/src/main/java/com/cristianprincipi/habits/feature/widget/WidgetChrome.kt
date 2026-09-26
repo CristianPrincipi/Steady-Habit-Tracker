@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.widget
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +46,22 @@ import com.cristianprincipi.habits.domain.model.HabitColor
  * so a Glance widget cannot read a token. Colours come from `HabitsDarkColors` directly for the same
  * reason, and v1 is dark-only by decision.
  */
+
+/**
+ * The size the **picker preview** is composed at — M15.9, and shared so the two entries match.
+ *
+ * ⭐ **The declared target footprint, not a flattering one.** Both widget-info files ask for
+ * `targetCellWidth=3`, `targetCellHeight=2`, and on the user's launcher (360dp wide, eight columns)
+ * four cells measured 176dp — so three are ~132dp, and two rows ~107dp. Composing the preview at the
+ * size the widget will actually land at is what makes the picture a promise rather than an advert:
+ * at 132x107 the grid fits nineteen weeks, and nineteen weeks is what they get.
+ *
+ * ⚠ **A preview needs a size of its own because `SizeMode.Exact` is not a `PreviewSizeMode`.** Both
+ * widgets are `Exact` — they draw to whatever they are given — and there is no widget yet when the
+ * picker asks, so there is nothing for `Exact` to read. Verified against the Glance 1.2.0 AAR:
+ * `Single` and `Responsive` implement the interface and `Exact` does not.
+ */
+internal val PREVIEW_SIZE = DpSize(132.dp, 107.dp)
 
 /** The inset from the widget's card edge to anything drawn in it. */
 internal val CARD_PADDING = 12.dp
