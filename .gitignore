@@ -1,23 +1,29 @@
-# --- Secrets: never commit any of these (CLAUDE.md §8) ---
+# --- Secrets: never commit any of these ---
 local.properties
 keystore.properties
+secrets.properties
 *.jks
 *.keystore
-secrets.properties
-# The Notion integration token is stored encrypted on-device and must never reach the repo.
+# The Notion token is stored encrypted on-device and must never reach the repo.
 
 # --- Gradle / build output ---
 .gradle/
 build/
 captures/
+.externalNativeBuild/
 .cxx/
 *.apk
 *.aab
 *.ap_
 *.dex
-# Android Studio's "Generate Signed App Bundle / APK" output. Anchored (M14.9): the bare `release/` this
-# used to be also swallowed `app/src/release/`, where the Baseline Profile is generated and committed.
+*.class
+*.log
+# Android Studio's "Generate Signed App Bundle / APK" output. Anchored on purpose: a bare `release/`
+# would also swallow `app/src/release/`, where the Baseline Profile is generated and committed.
 /app/release/
+
+# The Gradle wrapper jar stays tracked.
+!gradle/wrapper/gradle-wrapper.jar
 
 # --- IDE ---
 .idea/
@@ -25,6 +31,12 @@ captures/
 *.ipr
 *.iws
 .kotlin/
+.navigation/
+.vscode/
+
+# --- Local tooling ---
+.claude/
+.mcp.json
 
 # --- OS ---
 .DS_Store
