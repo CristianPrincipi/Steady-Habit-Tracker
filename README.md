@@ -127,7 +127,7 @@ Gradle 9.7.1 comes with the wrapper; you do not need to install it.
 1. **Clone the repository.**
 
    ```bash
-   git clone https://github.com/CristianPrincipi/Steady.git
+   git clone https://github.com/CristianPrincipi/Steady-Habit-Tracker.git
    ```
 
 2. **Open it in Android Studio** and let Gradle sync. Android Studio writes `local.properties` with
