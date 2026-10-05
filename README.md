@@ -15,7 +15,7 @@ Check your habits off each day and see streaks, a month, a year and completion r
 live in a Notion database of your own; Steady keeps a copy on the phone so it works with no signal,
 and syncs both ways whenever it can reach Notion.
 
-Steady is not on Google Play yet. To use it, build it from source as described under [Setup](#setup).
+Steady is not on Google Play. To use it, build it from source as described under [Setup](#setup).
 
 ## Screenshots
 
@@ -203,7 +203,6 @@ Not implemented yet:
 - Notion OAuth, so other people can connect without creating a token. That needs a token-exchange
   backend, because an OAuth client secret cannot be kept inside an APK.
 - Detecting a database built another way (see [`docs/notion-setup.md`](docs/notion-setup.md))
-- A Google Play release
 
 Out of scope: accounts, a backend of our own, social features, Wear OS, paid tiers.
 
