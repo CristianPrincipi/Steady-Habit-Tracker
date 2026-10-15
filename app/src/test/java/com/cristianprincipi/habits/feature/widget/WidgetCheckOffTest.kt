@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 import java.io.IOException
 import java.lang.reflect.Modifier
 import java.time.LocalDate
@@ -117,12 +118,47 @@ class WidgetCheckOffTest {
         }
 
     @Test
-    fun theTapSurvivesR8() {
-        // Glance builds the callback by reflection, and its consumer rule keeps only PUBLIC
-        // ActionCallbacks. A private one would pass every debug test and fail only in release.
+    fun theCallbackHasThePublicNoArgConstructorGlanceReflectsOn() {
+        // Glance builds the callback with getDeclaredConstructor().newInstance(), from its name.
         val callback = CheckOffTodayAction::class.java
 
         assertTrue(Modifier.isPublic(callback.modifiers))
         assertTrue(Modifier.isPublic(callback.getDeclaredConstructor().modifiers))
+    }
+
+    @Test
+    fun theReleaseBuildKeepsThatConstructor() {
+        // ⚠⚠ The test above passed while every tap on the phone failed: this JVM sees the debug
+        // class, and R8 had removed <init> from the release one (NoSuchMethodException). Glance's
+        // own rule keeps the class; under R8 full mode that no longer keeps its constructor. A
+        // shrunk build cannot run here, so the rule that prevents it is what gets checked.
+        val rules =
+            File(repoRoot(), "app/proguard-rules.pro")
+                .readLines()
+                .filterNot { line -> line.trimStart().startsWith("#") }
+                .joinToString("\n")
+
+        assertTrue(
+            "proguard-rules.pro must keep the no-arg constructor of every ActionCallback",
+            KEEPS_CALLBACK_CONSTRUCTOR.containsMatchIn(rules),
+        )
+    }
+
+    /** Walks up from the module directory, so this works whichever of the two Gradle runs it from. */
+    private fun repoRoot(): File {
+        var candidate: File? = File(System.getProperty("user.dir")).absoluteFile
+        while (candidate != null && !File(candidate, "settings.gradle.kts").isFile) {
+            candidate = candidate.parentFile
+        }
+        return requireNotNull(candidate) { "No settings.gradle.kts above ${System.getProperty("user.dir")}" }
+    }
+
+    private companion object {
+        /** `-keep class * implements …ActionCallback { … <init>(); }`, whatever the spacing. */
+        val KEEPS_CALLBACK_CONSTRUCTOR =
+            Regex(
+                """-keep\S*\s+class\s+\*\s+(implements|extends)\s+""" +
+                    """androidx\.glance\.appwidget\.action\.ActionCallback\s*\{[^}]*<init>\(\)""",
+            )
     }
 }
