@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -13,16 +14,23 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
+import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
+import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.unit.ColorProvider
 import com.cristianprincipi.habits.R
@@ -30,8 +38,10 @@ import com.cristianprincipi.habits.core.designsystem.component.DayStatus
 import com.cristianprincipi.habits.core.designsystem.component.DotGridMetrics
 import com.cristianprincipi.habits.core.designsystem.component.dotGridBitmap
 import com.cristianprincipi.habits.core.designsystem.component.yearDayColor
+import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColorScheme
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColors
 import com.cristianprincipi.habits.core.ui.resolveIn
+import com.cristianprincipi.habits.domain.model.HabitColor
 
 /**
  * A habit's trailing year on the home screen, as the dot grid the app already draws.
@@ -61,6 +71,10 @@ internal class HabitGridWidget : GlanceAppWidget() {
         context: Context,
         id: GlanceId,
     ) {
+        // M15.11: the corner square means "today", so the widget must hear about midnight. Armed on
+        // every session start — see MidnightRepaint.kt for why here and not in the app.
+        armMidnightRepaint(context)
+
         // Read and resolve BEFORE provideContent: loading is suspend and the composition is not, so
         // the alternative is a composable that blocks or one that renders empty and then corrects
         // itself — which on a widget is a visible flash of the wrong answer. This is the FIRST
@@ -135,7 +149,17 @@ internal class HabitGridWidget : GlanceAppWidget() {
 
 @Composable
 private fun WidgetBody(state: HabitWidgetState) {
-    WidgetCard {
+    val content = state as? HabitWidgetState.Content
+    val today = content?.today
+    // Only a habit that is really there gets a square: the two empty states are sentences about a
+    // widget with nothing to check off.
+    val corner: (@Composable () -> Unit)? =
+        if (content != null && today != null) {
+            { TodaySquare(check = today, name = content.name, color = content.color) }
+        } else {
+            null
+        }
+    WidgetCard(corner = corner) {
         when (state) {
             HabitWidgetState.Unconfigured -> {
                 WidgetMessage(R.string.widget_unconfigured)
@@ -159,6 +183,7 @@ private fun WidgetBody(state: HabitWidgetState) {
                             state.daysThisWeek,
                         ),
                     color = state.color,
+                    nameEndInset = if (state.today != null) SQUARE_SIZE + BADGE_GAP else 0.dp,
                 )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
@@ -220,5 +245,82 @@ private fun Grid(state: HabitWidgetState.Content) {
     Image(provider = ImageProvider(bitmap), contentDescription = null)
 }
 
+/**
+ * Today, as a square in the card's top-right corner, that checks the habit off — M15.11.
+ *
+ * ⭐ The two states the request asked for: an **outline in the habit's colour** while
+ * today is open, **filled with that colour** once it is done. A second tap takes it back, because a
+ * control on a home screen gets brushed by accident and has to be undoable where it was hit.
+ *
+ * ⭐ **It is today's dot, drawn large.** The corner is the grid's own ratio ([DOT_CORNER_RATIO]), so
+ * the square reads as the last dot of the grid lifted into the corner, not as a borrowed checkbox.
+ *
+ * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
+ * colour inset by [SQUARE_STROKE] draws the same picture on every API level this app supports.
+ *
+ * ⚠ **The touch target is bigger than the square** ([SQUARE_TARGET_WIDTH] by [SQUARE_TARGET_HEIGHT]),
+ * and it reaches into the card's padding — that is why the square is a [WidgetCard] corner rather
+ * than one more item in the header row. The padding has nothing else to do, and an 18dp target on a
+ * home screen is a target people miss.
+ */
+@Composable
+private fun TodaySquare(
+    check: TodayCheck,
+    name: String,
+    color: HabitColor,
+) {
+    val habitColor = ColorProvider(color.resolveIn(HabitsDarkColors.habit))
+    // Says what a tap DOES, not only what is shown: "checked" alone would not tell a TalkBack user
+    // that this square writes.
+    val description =
+        LocalContext.current.getString(
+            if (check.completed) R.string.widget_today_done else R.string.widget_today_open,
+            name,
+        )
+    Box(
+        modifier =
+            GlanceModifier
+                .size(SQUARE_TARGET_WIDTH, SQUARE_TARGET_HEIGHT)
+                .clickable(checkOffTodayAction(check))
+                .semantics { contentDescription = description }
+                .padding(top = CARD_PADDING, end = CARD_PADDING),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Box(
+            modifier =
+                GlanceModifier
+                    .size(SQUARE_SIZE)
+                    .cornerRadius(SQUARE_SIZE / DOT_CORNER_RATIO)
+                    .background(habitColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!check.completed) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .size(SQUARE_SIZE - SQUARE_STROKE * 2)
+                            .cornerRadius(SQUARE_SIZE / DOT_CORNER_RATIO - SQUARE_STROKE)
+                            .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer)),
+                ) {}
+            }
+        }
+    }
+}
+
 /** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
 private const val DOT_CORNER_RATIO = 6f
+
+/**
+ * The square's drawn size: the height of the name line beside it, so the two sit on one line and the
+ * subtitle underneath keeps its full width.
+ */
+private val SQUARE_SIZE = 18.dp
+
+private val SQUARE_STROKE = 2.dp
+
+/**
+ * The square's touch target, measured from the card's corner: the card padding, the square, and a
+ * margin past it — wider than tall, because below it is the subtitle, where a tap opens the app.
+ */
+private val SQUARE_TARGET_WIDTH = 40.dp
+private val SQUARE_TARGET_HEIGHT = 36.dp

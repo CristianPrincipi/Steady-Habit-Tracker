@@ -31,8 +31,9 @@ Steady is not on Google Play. To use it, build it from source as described under
 - **Stats** per habit: completed days, completion rate, current and best streak, and a monthly
   completions chart. Number properties you choose (weight, sleep, anything) are shown as daily
   averages over the last 30 days.
-- **Home screen widgets**: *Habit grid*, a year of one habit as dots, and *Number trend*, one
-  number's last 30 days as a line.
+- **Home screen widgets**: *Habit grid*, a year of one habit as dots, with a square in the corner
+  that checks today off without opening the app; and *Number trend*, one number's last 30 days as a
+  line.
 - **Two-way Notion sync**, offline-first. A check-off is saved on the phone immediately and sent to
   Notion afterwards; changes made in Notion are pulled down.
 - **Property mapping**: you choose which date property is the day, which checkboxes are habits and

@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.widget
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -74,7 +75,10 @@ internal val HEADER_GAP = 10.dp
 
 internal val BADGE_SIZE = 36.dp
 private val BADGE_CORNER = 18.dp
-private val BADGE_GAP = 8.dp
+
+/** Between the badge and the name — and, since M15.11, between the name and the corner square. */
+internal val BADGE_GAP = 8.dp
+
 private val TITLE_SIZE = 15.sp
 private val SUBTITLE_SIZE = 12.sp
 private val BADGE_EMOJI_SIZE = 16.sp
@@ -102,21 +106,36 @@ private const val MESSAGE_LINES = 3
  * that has left the mapping is exactly when a user wants the app, and a message with no way into it
  * would be a dead end.
  *
+ * ### The corner — M15.11
+ *
+ * [corner] is drawn over the card's **top-right corner, outside the padding**, so a control there can
+ * have a touch target bigger than the space the content gives up for it. The content column is
+ * exactly what it was — same size, same padding — so a widget that passes no corner draws as before.
+ * ⚠ A clickable corner is its own target: a tap inside it is that control's, not the card's.
+ *
  * @see MainActivity.landOnWeek for why the intent carries `CLEAR_TOP or SINGLE_TOP` rather than the
  *   one-line `CLEAR_TASK`.
  */
 @Composable
-internal fun WidgetCard(content: @Composable ColumnScope.() -> Unit) {
-    Column(
+internal fun WidgetCard(
+    corner: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(
         modifier =
             GlanceModifier
                 .fillMaxSize()
                 .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer))
                 .cornerRadius(CARD_CORNER)
-                .clickable(actionStartActivity(MainActivity.landOnWeek(LocalContext.current)))
-                .padding(CARD_PADDING),
-        content = content,
-    )
+                .clickable(actionStartActivity(MainActivity.landOnWeek(LocalContext.current))),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Column(
+            modifier = GlanceModifier.fillMaxSize().padding(CARD_PADDING),
+            content = content,
+        )
+        corner?.invoke()
+    }
 }
 
 /**
@@ -134,6 +153,9 @@ internal fun WidgetCard(content: @Composable ColumnScope.() -> Unit) {
  * @param badgeTextSize defaulted for the emoji case, where one glyph at 16sp clears a 36dp circle at
  *   every font scale Android offers. A number does not — see `fitBadgeSp`.
  * @param badgeColor required, not defaulted — see the note above [Text] in the body.
+ * @param nameEndInset room kept clear at the end of the **name line only**, for a [WidgetCard]
+ *   corner that sits beside it (M15.11). The subtitle line runs underneath that corner and keeps its
+ *   full width, so on a narrow widget only the name gives anything up.
  */
 @Composable
 internal fun WidgetHeader(
@@ -143,6 +165,7 @@ internal fun WidgetHeader(
     color: HabitColor,
     badgeColor: ColorProvider,
     badgeTextSize: TextUnit = BADGE_EMOJI_SIZE,
+    nameEndInset: Dp = 0.dp,
 ) {
     val resolved = color.resolveIn(HabitsDarkColors.habit)
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,6 +202,7 @@ internal fun WidgetHeader(
         Column {
             Text(
                 text = name,
+                modifier = GlanceModifier.padding(end = nameEndInset),
                 style =
                     TextStyle(
                         color = ColorProvider(HabitsDarkColors.text.primary),

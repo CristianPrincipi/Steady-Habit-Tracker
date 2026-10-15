@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
@@ -65,6 +66,22 @@ interface SyncScheduler {
      * `KEEP`, like [syncNow]: coming back to the app twice in a second is one sync.
      */
     fun syncOnAppOpen()
+
+    /**
+     * Asks for a sync about a minute after a check-off made **on a home-screen widget** — M15.11.
+     *
+     * ⭐ **The one check-off that asks for a sync, and the delay is what keeps §3.5 true.** A check-off
+     * in the app reaches Notion on the next app-open or periodic run; a widget exists so the app is
+     * never opened, which leaves only the periodic run — and the phone's battery saver decides when
+     * that is. The user's ruling was to push about a minute after the tap. The minute is the batching
+     * `CLAUDE.md` §3.5 asks for: ticking three habits in a row is one request, not three.
+     *
+     * `KEEP`, so the first tap of a run of them sets the time and the rest ride along. A tap that
+     * lands while that sync is already **running** is dropped rather than queued, and nothing is lost
+     * by it: its day stays `PENDING_PUSH` (`SyncEngine` checks for an edit made mid-push) and goes on
+     * the next run. Silent like [syncOnAppOpen], and for its reason — nobody is looking at the app.
+     */
+    fun syncAfterWidgetCheckOff()
 
     /**
      * Whether a run is happening **right now**.
@@ -145,11 +162,17 @@ class WorkManagerSyncScheduler
 
         override fun syncOnAppOpen() = enqueueOneRun(APP_OPEN_WORK)
 
-        private fun enqueueOneRun(uniqueName: String) {
+        override fun syncAfterWidgetCheckOff() = enqueueOneRun(WIDGET_CHECK_OFF_WORK, delay = WIDGET_CHECK_OFF_DELAY)
+
+        private fun enqueueOneRun(
+            uniqueName: String,
+            delay: Duration = Duration.ZERO,
+        ) {
             val request =
                 OneTimeWorkRequestBuilder<SyncWorker>()
                     .setConstraints(constraints)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF.toJavaDuration())
+                    .setInitialDelay(delay.toJavaDuration())
                     .build()
 
             WorkManager.getInstance(context).enqueueUniqueWork(
@@ -167,8 +190,8 @@ class WorkManagerSyncScheduler
          * Every unique name, folded into one boolean.
          *
          * Asked for separately because `getWorkInfosForUniqueWorkFlow` takes one name, and any of
-         * them can be the run in progress: the periodic schedule fires on its own, and [syncNow] and
-         * [syncOnAppOpen] enqueue beside it rather than replacing it.
+         * them can be the run in progress: the periodic schedule fires on its own, and [syncNow],
+         * [syncOnAppOpen] and [syncAfterWidgetCheckOff] enqueue beside it rather than replacing it.
          *
          * **`getInstance` is called on collection, not when the flow is built.** The same
          * initialisation-order trap the constructor comment describes — a caller could otherwise
@@ -183,8 +206,9 @@ class WorkManagerSyncScheduler
                         workManager.getWorkInfosForUniqueWorkFlow(PERIODIC_WORK),
                         workManager.getWorkInfosForUniqueWorkFlow(ON_DEMAND_WORK),
                         workManager.getWorkInfosForUniqueWorkFlow(APP_OPEN_WORK),
-                    ) { periodic, onDemand, appOpen ->
-                        (periodic + onDemand + appOpen).any { it.state == WorkInfo.State.RUNNING }
+                        workManager.getWorkInfosForUniqueWorkFlow(WIDGET_CHECK_OFF_WORK),
+                    ) { periodic, onDemand, appOpen, widget ->
+                        (periodic + onDemand + appOpen + widget).any { it.state == WorkInfo.State.RUNNING }
                     },
                 )
             }.distinctUntilChanged()
@@ -259,9 +283,16 @@ class WorkManagerSyncScheduler
              */
             val BACKOFF = 30.seconds
 
+            /**
+             * How long [syncAfterWidgetCheckOff] waits: long enough to gather a run of taps into one
+             * push, short enough that Notion is right by the time anyone looks there.
+             */
+            val WIDGET_CHECK_OFF_DELAY = 1.minutes
+
             const val PERIODIC_WORK = "notion-sync-periodic"
             const val ON_DEMAND_WORK = "notion-sync-now"
             const val APP_OPEN_WORK = "notion-sync-app-open"
+            const val WIDGET_CHECK_OFF_WORK = "notion-sync-widget-check-off"
         }
     }
 

@@ -674,6 +674,13 @@
     <string name="widget_habit_description">A year of one habit, as a dot grid.</string>
     <string name="widget_unconfigured">Remove this widget and add it again to pick a habit.</string>
     <string name="widget_habit_missing">Tick this habit again in Settings, or remove the widget.</string>
+    <!--
+      The habit widget's corner square - M15.11. Spoken by TalkBack, never drawn: they say what a
+      tap does, because the square's look alone ("filled") does not tell a screen-reader user that
+      tapping it writes. %1$s is the habit's name.
+    -->
+    <string name="widget_today_open">Mark %1$s done for today</string>
+    <string name="widget_today_done">%1$s is done for today. Tap to undo</string>
 
     <!--
       The configuration screen the system opens when a widget is dropped.

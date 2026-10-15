@@ -37,6 +37,9 @@ class FakeSyncScheduler : SyncScheduler {
     var appOpenRequests = 0
         private set
 
+    var widgetCheckOffRequests = 0
+        private set
+
     override fun ensureScheduled() {
         scheduleRequests++
     }
@@ -47,6 +50,10 @@ class FakeSyncScheduler : SyncScheduler {
 
     override fun syncOnAppOpen() {
         appOpenRequests++
+    }
+
+    override fun syncAfterWidgetCheckOff() {
+        widgetCheckOffRequests++
     }
 
     override fun observeRunning(): Flow<Boolean> = running

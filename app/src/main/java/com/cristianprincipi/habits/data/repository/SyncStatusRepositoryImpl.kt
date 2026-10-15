@@ -124,6 +124,10 @@ class SyncStatusRepositoryImpl
             scheduler.syncOnAppOpen()
         }
 
+        override fun requestWidgetCheckOffSync() {
+            scheduler.syncAfterWidgetCheckOff()
+        }
+
         override fun observeRequestedSyncRunning(): Flow<Boolean> = scheduler.observeRequestedRunning()
 
         /**

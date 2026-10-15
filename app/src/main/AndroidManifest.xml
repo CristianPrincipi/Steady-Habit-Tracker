@@ -147,6 +147,19 @@
             </intent-filter>
         </activity>
 
+        <!--
+          M15.11: repaints every widget at local midnight, so the habit widget's "today" square
+          empties for the new day. Reached only through this app's own PendingIntent, from an
+          inexact, non-waking alarm (see MidnightRepaint.kt), so it is NOT exported.
+
+          ⚠ An explicit closing tag, not a self-closing one: EveryWidgetIsRefreshedTest and
+          EveryWidgetHasAPreviewTest read each receiver up to the next closing tag, and a
+          self-closing one would borrow the measure widget's body and be mistaken for a widget.
+        -->
+        <receiver
+            android:name=".feature.widget.MidnightRepaintReceiver"
+            android:exported="false"></receiver>
+
         <receiver
             android:name=".feature.widget.MeasureWidgetReceiver"
             android:exported="false"

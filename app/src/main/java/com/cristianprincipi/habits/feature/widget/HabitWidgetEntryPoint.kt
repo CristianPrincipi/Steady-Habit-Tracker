@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.feature.widget
 
+import com.cristianprincipi.habits.core.widget.WidgetRefresher
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForYear
 import dagger.hilt.EntryPoint
@@ -30,4 +31,10 @@ internal interface HabitWidgetEntryPoint {
     fun habitsForWeek(): GetHabitsForWeek
 
     fun clock(): Clock
+
+    /** The corner square's tap — M15.11. */
+    fun checkOff(): WidgetCheckOff
+
+    /** For the midnight repaint, which has no widget session to ask for one — M15.11. */
+    fun widgets(): WidgetRefresher
 }

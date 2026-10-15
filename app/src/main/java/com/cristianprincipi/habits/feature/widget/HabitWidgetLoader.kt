@@ -64,6 +64,7 @@ internal fun habitWidgetStateFlow(
                 completedThisWeek = week?.completedCount ?: 0,
                 daysThisWeek = week?.cells?.size ?: DAYS_IN_WEEK,
                 year = year.period.cells.map { cell -> cell.toDayStatus() },
+                today = year.period.todayCheck(),
             )
         }
     }

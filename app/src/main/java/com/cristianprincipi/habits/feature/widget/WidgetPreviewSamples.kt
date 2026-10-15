@@ -6,6 +6,7 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.designsystem.component.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.designsystem.component.DayStatus
 import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.HabitId
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -56,18 +57,43 @@ internal suspend fun sampleHabitWidgetState(context: Context): HabitWidgetState.
             .firstOrNull()
             ?.period
             ?.habit
+    // ⚠ The real clock, for a sample year. The trailing year ends on the CURRENT week, so a grid
+    // whose last column were full would end on a Sunday whatever day it is — which is the one
+    // detail that would make the preview read as a picture rather than as the widget.
+    val today = LocalDate.now(deps.clock())
+    val futureDays = DAYS_PER_WEEK - today.dayOfWeek.value
+    val year = sampleYear(futureDays = futureDays)
     return HabitWidgetState.Content(
         name = habit?.name ?: context.getString(R.string.widget_preview_habit_name),
         emoji = habit?.emoji ?: context.getString(R.string.widget_preview_habit_emoji),
         color = habit?.color ?: SAMPLE_HABIT_COLOR,
         completedThisWeek = SAMPLE_COMPLETED_THIS_WEEK,
         daysThisWeek = DAYS_PER_WEEK,
-        // ⚠ The real clock, for a sample year. The trailing year ends on the CURRENT week, so a grid
-        // whose last column were full would end on a Sunday whatever day it is — which is the one
-        // detail that would make the preview read as a picture rather than as the widget.
-        year = sampleYear(futureDays = DAYS_PER_WEEK - LocalDate.now(deps.clock()).dayOfWeek.value),
+        year = year,
+        today = sampleTodayCheck(year, futureDays, today),
     )
 }
+
+/**
+ * The corner square of a sample — M15.11. **It agrees with the sample grid's own today**, for the
+ * reason the grid ends on the real weekday: a square that said done beside a dot that said missed
+ * would make the preview read as broken.
+ *
+ * ⚠⚠ **It never carries the real habit's id**, although the name and colour above are the real
+ * habit's. A preview is a picture, but its square is the same control the placed widget draws, so an
+ * id here would aim a sample's invented value at the user's real history. [SAMPLE_HABIT_ID] matches
+ * no habit, and `WidgetCheckOff` writes nothing for a habit it cannot find.
+ */
+internal fun sampleTodayCheck(
+    year: List<DayStatus>,
+    futureDays: Int,
+    today: LocalDate,
+): TodayCheck =
+    TodayCheck(
+        habitId = SAMPLE_HABIT_ID,
+        date = today,
+        completed = year[year.size - futureDays - 1] == DayStatus.COMPLETED,
+    )
 
 /**
  * The measure widget's preview subject: the first tracked number, over a sample series.
@@ -168,6 +194,9 @@ private const val SAMPLE_COMPLETED_THIS_WEEK = 5
 
 /** Only reached with no habits at all — see [sampleHabitWidgetState]'s note on the fallback. */
 private val SAMPLE_HABIT_COLOR = HabitColor.GREEN
+
+/** Not a Notion property id, so it can never name a real habit; see [sampleTodayCheck]. */
+internal val SAMPLE_HABIT_ID = HabitId("widget-preview-sample")
 private val SAMPLE_MEASURE_COLOR = HabitColor.PURPLE
 
 /** Only reached with no tracked numbers at all, where there is no real average to round. */

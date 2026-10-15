@@ -26,6 +26,9 @@ class FakeSyncStatusRepository(
     var appOpenSyncRequests = 0
         private set
 
+    var widgetCheckOffSyncRequests = 0
+        private set
+
     var dismissals = 0
         private set
 
@@ -37,6 +40,10 @@ class FakeSyncStatusRepository(
 
     override fun requestAppOpenSync() {
         appOpenSyncRequests++
+    }
+
+    override fun requestWidgetCheckOffSync() {
+        widgetCheckOffSyncRequests++
     }
 
     override fun observeRequestedSyncRunning(): Flow<Boolean> = requestedSyncRunning
