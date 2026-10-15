@@ -153,9 +153,8 @@ internal fun WidgetCard(
  * @param badgeTextSize defaulted for the emoji case, where one glyph at 16sp clears a 36dp circle at
  *   every font scale Android offers. A number does not — see `fitBadgeSp`.
  * @param badgeColor required, not defaulted — see the note above [Text] in the body.
- * @param nameEndInset room kept clear at the end of the **name line only**, for a [WidgetCard]
- *   corner that sits beside it (M15.11). The subtitle line runs underneath that corner and keeps its
- *   full width, so on a narrow widget only the name gives anything up.
+ * @param textEndInset room kept clear at the end of **both text lines**, for a [WidgetCard] corner
+ *   drawn on the header's right (M15.11) — the habit widget's square, which mirrors the badge.
  */
 @Composable
 internal fun WidgetHeader(
@@ -165,7 +164,7 @@ internal fun WidgetHeader(
     color: HabitColor,
     badgeColor: ColorProvider,
     badgeTextSize: TextUnit = BADGE_EMOJI_SIZE,
-    nameEndInset: Dp = 0.dp,
+    textEndInset: Dp = 0.dp,
 ) {
     val resolved = color.resolveIn(HabitsDarkColors.habit)
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -199,10 +198,9 @@ internal fun WidgetHeader(
             )
         }
         Spacer(GlanceModifier.width(BADGE_GAP))
-        Column {
+        Column(modifier = GlanceModifier.padding(end = textEndInset)) {
             Text(
                 text = name,
-                modifier = GlanceModifier.padding(end = nameEndInset),
                 style =
                     TextStyle(
                         color = ColorProvider(HabitsDarkColors.text.primary),

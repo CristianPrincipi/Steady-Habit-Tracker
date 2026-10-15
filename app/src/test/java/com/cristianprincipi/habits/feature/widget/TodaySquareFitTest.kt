@@ -2,49 +2,48 @@ package com.cristianprincipi.habits.feature.widget
 
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.hypot
 
 /**
- * Where the corner square fits — M15.11. Two limits squeeze it from opposite sides, and either one
- * moving is a defect only a phone would show.
- *
- * ⚠ **The first cut failed the first of these and passed every gate**: an 18dp square beside the
- * name left the name 38dp on the default widget, and most names ellipsised.
+ * Where the corner square fits — M15.11. Each limit here was crossed once by a version that passed
+ * every other gate, and showed only on the phone.
  */
 class TodaySquareFitTest {
     @Test
-    fun theNameKeepsRoomForASevenLetterWordOnTheDefaultWidget() {
-        // The default footprint is PREVIEW_SIZE's width. A seven-letter word at 15sp bold measured
-        // about 54dp in Noto Sans Bold, which is wider than Roboto, so 56dp is room with a margin.
-        val nameRoom =
+    fun theTextKeepsRoomForAFiveLetterNameOnTheDefaultWidget() {
+        // The square mirrors the badge, so it costs both text lines its own width plus the badge's
+        // gap. A five-letter word at 15sp bold measured ~41-44dp on the phone. (A seven-letter one is
+        // ~51dp: it fits on the user's ~149dp widgets, and ellipsises on the declared 132dp.)
+        val textRoom =
             PREVIEW_SIZE.width.value -
                 CARD_PADDING.value * 2 -
                 BADGE_SIZE.value -
                 BADGE_GAP.value -
-                SQUARE_NAME_INSET.value
+                SQUARE_TEXT_INSET.value
 
         assertTrue(
-            "The name line has ${nameRoom}dp beside the square; it needs at least $MIN_NAME_ROOM",
-            nameRoom >= MIN_NAME_ROOM,
+            "The header text has ${textRoom}dp beside the square; it needs at least $MIN_TEXT_ROOM",
+            textRoom >= MIN_TEXT_ROOM,
         )
     }
 
     @Test
-    fun theSquareStaysClearOfTheCardsRoundedCorner() {
-        // The card's corner is an arc of radius CARD_CORNER about (CARD_CORNER, CARD_CORNER). The
-        // square's outer corner sits at (SQUARE_INSET, SQUARE_INSET); pushing it further out to win
-        // the name more room puts it against the curve, which reads as clipped.
-        val centre = CARD_CORNER.value
-        val distance = hypot(centre - SQUARE_INSET.value, centre - SQUARE_INSET.value)
+    fun theSquareIsInsideItsOwnTouchTarget() {
+        // The target is anchored on the card's corner and the square on the badge's centre line, so
+        // moving either without the other can leave the square partly outside what a tap reaches.
+        val squareRight = CARD_PADDING.value + SQUARE_SIZE.value
+        val squareBottom = CARD_PADDING.value + (BADGE_SIZE.value + SQUARE_SIZE.value) / 2
 
         assertTrue(
-            "The square's corner is ${CARD_CORNER.value - distance}dp inside the card's curve; it needs $MIN_CORNER_CLEARANCE",
-            CARD_CORNER.value - distance >= MIN_CORNER_CLEARANCE,
+            "Target ${SQUARE_TARGET.width} is narrower than the square's reach",
+            SQUARE_TARGET.width.value >= squareRight,
+        )
+        assertTrue(
+            "Target ${SQUARE_TARGET.height} is shorter than the square's reach",
+            SQUARE_TARGET.height.value >= squareBottom,
         )
     }
 
     private companion object {
-        const val MIN_NAME_ROOM = 56f
-        const val MIN_CORNER_CLEARANCE = 3f
+        const val MIN_TEXT_ROOM = 44f
     }
 }

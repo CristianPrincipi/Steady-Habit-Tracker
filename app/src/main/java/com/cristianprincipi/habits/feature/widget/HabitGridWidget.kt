@@ -185,7 +185,7 @@ private fun WidgetBody(state: HabitWidgetState) {
                             state.daysThisWeek,
                         ),
                     color = state.color,
-                    nameEndInset = if (state.today != null) SQUARE_NAME_INSET else 0.dp,
+                    textEndInset = if (state.today != null) SQUARE_TEXT_INSET else 0.dp,
                 )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
@@ -257,26 +257,26 @@ private fun Grid(state: HabitWidgetState.Content) {
  * ⭐ **It is today's dot, drawn large.** The corner is the grid's own ratio ([DOT_CORNER_RATIO]), so
  * the square reads as the last dot of the grid lifted into the corner, not as a borrowed checkbox.
  *
- * ### ⚠⚠ It sits in the card's padding, and the name is why
+ * ### ⭐ It mirrors the habit badge, and that is the user's call
  *
- * The first cut was an 18dp square on the content's own 12dp inset, beside the name. On the default
- * three-cell widget (~132dp) that left the name **38dp**, and a seven-letter name at 15sp bold needs
- * about **54dp** — so most names ellipsised. No square small enough to share the name's line could
- * fix that: the line has 64dp, leaving ~10dp for a square *and* its gap.
+ * The badge sits [CARD_PADDING] in from the left, with [BADGE_GAP] to the text. The square sits
+ * [CARD_PADDING] in from the right, with the same gap back to the text, **centred on the badge's own
+ * line** — so the header reads badge · text · square, symmetric about its middle. Two earlier cuts
+ * were rejected on the phone: one beside the name's top line, and one tucked into the card's corner
+ * padding, which lined up with nothing else on the card.
  *
- * So the square is [SQUARE_SIZE] and sits [SQUARE_INSET] from the card's top and right edges — in the
- * padding, poking only [SQUARE_NAME_INSET] (gap included) into the name's line. The name gets 56dp.
- * ⚠ [SQUARE_INSET] cannot shrink much further: the card's 16dp corner curves in, and at 6dp the
- * square's corner nearly touches it. `TodaySquareFitTest` holds both numbers.
+ * ⚠ **The cost is the whole text column, not just the name line**, because a square on the badge's
+ * centre line straddles both lines: [SQUARE_TEXT_INSET]. That was affordable once the real widths were
+ * measured: the user's launcher lays the narrow habit widget out at ~149dp, where the text keeps ~63dp
+ * — every name they have fits. Below ~139dp a seven-letter name ellipsises. `TodaySquareFitTest`.
  *
  * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
  * colour inset by [SQUARE_STROKE] draws the same picture on every API level this app supports.
  *
- * ⚠ **The touch target is three times the square** ([SQUARE_TARGET]), anchored on the card's own
- * corner — that is why the square is a [WidgetCard] corner rather than one more item in the header
- * row, which could not reach the padding. ⚠ It covers the last few dp of a name long enough to reach
- * it, so a tap there checks off rather than opening the app; a bigger target would cover more of the
- * name, and a 10dp target would be one people miss.
+ * ⚠ **The touch target is much bigger than the square** ([SQUARE_TARGET]): the header's full height
+ * plus the top padding, and the right padding — that is why the square is a [WidgetCard] corner rather
+ * than one more item in the header row, which could not reach the padding. It overlaps the text by
+ * only a few dp, so a tap on a name still opens the app.
  */
 @Composable
 private fun TodaySquare(
@@ -298,7 +298,7 @@ private fun TodaySquare(
                 .size(SQUARE_TARGET.width, SQUARE_TARGET.height)
                 .clickable(checkOffTodayAction(check))
                 .semantics { contentDescription = description }
-                .padding(top = SQUARE_INSET, end = SQUARE_INSET),
+                .padding(top = CARD_PADDING + (BADGE_SIZE - SQUARE_SIZE) / 2, end = CARD_PADDING),
         contentAlignment = Alignment.TopEnd,
     ) {
         Box(
@@ -328,20 +328,14 @@ private const val DOT_CORNER_RATIO = 6f
 /** The square's drawn size — see [TodaySquare] for why it is no bigger. */
 internal val SQUARE_SIZE = 10.dp
 
-/** From the card's top and right edges to the square: inside the 12dp padding, clear of the corner. */
-internal val SQUARE_INSET = 7.dp
-
 /** 1.5dp, not 2: on a 10dp square a 2dp ring leaves a 6dp hole and reads as a filled dot. */
 private val SQUARE_STROKE = 1.5.dp
 
-/** Between the end of the name and the square. */
-private val SQUARE_GAP = 3.dp
+/** What the square takes from the header's text: itself, and the badge's own gap on the other side. */
+internal val SQUARE_TEXT_INSET = SQUARE_SIZE + BADGE_GAP
 
 /**
- * What the square takes from the **name line**: the part of it that pokes past the card padding into
- * the content, plus [SQUARE_GAP].
+ * The square's touch target, from the card's corner: the right padding, the square and most of its
+ * gap across; the top padding and the whole header down — `CARD_PADDING + BADGE_SIZE` is 48dp.
  */
-internal val SQUARE_NAME_INSET = SQUARE_INSET + SQUARE_SIZE + SQUARE_GAP - CARD_PADDING
-
-/** The square's touch target, measured from the card's corner. */
-private val SQUARE_TARGET = DpSize(30.dp, 28.dp)
+internal val SQUARE_TARGET = DpSize(32.dp, 48.dp)
