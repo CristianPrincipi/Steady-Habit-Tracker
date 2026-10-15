@@ -6,6 +6,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
@@ -183,7 +185,7 @@ private fun WidgetBody(state: HabitWidgetState) {
                             state.daysThisWeek,
                         ),
                     color = state.color,
-                    nameEndInset = if (state.today != null) SQUARE_SIZE + BADGE_GAP else 0.dp,
+                    nameEndInset = if (state.today != null) SQUARE_NAME_INSET else 0.dp,
                 )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
@@ -255,13 +257,26 @@ private fun Grid(state: HabitWidgetState.Content) {
  * ⭐ **It is today's dot, drawn large.** The corner is the grid's own ratio ([DOT_CORNER_RATIO]), so
  * the square reads as the last dot of the grid lifted into the corner, not as a borrowed checkbox.
  *
+ * ### ⚠⚠ It sits in the card's padding, and the name is why
+ *
+ * The first cut was an 18dp square on the content's own 12dp inset, beside the name. On the default
+ * three-cell widget (~132dp) that left the name **38dp**, and a seven-letter name at 15sp bold needs
+ * about **54dp** — so most names ellipsised. No square small enough to share the name's line could
+ * fix that: the line has 64dp, leaving ~10dp for a square *and* its gap.
+ *
+ * So the square is [SQUARE_SIZE] and sits [SQUARE_INSET] from the card's top and right edges — in the
+ * padding, poking only [SQUARE_NAME_INSET] (gap included) into the name's line. The name gets 56dp.
+ * ⚠ [SQUARE_INSET] cannot shrink much further: the card's 16dp corner curves in, and at 6dp the
+ * square's corner nearly touches it. `TodaySquareFitTest` holds both numbers.
+ *
  * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
  * colour inset by [SQUARE_STROKE] draws the same picture on every API level this app supports.
  *
- * ⚠ **The touch target is bigger than the square** ([SQUARE_TARGET_WIDTH] by [SQUARE_TARGET_HEIGHT]),
- * and it reaches into the card's padding — that is why the square is a [WidgetCard] corner rather
- * than one more item in the header row. The padding has nothing else to do, and an 18dp target on a
- * home screen is a target people miss.
+ * ⚠ **The touch target is three times the square** ([SQUARE_TARGET]), anchored on the card's own
+ * corner — that is why the square is a [WidgetCard] corner rather than one more item in the header
+ * row, which could not reach the padding. ⚠ It covers the last few dp of a name long enough to reach
+ * it, so a tap there checks off rather than opening the app; a bigger target would cover more of the
+ * name, and a 10dp target would be one people miss.
  */
 @Composable
 private fun TodaySquare(
@@ -280,10 +295,10 @@ private fun TodaySquare(
     Box(
         modifier =
             GlanceModifier
-                .size(SQUARE_TARGET_WIDTH, SQUARE_TARGET_HEIGHT)
+                .size(SQUARE_TARGET.width, SQUARE_TARGET.height)
                 .clickable(checkOffTodayAction(check))
                 .semantics { contentDescription = description }
-                .padding(top = CARD_PADDING, end = CARD_PADDING),
+                .padding(top = SQUARE_INSET, end = SQUARE_INSET),
         contentAlignment = Alignment.TopEnd,
     ) {
         Box(
@@ -299,7 +314,7 @@ private fun TodaySquare(
                     modifier =
                         GlanceModifier
                             .size(SQUARE_SIZE - SQUARE_STROKE * 2)
-                            .cornerRadius(SQUARE_SIZE / DOT_CORNER_RATIO - SQUARE_STROKE)
+                            .cornerRadius((SQUARE_SIZE / DOT_CORNER_RATIO - SQUARE_STROKE).coerceAtLeast(0.dp))
                             .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer)),
                 ) {}
             }
@@ -310,17 +325,23 @@ private fun TodaySquare(
 /** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
 private const val DOT_CORNER_RATIO = 6f
 
-/**
- * The square's drawn size: the height of the name line beside it, so the two sit on one line and the
- * subtitle underneath keeps its full width.
- */
-private val SQUARE_SIZE = 18.dp
+/** The square's drawn size — see [TodaySquare] for why it is no bigger. */
+internal val SQUARE_SIZE = 10.dp
 
-private val SQUARE_STROKE = 2.dp
+/** From the card's top and right edges to the square: inside the 12dp padding, clear of the corner. */
+internal val SQUARE_INSET = 7.dp
+
+/** 1.5dp, not 2: on a 10dp square a 2dp ring leaves a 6dp hole and reads as a filled dot. */
+private val SQUARE_STROKE = 1.5.dp
+
+/** Between the end of the name and the square. */
+private val SQUARE_GAP = 3.dp
 
 /**
- * The square's touch target, measured from the card's corner: the card padding, the square, and a
- * margin past it — wider than tall, because below it is the subtitle, where a tap opens the app.
+ * What the square takes from the **name line**: the part of it that pokes past the card padding into
+ * the content, plus [SQUARE_GAP].
  */
-private val SQUARE_TARGET_WIDTH = 40.dp
-private val SQUARE_TARGET_HEIGHT = 36.dp
+internal val SQUARE_NAME_INSET = SQUARE_INSET + SQUARE_SIZE + SQUARE_GAP - CARD_PADDING
+
+/** The square's touch target, measured from the card's corner. */
+private val SQUARE_TARGET = DpSize(30.dp, 28.dp)
