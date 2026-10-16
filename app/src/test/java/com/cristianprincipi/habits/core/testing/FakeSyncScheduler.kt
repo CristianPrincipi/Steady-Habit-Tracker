@@ -52,7 +52,7 @@ class FakeSyncScheduler : SyncScheduler {
         appOpenRequests++
     }
 
-    override fun syncAfterWidgetCheckOff() {
+    override suspend fun syncAfterWidgetCheckOff() {
         widgetCheckOffRequests++
     }
 

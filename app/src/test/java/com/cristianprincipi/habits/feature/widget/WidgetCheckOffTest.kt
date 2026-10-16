@@ -118,6 +118,19 @@ class WidgetCheckOffTest {
         }
 
     @Test
+    fun aSyncRequestThatFailsIsSwallowedAndTheCheckOffStands() =
+        runTest {
+            // The request now waits for WorkManager to store it, so it can throw — and it runs in
+            // the same Glance callback as the write. The day is already PENDING_PUSH either way.
+            syncStatus.failWidgetCheckOffSyncWith = IllegalStateException("WorkManager could not store it")
+
+            checkOff()(read.id, today, completed = true)
+
+            assertEquals(listOf(FakeHabitRepository.Write(read.id, today, completed = true)), habits.writes)
+            assertEquals(1, syncStatus.widgetCheckOffSyncRequests)
+        }
+
+    @Test
     fun theCallbackHasThePublicNoArgConstructorGlanceReflectsOn() {
         // Glance builds the callback with getDeclaredConstructor().newInstance(), from its name.
         val callback = CheckOffTodayAction::class.java

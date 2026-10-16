@@ -30,6 +30,10 @@ import dagger.assisted.AssistedInject
  * reads Room, and a check-off has already succeeded locally before any of this runs (`CLAUDE.md`
  * §1). An ordinary one-time request that starts within seconds of the app opening is the same
  * experience without the notification the user never asked for.
+ *
+ * ⚠ **One exception since M15.11 (ADR-152): a widget check-off's run is expedited on API 31+**, where
+ * expedited work needs no notification. That run starts with the app in the background, and on the
+ * user's phone an ordinary request from there waited until the app was next opened.
  */
 @HiltWorker
 class SyncWorker

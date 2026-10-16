@@ -42,8 +42,12 @@ class FakeSyncStatusRepository(
         appOpenSyncRequests++
     }
 
-    override fun requestWidgetCheckOffSync() {
+    /** Thrown by [requestWidgetCheckOffSync] after counting — WorkManager failing to store it. */
+    var failWidgetCheckOffSyncWith: Throwable? = null
+
+    override suspend fun requestWidgetCheckOffSync() {
         widgetCheckOffSyncRequests++
+        failWidgetCheckOffSyncWith?.let { throw it }
     }
 
     override fun observeRequestedSyncRunning(): Flow<Boolean> = requestedSyncRunning

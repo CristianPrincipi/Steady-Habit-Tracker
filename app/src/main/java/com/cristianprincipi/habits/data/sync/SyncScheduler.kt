@@ -1,15 +1,19 @@
 package com.cristianprincipi.habits.data.sync
 
 import android.content.Context
+import android.os.Build
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.await
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -19,11 +23,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.toJavaDuration
@@ -68,20 +72,28 @@ interface SyncScheduler {
     fun syncOnAppOpen()
 
     /**
-     * Asks for a sync about a minute after a check-off made **on a home-screen widget** — M15.11.
+     * Asks for a sync **now**, because a habit was checked off **on a home-screen widget** — M15.11.
      *
-     * ⭐ **The one check-off that asks for a sync, and the delay is what keeps §3.5 true.** A check-off
-     * in the app reaches Notion on the next app-open or periodic run; a widget exists so the app is
-     * never opened, which leaves only the periodic run — and the phone's battery saver decides when
-     * that is. The user's ruling was to push about a minute after the tap. The minute is the batching
-     * `CLAUDE.md` §3.5 asks for: ticking three habits in a row is one request, not three.
+     * ⭐ **The one check-off that asks for a sync.** A check-off in the app reaches Notion on the next
+     * app-open or periodic run; a widget exists so the app is never opened, which leaves only the
+     * periodic run — and the phone's battery saver decides when that is.
      *
-     * `KEEP`, so the first tap of a run of them sets the time and the rest ride along. A tap that
-     * lands while that sync is already **running** is dropped rather than queued, and nothing is lost
-     * by it: its day stays `PENDING_PUSH` (`SyncEngine` checks for an edit made mid-push) and goes on
-     * the next run. Silent like [syncOnAppOpen], and for its reason — nobody is looking at the app.
+     * ⚠⚠ **Now, not "about a minute after the tap" — that was the first version, and the phone
+     * refused it (ADR-152).** A delayed request needs the system to start the app again later, and
+     * the user's phone freezes a backgrounded app within seconds and holds its jobs: the minute
+     * passed, nothing ran, and the tick reached Notion only when something next woke the app. The one
+     * moment the app is certainly awake is the tap itself, so the run starts then — expedited on API
+     * 31+, which asks the system to keep the app running until the run ends.
+     *
+     * ⭐ **Never dropped, and still batched** — see [widgetCheckOffPolicy]. A tap while a run is going
+     * queues **one** run after it; every further tap rides on that one. Three ticks in a row are two
+     * runs at most, which is the coalescing `CLAUDE.md` §3.5 asks for, and the last tick is never the
+     * one left behind. Silent like [syncOnAppOpen], and for its reason — nobody is looking at the app.
+     *
+     * **Suspends until WorkManager has stored the request**, so it is on disk before the tap's
+     * broadcast ends and the app can be frozen again.
      */
-    fun syncAfterWidgetCheckOff()
+    suspend fun syncAfterWidgetCheckOff()
 
     /**
      * Whether a run is happening **right now**.
@@ -162,19 +174,15 @@ class WorkManagerSyncScheduler
 
         override fun syncOnAppOpen() = enqueueOneRun(APP_OPEN_WORK)
 
-        override fun syncAfterWidgetCheckOff() = enqueueOneRun(WIDGET_CHECK_OFF_WORK, delay = WIDGET_CHECK_OFF_DELAY)
+        override suspend fun syncAfterWidgetCheckOff() {
+            val workManager = WorkManager.getInstance(context)
+            val states = workManager.getWorkInfosForUniqueWorkFlow(WIDGET_CHECK_OFF_WORK).first().map(WorkInfo::state)
+            workManager
+                .enqueueUniqueWork(WIDGET_CHECK_OFF_WORK, widgetCheckOffPolicy(states), oneRun(expedited = true))
+                .await()
+        }
 
-        private fun enqueueOneRun(
-            uniqueName: String,
-            delay: Duration = Duration.ZERO,
-        ) {
-            val request =
-                OneTimeWorkRequestBuilder<SyncWorker>()
-                    .setConstraints(constraints)
-                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF.toJavaDuration())
-                    .setInitialDelay(delay.toJavaDuration())
-                    .build()
-
+        private fun enqueueOneRun(uniqueName: String) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 uniqueName,
                 // KEEP, so a jabbed refresh button or a quick back-and-forth into the app is one
@@ -182,9 +190,27 @@ class WorkManagerSyncScheduler
                 // day owed stays `PENDING_PUSH` until some run takes it, and the periodic schedule is
                 // right there.
                 ExistingWorkPolicy.KEEP,
-                request,
+                oneRun(),
             )
         }
+
+        /**
+         * One sync, as soon as there is a connection.
+         *
+         * @param expedited asks the system to start it at once and keep the app running until it
+         *   ends — **API 31+ only**. Below that, WorkManager runs expedited work as a foreground
+         *   service, which needs the notification v1 does not have (`SyncWorker`'s KDoc), so there it
+         *   stays an ordinary request. Out of quota, it still runs, as an ordinary one.
+         */
+        private fun oneRun(expedited: Boolean = false): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF.toJavaDuration())
+                .apply {
+                    if (expedited && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    }
+                }.build()
 
         /**
          * Every unique name, folded into one boolean.
@@ -283,17 +309,38 @@ class WorkManagerSyncScheduler
              */
             val BACKOFF = 30.seconds
 
-            /**
-             * How long [syncAfterWidgetCheckOff] waits: long enough to gather a run of taps into one
-             * push, short enough that Notion is right by the time anyone looks there.
-             */
-            val WIDGET_CHECK_OFF_DELAY = 1.minutes
-
             const val PERIODIC_WORK = "notion-sync-periodic"
             const val ON_DEMAND_WORK = "notion-sync-now"
             const val APP_OPEN_WORK = "notion-sync-app-open"
             const val WIDGET_CHECK_OFF_WORK = "notion-sync-widget-check-off"
         }
+    }
+
+/**
+ * How a widget tap's request meets whatever is already under
+ * [WorkManagerSyncScheduler.WIDGET_CHECK_OFF_WORK], given the state of every request under that
+ * name, finished ones included — M15.11, ADR-152.
+ *
+ * ⭐ **The rule is that every tap gets a run that starts after its write**, and the write has already
+ * landed by the time this is asked:
+ *
+ * - **Nothing running → `REPLACE`.** Either nothing is unfinished, or a request is waiting — for the
+ *   network, or out a retry's backoff. A fresh, expedited request now is at least as good as either.
+ * - **A run going, nothing after it → `APPEND_OR_REPLACE`.** ⚠ The running one may have read the day
+ *   before this tap wrote it, so one more run goes after it. `KEEP` here was the first version's
+ *   bug: it dropped the request, and the last tick of a row of them waited for the app to be opened.
+ * - **A run going, one already after it → `KEEP`.** That one has not started, so it will read this
+ *   tap's write. Appending again would only add a run.
+ *
+ * Losing a race costs nothing. A run that ends before the append lands leaves a request that starts
+ * at once; a waiting request that starts before `REPLACE` lands is cancelled mid-run, which the engine
+ * is built to survive (ADR-047), and the replacement runs straight after it.
+ */
+internal fun widgetCheckOffPolicy(states: Collection<WorkInfo.State>): ExistingWorkPolicy =
+    when {
+        WorkInfo.State.RUNNING !in states -> ExistingWorkPolicy.REPLACE
+        WorkInfo.State.BLOCKED in states -> ExistingWorkPolicy.KEEP
+        else -> ExistingWorkPolicy.APPEND_OR_REPLACE
     }
 
 @Module

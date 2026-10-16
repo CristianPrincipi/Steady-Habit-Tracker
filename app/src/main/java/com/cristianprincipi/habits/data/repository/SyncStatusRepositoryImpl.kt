@@ -124,7 +124,7 @@ class SyncStatusRepositoryImpl
             scheduler.syncOnAppOpen()
         }
 
-        override fun requestWidgetCheckOffSync() {
+        override suspend fun requestWidgetCheckOffSync() {
             scheduler.syncAfterWidgetCheckOff()
         }
 

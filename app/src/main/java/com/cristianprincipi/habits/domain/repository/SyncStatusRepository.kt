@@ -44,14 +44,16 @@ interface SyncStatusRepository {
     fun requestAppOpenSync()
 
     /**
-     * Asks for a sync about a minute from now, because a habit was checked off **on a home-screen
-     * widget** — M15.11. Taps within that minute share the one sync.
+     * Asks for a sync now, because a habit was checked off **on a home-screen widget** — M15.11. A
+     * tap while that sync runs gets one more run after it, shared by every tap that follows (ADR-152).
      *
      * The single exception to *"not for a check-off"* above, and the reason is where the tap happens:
      * a widget is there so the app is not opened, so there is no app-open sync to carry the day to
      * Notion. Silent, like [requestAppOpenSync].
+     *
+     * Suspends until the request is stored, because the app may be frozen the moment the tap is done.
      */
-    fun requestWidgetCheckOffSync()
+    suspend fun requestWidgetCheckOffSync()
 
     /**
      * Whether a sync the user asked for through [requestSync] is running. The pull indicator's one

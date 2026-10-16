@@ -26,7 +26,8 @@ import javax.inject.Inject
  * ⭐⭐ **The goal is to track a habit without opening the app or Notion, and that rules two things in.**
  * The tap writes through the same [ToggleCompletion] the Week pills use — Room first, every widget
  * repainted by the repository — and then asks for the sync that would otherwise wait for an app-open
- * that, by design, is not coming.
+ * that, by design, is not coming. That sync starts **now**, while the tap has the app awake: a
+ * delayed one never ran on the user's phone (ADR-152).
  *
  * ### ⚠⚠ It writes only what the user could see, and refuses the rest
  *
@@ -83,9 +84,25 @@ internal class WidgetCheckOff
                 }
             if (written) {
                 // The write already repainted every widget — `HabitRepositoryImpl.setCompleted`.
-                syncStatus.requestWidgetCheckOffSync()
+                requestSync()
             } else {
                 widgets.refreshQuietly()
+            }
+        }
+
+        /**
+         * Swallowed if it fails, for the class KDoc's reason. Nothing is lost: the day is already
+         * `PENDING_PUSH`, and the next app-open or periodic run takes it.
+         */
+        private suspend fun requestSync() {
+            try {
+                syncStatus.requestWidgetCheckOffSync()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (
+                @Suppress("TooGenericExceptionCaught", "SwallowedException") throwable: Throwable,
+            ) {
+                // Nowhere to report it — see the class KDoc.
             }
         }
 

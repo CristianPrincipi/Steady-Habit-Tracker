@@ -292,7 +292,7 @@ private object IdleSyncStatus : SyncStatusRepository {
 
     override fun requestAppOpenSync() = Unit
 
-    override fun requestWidgetCheckOffSync() = Unit
+    override suspend fun requestWidgetCheckOffSync() = Unit
 
     override fun observeRequestedSyncRunning(): Flow<Boolean> = flowOf(false)
 
