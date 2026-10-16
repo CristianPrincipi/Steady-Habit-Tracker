@@ -10,10 +10,12 @@ import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.model.Measure
 import com.cristianprincipi.habits.domain.model.MeasureId
+import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.usecase.CalculateStreak
 import com.cristianprincipi.habits.domain.usecase.GetCompletionRate
 import com.cristianprincipi.habits.domain.usecase.HabitStats
 import com.cristianprincipi.habits.domain.usecase.HabitYear
+import com.cristianprincipi.habits.domain.usecase.buildMeasureWeek
 import com.cristianprincipi.habits.domain.usecase.buildPeriod
 import com.cristianprincipi.habits.domain.usecase.byHabit
 import com.cristianprincipi.habits.domain.usecase.monthlyCompletions
@@ -78,6 +80,44 @@ object SampleHabits {
             Measure(id = MeasureId("weight"), name = "Weight", emoji = "⚖️", unit = "kg", color = HabitColor.GREEN),
             Measure(id = MeasureId("sleep"), name = "Sleep", emoji = "😴", unit = "h", color = HabitColor.PURPLE),
         )
+
+    /**
+     * [measures] over one week, for the Week screen's number rows (M16.1) — through the real
+     * `buildMeasureWeek`, for [weekPeriods]' reason.
+     *
+     * The readings are invented and deterministic, and **gappy on purpose**: Weight is a weigh-in
+     * on some days and not others, Sleep is logged most nights. A preview with a value on every
+     * day would never show the dash, which is the one thing about this row the user ruled on.
+     *
+     * @param reference "today", so the days after it come back future and draw empty.
+     * @param weekOf which week to draw, as in [weekPeriods].
+     */
+    fun measureWeeks(
+        reference: LocalDate = referenceDate,
+        weekOf: LocalDate = reference,
+    ): List<MeasureWeek> {
+        val week = weekWindow(weekOf).filterNotNull()
+        return measures().map { measure ->
+            val (base, spread, keepRate) = READING_SHAPES.getValue(measure.id.value)
+            var seed = measure.id.value.fold(SEED_BASE) { acc, char -> acc + char.code }
+
+            fun next(): Double {
+                seed = (seed * MULTIPLIER + INCREMENT) and MASK
+                return seed / MASK.toDouble()
+            }
+            // Drawn day by day from the start of the week, so a reading never depends on "today":
+            // paging the preview forwards does not rewrite the past.
+            val values =
+                week
+                    .filter { date -> date <= reference }
+                    .mapNotNull { date ->
+                        val keep = next() < keepRate
+                        val value = base + (next() - HALF) * spread
+                        if (keep) date to Math.round(value * TENTHS) / TENTHS else null
+                    }.toMap()
+            buildMeasureWeek(measure, week, values, today = reference)
+        }
+    }
 
     /**
      * Completions for [habits], from each habit's start date up to [reference].
@@ -284,6 +324,16 @@ object SampleHabits {
             "diet" to 0.48,
             "focus" to 0.69,
         )
+
+    /** Per measure: a typical value, how far either way it wanders, and how often it is logged. */
+    private val READING_SHAPES =
+        mapOf(
+            "weight" to Triple(82.8, 1.2, 0.6),
+            "sleep" to Triple(7.4, 1.6, 0.85),
+        )
+
+    private const val HALF = 0.5
+    private const val TENTHS = 10.0
 
     private const val SEED_BASE = 1_013L
     private const val MULTIPLIER = 1_664_525L

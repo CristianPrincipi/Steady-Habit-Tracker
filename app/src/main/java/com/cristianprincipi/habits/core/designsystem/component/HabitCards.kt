@@ -28,6 +28,9 @@ import com.cristianprincipi.habits.core.designsystem.theme.Spacing
  * [HabitCardHeader] and nothing else. Every one takes primitives rather than a `Habit`: `domain/`
  * does not exist until M3, and a design system that does not know about the domain is one that can
  * be previewed and tested without it.
+ *
+ * Since M16.1 a fourth lives here too — [WeekMeasureCard], a number's week — because it is the Week
+ * card with values for pills and needs the same header, which is private to this file.
  */
 
 /**
@@ -100,6 +103,53 @@ fun WeekHabitCard(
             habitColor = habitColor,
             todayIndex = todayIndex,
             onToggle = onToggleDay,
+        )
+    }
+}
+
+/**
+ * A tracked number's week — Weight, Sleep — under the habit cards on Week (M16.1).
+ *
+ * [WeekHabitCard]'s shape with [WeekValues] where the pills would be, so the two read as one list
+ * and a value sits under the pill for its day. **Undesigned**: the prototype has no number on this
+ * screen, so the header line, the cell tint and the dash are this app's, and were shown to the user.
+ *
+ * @param description the week's average, already formatted, or the sentence for a week without one.
+ */
+@Composable
+fun WeekMeasureCard(
+    name: String,
+    description: String,
+    emoji: String,
+    color: Color,
+    texts: List<String>,
+    statuses: List<ValueStatus>,
+    dayLabels: List<String>,
+    dayContentDescriptions: List<String>,
+    todayIndex: Int,
+    modifier: Modifier = Modifier,
+) {
+    HabitsCard(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.cardContentGap),
+    ) {
+        HabitCardHeader(
+            name = name,
+            description = description,
+            emoji = emoji,
+            habitColor = color,
+            iconSize = HabitIconSize.LARGE,
+            nameStyle = MaterialTheme.typography.titleSmall,
+            descriptionStyle = MaterialTheme.typography.bodySmall,
+            descriptionColor = HabitsTheme.colors.text.secondary,
+        )
+        WeekValues(
+            texts = texts,
+            statuses = statuses,
+            dayLabels = dayLabels,
+            contentDescriptions = dayContentDescriptions,
+            color = color,
+            todayIndex = todayIndex,
         )
     }
 }
@@ -312,6 +362,34 @@ private fun WeekHabitCardPreview() {
             dayContentDescriptions = PREVIEW_DAY_LABELS,
             todayIndex = 4,
             onToggleDay = {},
+            modifier = Modifier.padding(Spacing.screenPadding),
+        )
+    }
+}
+
+@Preview(backgroundColor = 0xFF111113, showBackground = true, widthDp = 400)
+@Composable
+private fun WeekMeasureCardPreview() {
+    HabitsTheme {
+        WeekMeasureCard(
+            name = "Weight",
+            description = "Average 82.6 kg",
+            emoji = "⚖️",
+            color = HabitsTheme.colors.habit.green,
+            texts = listOf("82.9", "–", "82.6", "82.4", "–", "", ""),
+            statuses =
+                listOf(
+                    ValueStatus.RECORDED,
+                    ValueStatus.MISSING,
+                    ValueStatus.RECORDED,
+                    ValueStatus.RECORDED,
+                    ValueStatus.MISSING,
+                    ValueStatus.FUTURE,
+                    ValueStatus.FUTURE,
+                ),
+            dayLabels = PREVIEW_DAY_LABELS,
+            dayContentDescriptions = PREVIEW_DAY_LABELS,
+            todayIndex = 4,
             modifier = Modifier.padding(Spacing.screenPadding),
         )
     }

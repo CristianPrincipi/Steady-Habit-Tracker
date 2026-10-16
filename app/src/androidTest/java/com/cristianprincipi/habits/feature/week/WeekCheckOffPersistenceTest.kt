@@ -28,12 +28,14 @@ import com.cristianprincipi.habits.data.local.RoomTransactionRunner
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.repository.HabitRepositoryImpl
+import com.cristianprincipi.habits.data.repository.MeasureRepositoryImpl
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
+import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -155,6 +157,8 @@ class WeekCheckOffPersistenceTest {
             )
         return WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
+            getMeasuresForWeek =
+                GetMeasuresForWeek(MeasureRepositoryImpl(instance.measureDao(), RecordingWidgetRefresher()), clock),
             toggleCompletion = ToggleCompletion(repository, clock),
             // Read only when there are no habits to draw, which is never in this test — seeded
             // habits are the whole premise. A permanently idle status keeps it out of the way.

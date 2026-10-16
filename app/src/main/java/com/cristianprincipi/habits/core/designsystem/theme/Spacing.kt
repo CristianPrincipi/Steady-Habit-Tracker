@@ -96,6 +96,13 @@ object Spacing {
     /** `gap-1.5` — between the seven pills of a week row. */
     val weekPillGap: Dp = 6.dp
 
+    /**
+     * Inside a Week number cell, either side of the value (M16.1). **Undesigned** — the prototype
+     * has no number row. 2dp keeps `82.9` at full size in the ~44dp column a 360dp card gives it,
+     * while stopping a long value from touching the cell's rounded edge.
+     */
+    val valueCellPadding: Dp = 2.dp
+
     /** `gap-2` — between habit chips in the Stats selector row. */
     val chipGap: Dp = 8.dp
 

@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.week
 import android.database.sqlite.SQLiteFullException
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
+import com.cristianprincipi.habits.core.testing.FakeMeasureRepository
 import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
 import com.cristianprincipi.habits.core.testing.FakeTodayFlow
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
@@ -11,6 +12,7 @@ import com.cristianprincipi.habits.core.testing.testHabit
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
+import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -63,6 +65,7 @@ class WeekWriteFailureTest {
         return repository to
             WeekViewModel(
                 getHabitsForWeek = GetHabitsForWeek(repository, clock),
+                getMeasuresForWeek = GetMeasuresForWeek(FakeMeasureRepository(), clock),
                 toggleCompletion = ToggleCompletion(repository, clock),
                 syncStatus = syncStatus,
                 today = todayFlow,

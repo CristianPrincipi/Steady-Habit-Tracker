@@ -127,6 +127,7 @@ private fun SampleWeek(empty: HabitsEmptyReason?) {
             habits = SampleHabits.weekPeriods(reference, completed, weekStart),
             isCurrentWeek = weekStart == thisWeek,
             currentYear = reference.year,
+            measures = SampleHabits.measureWeeks(reference, weekStart),
         )
     val state = empty?.let(WeekUiState::Empty) ?: content
 

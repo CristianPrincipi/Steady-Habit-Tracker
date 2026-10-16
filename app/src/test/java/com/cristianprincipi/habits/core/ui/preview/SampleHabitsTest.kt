@@ -87,6 +87,19 @@ class SampleHabitsTest {
     }
 
     @Test
+    fun theSampleNumberWeekShowsAValueADashAndAFutureDay() {
+        // M16.1. The preview exists so the user can judge the row, and the row has three looks: a
+        // number, the dash they ruled on, and an empty future cell. A sample week missing any one of
+        // them would hide it from the only review it gets.
+        val days = SampleHabits.measureWeeks().flatMap { week -> week.days }
+
+        assertTrue(days.any { it.value != null })
+        assertTrue(days.any { it.value == null && !it.isFuture })
+        assertTrue(days.any { it.isFuture })
+        assertEquals(SampleHabits.measureWeeks(), SampleHabits.measureWeeks())
+    }
+
+    @Test
     fun theSameReferenceDateGivesTheSameHistoryEveryTime() {
         // The whole point of the seeded generator. Random() here would make every preview a
         // different picture on every recomposition.

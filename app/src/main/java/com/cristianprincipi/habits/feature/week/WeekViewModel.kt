@@ -10,8 +10,10 @@ import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.core.ui.observeEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
+import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,7 +24,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -88,6 +89,8 @@ class WeekViewModel
     @Inject
     constructor(
         private val getHabitsForWeek: GetHabitsForWeek,
+        // M16.1 — the number rows under the cards. Read-only: nothing here writes a reading.
+        private val getMeasuresForWeek: GetMeasuresForWeek,
         private val toggleCompletion: ToggleCompletion,
         // Read for one branch only — see `emptyReason`. Never awaited, never a gate (`CLAUDE.md` §1).
         private val syncStatus: SyncStatusRepository,
@@ -138,19 +141,29 @@ class WeekViewModel
                 Snapshot(week = pinned ?: startOfWeek(today), today = today)
             }
 
+        /** One emission of [visibleWeek]: the week, and everything drawn over it. */
+        private data class VisibleWeek(
+            val snapshot: Snapshot,
+            val habits: List<HabitPeriod>,
+            val measures: List<MeasureWeek>,
+        )
+
         /**
-         * The week on screen and the habits over it, as one value.
+         * The week on screen and the habits and numbers over it, as one value.
          *
-         * `flatMapLatest` swaps the underlying query whenever [snapshot] moves, cancelling the week
-         * the user just paged away from. The snapshot is carried alongside the habits rather than
+         * `flatMapLatest` swaps the underlying queries whenever [snapshot] moves, cancelling the week
+         * the user just paged away from. The snapshot is carried alongside the data rather than
          * read back afterwards, because by the time a slow query returns the user may have paged on
          * — pairing them here is what stops the label describing a different week from the pills
-         * below it.
+         * below it. ⚠ The numbers (M16.1) are combined **inside** the same switch for that reason:
+         * combined outside it, a page could draw this week's pills over last week's values.
          */
         @OptIn(ExperimentalCoroutinesApi::class)
-        private val visibleWeek: Flow<Pair<Snapshot, List<HabitPeriod>>> =
+        private val visibleWeek: Flow<VisibleWeek> =
             snapshot.flatMapLatest { visible ->
-                getHabitsForWeek(visible.week).map { habits -> visible to habits }
+                combine(getHabitsForWeek(visible.week), getMeasuresForWeek(visible.week)) { habits, measures ->
+                    VisibleWeek(visible, habits, measures)
+                }
             }
 
         /**
@@ -170,8 +183,8 @@ class WeekViewModel
         private val emptyReason: Flow<HabitsEmptyReason> = syncStatus.observeEmptyReason()
 
         val uiState: StateFlow<WeekUiState> =
-            combine(visibleWeek, emptyReason) { (visible, habits), reason ->
-                stateFor(visible, habits, reason)
+            combine(visibleWeek, emptyReason) { visible, reason ->
+                stateFor(visible, reason)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
@@ -357,11 +370,11 @@ class WeekViewModel
                 ?.name
 
         private fun stateFor(
-            visible: Snapshot,
-            habits: List<HabitPeriod>,
+            week: VisibleWeek,
             reason: HabitsEmptyReason,
-        ): WeekUiState =
-            if (habits.isEmpty()) {
+        ): WeekUiState {
+            val visible = week.snapshot
+            return if (week.habits.isEmpty()) {
                 // Week-independent: habits are global, so an empty list here means there are no
                 // active habits at all rather than none *this* week. `WeekUiState.Empty` explains
                 // why that distinction matters, why it carries no week, and why the only thing that
@@ -370,14 +383,16 @@ class WeekViewModel
             } else {
                 WeekUiState.Content(
                     weekStart = visible.week,
-                    habits = habits,
+                    habits = week.habits,
                     // Both against the snapshot's own day, not the clock's. Reading the clock here
                     // would reintroduce exactly the bug M6.9 removes: a second, later answer to
                     // "what day is it" inside a value built from an earlier one.
                     isCurrentWeek = visible.week == startOfWeek(visible.today),
                     currentYear = visible.today.year,
+                    measures = week.measures,
                 )
             }
+        }
 
         private companion object {
             /** `CLAUDE.md` §6's `WhileSubscribed(5_000)` — survives a rotation, stops on a real exit. */

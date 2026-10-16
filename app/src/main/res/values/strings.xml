@@ -334,6 +334,24 @@
     <string name="week_pill_description">%1$s, %2$s</string>
 
     <!--
+      Week number rows (M16.1) — Weight, Sleep under the habit cards. UNDESIGNED: the prototype has
+      no number on this screen.
+
+      ⚠⚠ week_measure_missing is a DASH, never an "X" and never a zero — the user's ruling,
+      2026-10-16: in a habit tracker an X reads as "missed", and skipping a weigh-in is not a
+      failure. It is drawn dimmed. A day that has not happened yet draws nothing at all.
+
+      week_measure_average reuses stats_measure_value(_with_unit) for its number, so the Week card
+      and the Stats tile print an average to the same one decimal place.
+    -->
+    <string name="week_measure_average">Average %1$s</string>
+    <string name="week_measure_no_entries">No entries this week</string>
+    <string name="week_measure_missing">–</string>
+    <string name="week_measure_value_with_unit">%1$s %2$s</string>
+    <string name="week_measure_cell_description">%1$s, %2$s, %3$s</string>
+    <string name="week_measure_cell_empty">no entry</string>
+
+    <!--
       The empty state EVERY habit screen shows — M6.8's copy, judged by the user at M6.11, and
       moved out of the Week strings in M8.1 when the Month view turned out to need the identical
       thing. The copy is UNDESIGNED.

@@ -3,6 +3,7 @@ package com.cristianprincipi.habits.feature.week
 import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MeasureWeek
 import java.time.LocalDate
 
 /**
@@ -98,12 +99,16 @@ sealed interface WeekUiState {
      * @param currentYear the year today falls in, for the sub-nav label — `weekRangeLabel` prints a
      *   year only for an endpoint that is not in it (M6.11). Read from the **same snapshot** as
      *   [isCurrentWeek], so the label and the today ring can never describe different days.
+     * @param measures the tracked numbers over the same seven days, drawn under the habit cards
+     *   (M16.1). Read-only. Empty when the user mapped none, which draws nothing — and it does not
+     *   decide [Empty]: a screen with numbers and no habits has no check-off loop to land on.
      */
     data class Content(
         val weekStart: LocalDate,
         val habits: List<HabitPeriod>,
         val isCurrentWeek: Boolean,
         val currentYear: Int,
+        val measures: List<MeasureWeek> = emptyList(),
     ) : WeekUiState {
         /**
          * The last day of the shown week, for the `‹ Aug 17 – Aug 23 ›` label (M6.4).

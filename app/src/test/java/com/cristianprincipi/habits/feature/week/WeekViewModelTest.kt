@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.week
 
 import app.cash.turbine.test
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
+import com.cristianprincipi.habits.core.testing.FakeMeasureRepository
 import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository
 import com.cristianprincipi.habits.core.testing.FakeTodayFlow
 import com.cristianprincipi.habits.core.testing.MainDispatcherRule
@@ -12,12 +13,17 @@ import com.cristianprincipi.habits.domain.model.Completion
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
 import com.cristianprincipi.habits.domain.model.Habit
+import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.Measure
+import com.cristianprincipi.habits.domain.model.MeasureId
+import com.cristianprincipi.habits.domain.model.MeasureReading
 import com.cristianprincipi.habits.domain.model.PeriodCell
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
+import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +31,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -85,9 +92,11 @@ class WeekViewModelTest {
         habits: List<Habit> = listOf(read, run),
         completions: List<Completion> = emptyList(),
         repository: FakeHabitRepository = FakeHabitRepository(habits, completions),
+        measures: FakeMeasureRepository = FakeMeasureRepository(),
     ) = repository to
         WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
+            getMeasuresForWeek = GetMeasuresForWeek(measures, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
             syncStatus = syncStatus,
             today = todayFlow,
@@ -159,6 +168,75 @@ class WeekViewModelTest {
 
             // Wednesday is the third day of a Monday-based week, so index 2.
             state.habits.forEach { period -> assertEquals(2, period.todayIndex) }
+        }
+
+    // --- the number rows (M16.1) ---------------------------------------------------------------
+
+    private val weight = Measure(MeasureId("w"), name = "Weight", emoji = "", unit = "kg", color = HabitColor.GREEN)
+
+    @Test
+    fun theNumbersComeWithTheWeekTheirReadingsIn() =
+        runTest {
+            val measures = FakeMeasureRepository(listOf(weight), listOf(MeasureReading(weight.id, thisMonday, 82.9)))
+            val (_, viewModel) = viewModel(measures = measures)
+
+            val row = content(viewModel).measures.single()
+
+            assertEquals(weight, row.measure)
+            assertEquals((0L..6L).map { thisMonday.plusDays(it) }, row.days.map { it.date })
+            assertEquals(82.9, requireNotNull(row.days.first().value), 0.0)
+            // Tuesday had no weigh-in. Absent, not zero — the screen draws the dash from this null.
+            assertNull(row.days[1].value)
+            // The ring lines up with the habits' on the same screen.
+            assertEquals(2, row.todayIndex)
+        }
+
+    @Test
+    fun pagingMovesTheNumbersWithThePills() =
+        runTest {
+            // ⚠ The numbers are combined inside the same week switch as the habits. Outside it, a
+            // page could draw this week's pills over last week's values, and nothing would look wrong.
+            val lastMonday = thisMonday.minusDays(7)
+            val measures = FakeMeasureRepository(listOf(weight), listOf(MeasureReading(weight.id, lastMonday, 83.4)))
+            val (_, viewModel) = viewModel(measures = measures)
+
+            viewModel.onEvent(WeekEvent.PreviousWeekPressed)
+            val state = content(viewModel)
+
+            assertEquals(
+                lastMonday,
+                state.measures
+                    .single()
+                    .days
+                    .first()
+                    .date,
+            )
+            assertEquals(
+                83.4,
+                requireNotNull(
+                    state.measures
+                        .single()
+                        .days
+                        .first()
+                        .value,
+                ),
+                0.0,
+            )
+            assertEquals(lastMonday to lastMonday.plusDays(6), measures.requestedRanges.last())
+        }
+
+    @Test
+    fun numbersWithoutHabitsAreStillTheEmptyScreen() =
+        runTest {
+            // The empty state means "no habits to check off yet". Numbers alone are not a reason to
+            // land on a Week with nothing to tap — the first import puts both in at once anyway.
+            val measures = FakeMeasureRepository(listOf(weight))
+            val (_, viewModel) = viewModel(habits = emptyList(), measures = measures)
+
+            var state: WeekUiState = WeekUiState.Loading
+            viewModel.uiState.test { state = awaitItem() }
+
+            assertTrue(state is WeekUiState.Empty)
         }
 
     // --- paging -------------------------------------------------------------------------------
@@ -794,6 +872,7 @@ class WeekViewModelTest {
             val model =
                 WeekViewModel(
                     getHabitsForWeek = GetHabitsForWeek(silent, clock),
+                    getMeasuresForWeek = GetMeasuresForWeek(FakeMeasureRepository(), clock),
                     toggleCompletion = ToggleCompletion(silent, clock),
                     syncStatus = SilentSyncStatus,
                     today = todayFlow,

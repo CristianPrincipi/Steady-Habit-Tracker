@@ -16,7 +16,9 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.datetime.weekdayLabels
+import com.cristianprincipi.habits.core.designsystem.component.ValueStatus
 import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
+import com.cristianprincipi.habits.core.designsystem.component.WeekMeasureCard
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -28,7 +30,11 @@ import com.cristianprincipi.habits.core.ui.resolve
 import com.cristianprincipi.habits.core.ui.toDayStatus
 import com.cristianprincipi.habits.domain.model.DayState
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MeasureDay
+import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.model.PeriodCell
+import java.math.RoundingMode
+import java.text.NumberFormat
 import java.util.Locale
 
 /**
@@ -141,6 +147,17 @@ private fun WeekList(
                 modifier = Modifier.animateItem(),
             )
         }
+        // M16.1 — the numbers come after every habit, so the check-off list above stays unbroken.
+        // ⚠ Keyed with a prefix: a measure id and a habit id are both Notion property ids, distinct in
+        // practice, but one grid cannot be allowed to hold two items with the same key.
+        items(items = state.measures, key = { week -> "measure:${week.measure.id.value}" }) { week ->
+            WeekMeasureRow(
+                week = week,
+                dayLabels = labels,
+                locale = locale,
+                modifier = Modifier.animateItem(),
+            )
+        }
     }
 }
 
@@ -186,6 +203,116 @@ private fun WeekHabitRow(
         todayIndex = period.todayIndex,
         onToggleDay = { index -> period.toggleAt(index)?.let(onEvent) },
     )
+}
+
+/**
+ * One tracked number's card — M16.1, read-only.
+ *
+ * ### The card's second line is the week's average
+ *
+ * It is the habit card's *"5 of 7"* for a number: the one fact the week as a whole has. Formatted
+ * through Stats' own strings, so the two screens print a mean to the same one decimal place, and a
+ * week without readings says so instead of printing a zero.
+ *
+ * ### ⚠ A cell drops a trailing ".0", and the average does not
+ *
+ * A cell is one reading as it was entered, and `8.0` in a 44dp column is width spent on nothing. A mean is a computed figure, and Stats has always
+ * printed it to one place. Both round half-up, as `String.format` does, so a cell and a tile never
+ * round one value two ways.
+ */
+@Composable
+private fun WeekMeasureRow(
+    week: MeasureWeek,
+    dayLabels: List<String>,
+    locale: Locale,
+    modifier: Modifier = Modifier,
+) {
+    val measure = week.measure
+    val formatter = remember(locale) { cellFormat(locale) }
+    val missing = stringResource(R.string.week_measure_missing)
+    val average = week.average.value
+    val description =
+        when {
+            average == null -> {
+                stringResource(R.string.week_measure_no_entries)
+            }
+
+            measure.unit.isBlank() -> {
+                stringResource(R.string.week_measure_average, stringResource(R.string.stats_measure_value, average))
+            }
+
+            else -> {
+                stringResource(
+                    R.string.week_measure_average,
+                    stringResource(R.string.stats_measure_value_with_unit, average, measure.unit),
+                )
+            }
+        }
+    val texts = week.days.map { day -> day.value?.let { value -> formatter.format(value) } ?: missing }
+
+    WeekMeasureCard(
+        modifier = modifier,
+        name = measure.name,
+        description = description,
+        emoji = measure.emoji,
+        color = measure.color.resolve(),
+        texts = texts,
+        statuses = week.days.map { day -> day.status() },
+        dayLabels = dayLabels,
+        dayContentDescriptions = week.spokenLabels(texts, locale),
+        todayIndex = week.todayIndex,
+    )
+}
+
+/** At most one decimal, none when it is zero — see [WeekMeasureRow]. */
+private fun cellFormat(locale: Locale): NumberFormat =
+    NumberFormat.getNumberInstance(locale).apply {
+        maximumFractionDigits = 1
+        roundingMode = RoundingMode.HALF_UP
+    }
+
+/** A reading outranks "future" — see [MeasureDay.isFuture]. */
+private fun MeasureDay.status(): ValueStatus =
+    when {
+        value != null -> ValueStatus.RECORDED
+        isFuture -> ValueStatus.FUTURE
+        else -> ValueStatus.MISSING
+    }
+
+/**
+ * What a screen reader says for each of a number card's seven cells: the measure, the date, and
+ * the value with its unit — or "no entry", so a missing day is heard as missing rather than as a
+ * dash. A future day is the date alone, as its pill above is.
+ */
+@Composable
+private fun MeasureWeek.spokenLabels(
+    texts: List<String>,
+    locale: Locale,
+): List<String> {
+    val withValue = stringResource(R.string.week_measure_cell_description)
+    val withUnit = stringResource(R.string.week_measure_value_with_unit)
+    val empty = stringResource(R.string.week_measure_cell_empty)
+    val dateOnly = stringResource(R.string.week_pill_description)
+    return remember(days, texts, locale, measure, withValue, withUnit, empty, dateOnly) {
+        days.mapIndexed { index, day ->
+            val date = accessibleDate(day.date, locale)
+            when (day.status()) {
+                ValueStatus.FUTURE -> {
+                    dateOnly.format(measure.name, date)
+                }
+
+                ValueStatus.MISSING -> {
+                    withValue.format(measure.name, date, empty)
+                }
+
+                ValueStatus.RECORDED -> {
+                    val value = texts[index]
+                    val spoken = if (measure.unit.isBlank()) value else withUnit.format(value, measure.unit)
+                    withValue.format(measure.name, date, spoken)
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -238,7 +365,7 @@ private fun HabitPeriod.spokenLabels(locale: Locale): List<String> {
 
 // --- previews ---------------------------------------------------------------------------------
 
-@Preview(name = "Week", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 720)
+@Preview(name = "Week", backgroundColor = 0xFF111113, showBackground = true, widthDp = 360, heightDp = 1100)
 @Composable
 private fun WeekContentPreview() {
     HabitsTheme {
@@ -249,6 +376,7 @@ private fun WeekContentPreview() {
                     habits = SampleHabits.weekPeriods(),
                     isCurrentWeek = true,
                     currentYear = SampleHabits.referenceDate.year,
+                    measures = SampleHabits.measureWeeks(),
                 ),
             onEvent = {},
             onOpenSyncStatus = {},
