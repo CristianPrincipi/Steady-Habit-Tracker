@@ -57,6 +57,20 @@ internal fun fitGrid(
 }
 
 /**
+ * [fitGrid] for a habit widget card of this size: what is left once the card's padding, the header
+ * and the gap under it are taken out. One place, because the corner square is sized from this
+ * grid's dot (`SquareFit.kt`) and two copies of the subtraction would drift.
+ */
+internal fun fitHabitWidgetGrid(
+    cardWidthDp: Float,
+    cardHeightDp: Float,
+): GridFit =
+    fitGrid(
+        availableWidthDp = cardWidthDp - CARD_PADDING.value * 2,
+        availableHeightDp = cardHeightDp - CARD_PADDING.value * 2 - BADGE_SIZE.value - HEADER_GAP.value,
+    )
+
+/**
  * The most recent [columns] weeks of a trailing year.
  *
  * ⚠ **The END of the list, matching `YearDotGrid`'s own decision to open scrolled to the end**: the

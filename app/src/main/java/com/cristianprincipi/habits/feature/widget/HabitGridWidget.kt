@@ -6,7 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -153,11 +152,14 @@ internal class HabitGridWidget : GlanceAppWidget() {
 private fun WidgetBody(state: HabitWidgetState) {
     val content = state as? HabitWidgetState.Content
     val today = content?.today
+    val size = LocalSize.current
+    // One fit for both: the square and the room the header text keeps for it must agree.
+    val square = fitTodaySquare(size.width.value, size.height.value)
     // Only a habit that is really there gets a square: the two empty states are sentences about a
     // widget with nothing to check off.
     val corner: (@Composable () -> Unit)? =
         if (content != null && today != null) {
-            { TodaySquare(check = today, name = content.name, color = content.color) }
+            { TodaySquare(check = today, name = content.name, color = content.color, fit = square) }
         } else {
             null
         }
@@ -185,7 +187,7 @@ private fun WidgetBody(state: HabitWidgetState) {
                             state.daysThisWeek,
                         ),
                     color = state.color,
-                    textEndInset = if (state.today != null) SQUARE_TEXT_INSET else 0.dp,
+                    textEndInset = if (state.today != null) square.textEndInsetDp.dp else 0.dp,
                 )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 // ⭐ The grid takes the rest of the card and sits in the MIDDLE of it — the user's
@@ -217,10 +219,7 @@ private fun WidgetBody(state: HabitWidgetState) {
 private fun Grid(state: HabitWidgetState.Content) {
     val density = LocalContext.current.resources.displayMetrics.density
     val size = LocalSize.current
-    // What is left after the card's padding and the header above this.
-    val availableWidth = size.width.value - (CARD_PADDING.value * 2)
-    val availableHeight = size.height.value - (CARD_PADDING.value * 2) - BADGE_SIZE.value - HEADER_GAP.value
-    val fit = fitGrid(availableWidth, availableHeight)
+    val fit = fitHabitWidgetGrid(size.width.value, size.height.value)
     val days = state.year.lastWeeks(fit.columns)
 
     val habitColor = state.color.resolveIn(HabitsDarkColors.habit)
@@ -259,31 +258,38 @@ private fun Grid(state: HabitWidgetState.Content) {
  *
  * ### ⭐ It mirrors the habit badge, and that is the user's call
  *
- * The badge sits [CARD_PADDING] in from the left, with [BADGE_GAP] to the text. The square sits
- * [CARD_PADDING] in from the right, with the same gap back to the text, **centred on the badge's own
- * line** — so the header reads badge · text · square, symmetric about its middle. Two earlier cuts
- * were rejected on the phone: one beside the name's top line, and one tucked into the card's corner
- * padding, which lined up with nothing else on the card.
+ * The badge sits [CARD_PADDING] in from the left, with [BADGE_GAP] to the text. The square sits on the
+ * right with the same gap back to the text, **centred on the badge's own line** — so the header reads
+ * badge · text · square, symmetric about its middle. Two earlier cuts were rejected on the phone: one
+ * beside the name's top line, and one tucked into the card's corner padding, which lined up with
+ * nothing else on the card.
+ *
+ * ⭐ **Its size and place come from the card ([fit], `SquareFit.kt`)**: 10dp on [CARD_PADDING] on a
+ * short card, growing with the grid's dots to 13dp, 15dp in, on a 2x2 and everything bigger — the
+ * size the user picked off their own 2x2 widgets. A fixed 10dp was smaller than a single dot on a
+ * big card, and the user saw it (ADR-153).
  *
  * ⚠ **The cost is the whole text column, not just the name line**, because a square on the badge's
- * centre line straddles both lines: [SQUARE_TEXT_INSET]. That was affordable once the real widths were
- * measured: the user's launcher lays the narrow habit widget out at ~149dp, where the text keeps ~63dp
- * — every name they have fits. Below ~139dp a seven-letter name ellipsises. `TodaySquareFitTest`.
+ * centre line straddles both lines: [SquareFit.textEndInsetDp]. The square grows only while the name
+ * keeps its room. `TodaySquareFitTest`.
  *
  * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
- * colour inset by [SQUARE_STROKE] draws the same picture on every API level this app supports.
+ * colour inset by the stroke draws the same picture on every API level this app supports.
  *
- * ⚠ **The touch target is much bigger than the square** ([SQUARE_TARGET]): the header's full height
- * plus the top padding, and the right padding — that is why the square is a [WidgetCard] corner rather
- * than one more item in the header row, which could not reach the padding. It overlaps the text by
- * only a few dp, so a tap on a name still opens the app.
+ * ⚠ **The touch target is much bigger than the square**: the header's full height plus the top
+ * padding ([SQUARE_TARGET_HEIGHT]), and everything right of the text — that is why the square is a
+ * [WidgetCard] corner rather than one more item in the header row, which could not reach the padding.
+ * It overlaps the text by only a few dp, so a tap on a name still opens the app.
  */
 @Composable
 private fun TodaySquare(
     check: TodayCheck,
     name: String,
     color: HabitColor,
+    fit: SquareFit,
 ) {
+    val size = fit.sizeDp.dp
+    val stroke = fit.strokeDp.dp
     val habitColor = ColorProvider(color.resolveIn(HabitsDarkColors.habit))
     // Says what a tap DOES, not only what is shown: "checked" alone would not tell a TalkBack user
     // that this square writes.
@@ -295,17 +301,17 @@ private fun TodaySquare(
     Box(
         modifier =
             GlanceModifier
-                .size(SQUARE_TARGET.width, SQUARE_TARGET.height)
+                .size(fit.targetWidthDp.dp, SQUARE_TARGET_HEIGHT)
                 .clickable(checkOffTodayAction(check))
                 .semantics { contentDescription = description }
-                .padding(top = CARD_PADDING + (BADGE_SIZE - SQUARE_SIZE) / 2, end = CARD_PADDING),
+                .padding(top = CARD_PADDING + (BADGE_SIZE - size) / 2, end = fit.endDp.dp),
         contentAlignment = Alignment.TopEnd,
     ) {
         Box(
             modifier =
                 GlanceModifier
-                    .size(SQUARE_SIZE)
-                    .cornerRadius(SQUARE_SIZE / DOT_CORNER_RATIO)
+                    .size(size)
+                    .cornerRadius(size / DOT_CORNER_RATIO)
                     .background(habitColor),
             contentAlignment = Alignment.Center,
         ) {
@@ -313,8 +319,8 @@ private fun TodaySquare(
                 Box(
                     modifier =
                         GlanceModifier
-                            .size(SQUARE_SIZE - SQUARE_STROKE * 2)
-                            .cornerRadius((SQUARE_SIZE / DOT_CORNER_RATIO - SQUARE_STROKE).coerceAtLeast(0.dp))
+                            .size(size - stroke * 2)
+                            .cornerRadius((size / DOT_CORNER_RATIO - stroke).coerceAtLeast(0.dp))
                             .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer)),
                 ) {}
             }
@@ -325,17 +331,5 @@ private fun TodaySquare(
 /** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
 private const val DOT_CORNER_RATIO = 6f
 
-/** The square's drawn size — see [TodaySquare] for why it is no bigger. */
-internal val SQUARE_SIZE = 10.dp
-
-/** 1.5dp, not 2: on a 10dp square a 2dp ring leaves a 6dp hole and reads as a filled dot. */
-private val SQUARE_STROKE = 1.5.dp
-
-/** What the square takes from the header's text: itself, and the badge's own gap on the other side. */
-internal val SQUARE_TEXT_INSET = SQUARE_SIZE + BADGE_GAP
-
-/**
- * The square's touch target, from the card's corner: the right padding, the square and most of its
- * gap across; the top padding and the whole header down — `CARD_PADDING + BADGE_SIZE` is 48dp.
- */
-internal val SQUARE_TARGET = DpSize(32.dp, 48.dp)
+/** The square's touch target reaches from the card's top edge to the header's bottom: 48dp. */
+internal val SQUARE_TARGET_HEIGHT = CARD_PADDING + BADGE_SIZE
