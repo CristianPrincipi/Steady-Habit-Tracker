@@ -583,8 +583,10 @@ still: a checkbox, a date and — since M16.2 — a number, enforced by `NotionP
 - **Only numbers this device holds an edit for are sent** — a number column nobody typed into on the
   phone is never part of a request body. Only `number` columns can be mapped as measures, and
   `formula` / `rollup` are read-only above, so nothing unwritable can be chosen as a target.
-- ⚠ **These shapes are from the reference, not yet from a live write.** M16.2a is tested against the
-  fake Notion only; the first real write is M16.2b's check on a phone, and its result belongs here.
+- ⭐ **Set is confirmed live (2026-10-17, M16.2b):** a number typed in the app, sent as
+  `{"number": <value>}` in a page update, appeared in that day's page in Notion. ⚠ **Clear
+  (`{"number": null}`) has not been watched against the live API yet** — it rests on the reference and
+  on the fake-Notion tests; record it here the first time it is seen.
 
 ### Every property type a schema can hold
 
