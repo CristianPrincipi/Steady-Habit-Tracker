@@ -1,16 +1,18 @@
 package com.cristianprincipi.habits.feature.week
 
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureId
 import java.time.LocalDate
 
 /**
  * Everything the user can do on the Week screen.
  *
  * One sealed interface and one `onEvent`, per `CLAUDE.md` §6 — rather than a lambda per control
- * piled onto the ViewModel. Five cases, because five things happen here: you check a day off, you
- * take that back from the snackbar, and you move between weeks three ways. The first two share the
- * [Write] supertype, because they are the two that touch storage and therefore the two that can
- * fail (M13.12).
+ * piled onto the ViewModel. You check a day off, you take that back from the snackbar, you move
+ * between weeks three ways — and since M16.2b you type a number into a day, through a small dialog
+ * whose state the ViewModel holds (the `Reading…` cases at the bottom). The first two share the
+ * [Write] supertype, because they are the two habit events that touch storage and therefore can
+ * fail (M13.12); a number's write fails through [ReadingRetried] instead.
  *
  * ### What is deliberately not here yet
  *
@@ -92,4 +94,49 @@ sealed interface WeekEvent {
      * M6.4 calls for the affordance; `WeekUiState.Content.isCurrentWeek` says when to show it.
      */
     data object ThisWeekPressed : WeekEvent
+
+    // ---- M16.2b: a number's cell and its dialog (ADR-156 §2) -----------------------------------
+
+    /** The six number events, grouped so the ViewModel handles them in one place of their own. */
+    sealed interface Reading : WeekEvent
+
+    /**
+     * A number's cell was tapped — open the dialog for [measureId] on [date].
+     *
+     * @param prefill the day's value as the field should start, **formatted by the screen** in the
+     *   reader's own decimal separator, or empty for a day without one. The screen formats because
+     *   only it knows the locale (`CLAUDE.md` §6 keeps `Context` out of a ViewModel); the ViewModel
+     *   only ever *parses*, and parsing accepts either separator (`ReadingInput`).
+     */
+    data class ReadingCellTapped(
+        val measureId: MeasureId,
+        val date: LocalDate,
+        val prefill: String,
+    ) : Reading
+
+    /** The dialog's field changed. */
+    data class ReadingTextChanged(
+        val text: String,
+    ) : Reading
+
+    /** Save: write what the field holds. Ignored while it does not hold a number. */
+    data object ReadingSaved : Reading
+
+    /** Clear: the day had a value and now has none — sent to Notion as empty, never as zero. */
+    data object ReadingCleared : Reading
+
+    /** Cancel, the scrim, or back: nothing is written. */
+    data object ReadingDismissed : Reading
+
+    /**
+     * The failure snackbar's Retry, for a number (M13.12's rule: a local write that fails says so).
+     *
+     * Carries the value rather than reopening the dialog: the user already said what they wanted,
+     * and what failed was storing it.
+     */
+    data class ReadingRetried(
+        val measureId: MeasureId,
+        val date: LocalDate,
+        val value: Double?,
+    ) : Reading
 }

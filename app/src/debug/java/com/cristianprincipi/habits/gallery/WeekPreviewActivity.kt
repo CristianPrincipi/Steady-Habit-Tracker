@@ -24,12 +24,17 @@ import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.Completion
+import com.cristianprincipi.habits.domain.model.MeasureId
+import com.cristianprincipi.habits.feature.week.ReadingEntry
 import com.cristianprincipi.habits.feature.week.WeekEvent
 import com.cristianprincipi.habits.feature.week.WeekMessage
 import com.cristianprincipi.habits.feature.week.WeekUiState
 import com.cristianprincipi.habits.feature.week.WeekWithUndo
+import com.cristianprincipi.habits.feature.week.prefillText
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import java.time.LocalDate
+import java.util.Locale
 
 /**
  * The Week screen against `SampleHabits`, with no Room and no Notion behind it.
@@ -80,13 +85,20 @@ class WeekPreviewActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    SampleWeek(empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)))
+                    SampleWeek(
+                        empty = emptyReasonFrom(intent.getStringExtra(EXTRA_STATE)),
+                        openReading = intent.getStringExtra(EXTRA_STATE) == "reading",
+                    )
                 }
             }
         }
     }
 }
 
+/**
+ * `pending` / `failed` draw the empty screen; `reading` opens the number dialog on today's first
+ * measure (M16.2b), so it can be photographed without driving a tap.
+ */
 private const val EXTRA_STATE = "state"
 
 /** `null` for the sample week; a reason to render [WeekUiState.Empty] instead. */
@@ -110,9 +122,15 @@ private fun emptyReasonFrom(extra: String?): HabitsEmptyReason? =
  * emulator would be showing behaviour the app does not have.
  */
 @Composable
-private fun SampleWeek(empty: HabitsEmptyReason?) {
+private fun SampleWeek(
+    empty: HabitsEmptyReason?,
+    openReading: Boolean,
+) {
     val reference = SampleHabits.referenceDate
     val thisWeek = startOfWeek(reference)
+    // M16.2b: typed numbers over the sample ones, and the dialog — the ViewModel's two fields.
+    var typed by remember { mutableStateOf(emptyMap<Pair<MeasureId, LocalDate>, Double?>()) }
+    var entry by remember { mutableStateOf(if (openReading) todaysFirstReading(reference) else null) }
 
     var completed by remember { mutableStateOf(SampleHabits.completions(reference).toSet()) }
     var weekStart by remember { mutableStateOf(thisWeek) }
@@ -127,8 +145,19 @@ private fun SampleWeek(empty: HabitsEmptyReason?) {
             habits = SampleHabits.weekPeriods(reference, completed, weekStart),
             isCurrentWeek = weekStart == thisWeek,
             currentYear = reference.year,
-            measures = SampleHabits.measureWeeks(reference, weekStart),
+            measures =
+                SampleHabits.measureWeeks(reference, weekStart).map { week ->
+                    week.copy(
+                        days =
+                            week.days.map { day ->
+                                val key = week.measure.id to day.date
+                                if (key in typed) day.copy(value = typed[key]) else day
+                            },
+                    )
+                },
+            readingEntry = entry,
         )
+
     val state = empty?.let(WeekUiState::Empty) ?: content
 
     WeekWithUndo(
@@ -175,6 +204,48 @@ private fun SampleWeek(empty: HabitsEmptyReason?) {
                 WeekEvent.ThisWeekPressed -> {
                     weekStart = thisWeek
                 }
+
+                // The ViewModel's handling, against a map instead of Room — see `WeekViewModel`.
+                is WeekEvent.ReadingCellTapped -> {
+                    val week = content.measures.first { it.measure.id == event.measureId }
+                    val day = week.days.first { it.date == event.date }
+                    entry =
+                        ReadingEntry(
+                            measureId = event.measureId,
+                            measureName = week.measure.name,
+                            unit = week.measure.unit,
+                            date = event.date,
+                            text = event.prefill,
+                            hadValue = day.value != null,
+                        ).takeUnless { day.isFuture }
+                }
+
+                is WeekEvent.ReadingTextChanged -> {
+                    entry = entry?.copy(text = event.text)
+                }
+
+                WeekEvent.ReadingSaved -> {
+                    entry?.let { open ->
+                        open.value?.let { value ->
+                            typed = typed + ((open.measureId to open.date) to value)
+                            entry = null
+                        }
+                    }
+                }
+
+                WeekEvent.ReadingCleared -> {
+                    entry?.let { open -> typed = typed + ((open.measureId to open.date) to null) }
+                    entry = null
+                }
+
+                WeekEvent.ReadingDismissed -> {
+                    entry = null
+                }
+
+                // A map cannot fail to take a value, so nothing here ever offers a retry.
+                is WeekEvent.ReadingRetried -> {
+                    Unit
+                }
             }
         },
         // Real navigation is the shell's; here it is the one thing this activity cannot show.
@@ -182,3 +253,17 @@ private fun SampleWeek(empty: HabitsEmptyReason?) {
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing),
     )
 }
+
+/** The dialog as a tap on today's first number would open it — the `reading` extra's starting state. */
+private fun todaysFirstReading(reference: LocalDate): ReadingEntry? =
+    SampleHabits.measureWeeks(reference, startOfWeek(reference)).firstOrNull()?.let { week ->
+        val today = week.days.first { it.date == reference }
+        ReadingEntry(
+            measureId = week.measure.id,
+            measureName = week.measure.name,
+            unit = week.measure.unit,
+            date = reference,
+            text = prefillText(today.value, Locale.US),
+            hadValue = today.value != null,
+        )
+    }

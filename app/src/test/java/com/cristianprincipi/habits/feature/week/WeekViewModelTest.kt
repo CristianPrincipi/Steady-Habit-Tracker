@@ -24,6 +24,7 @@ import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
+import com.cristianprincipi.habits.domain.usecase.SetMeasureReading
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,6 +98,7 @@ class WeekViewModelTest {
         WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
             getMeasuresForWeek = GetMeasuresForWeek(measures, clock),
+            setMeasureReading = SetMeasureReading(measures, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
             syncStatus = syncStatus,
             today = todayFlow,
@@ -873,6 +875,7 @@ class WeekViewModelTest {
                 WeekViewModel(
                     getHabitsForWeek = GetHabitsForWeek(silent, clock),
                     getMeasuresForWeek = GetMeasuresForWeek(FakeMeasureRepository(), clock),
+                    setMeasureReading = SetMeasureReading(FakeMeasureRepository(), clock),
                     toggleCompletion = ToggleCompletion(silent, clock),
                     syncStatus = SilentSyncStatus,
                     today = todayFlow,

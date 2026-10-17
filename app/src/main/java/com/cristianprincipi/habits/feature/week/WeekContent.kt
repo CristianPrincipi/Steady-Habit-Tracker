@@ -33,7 +33,9 @@ import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.model.MeasureDay
 import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.model.PeriodCell
+import java.math.BigDecimal
 import java.math.RoundingMode
+import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -100,6 +102,9 @@ fun WeekContent(
                     onEvent = onEvent,
                     modifier = Modifier.fillMaxSize(),
                 )
+                state.readingEntry?.let { entry ->
+                    ReadingEntryDialog(entry = entry, locale = locale, onEvent = onEvent)
+                }
             }
         }
     }
@@ -155,6 +160,7 @@ private fun WeekList(
                 week = week,
                 dayLabels = labels,
                 locale = locale,
+                onEvent = onEvent,
                 modifier = Modifier.animateItem(),
             )
         }
@@ -219,12 +225,19 @@ private fun WeekHabitRow(
  * A cell is one reading as it was entered, and `8.0` in a 44dp column is width spent on nothing. A mean is a computed figure, and Stats has always
  * printed it to one place. Both round half-up, as `String.format` does, so a cell and a tile never
  * round one value two ways.
+ *
+ * ### ⭐ A day that has happened can be tapped — M16.2b
+ *
+ * It opens [ReadingEntryDialog] with the day's value **as stored, not as drawn**: the cell shows one
+ * decimal, and a field that started at `83` for an `82.95` would round the value the moment it was
+ * saved untouched. A future day is inert, as its pill above is.
  */
 @Composable
 private fun WeekMeasureRow(
     week: MeasureWeek,
     dayLabels: List<String>,
     locale: Locale,
+    onEvent: (WeekEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val measure = week.measure
@@ -261,7 +274,31 @@ private fun WeekMeasureRow(
         dayLabels = dayLabels,
         dayContentDescriptions = week.spokenLabels(texts, locale),
         todayIndex = week.todayIndex,
+        editable = week.days.map { day -> !day.isFuture },
+        editLabel = stringResource(R.string.week_reading_edit_action),
+        onCellTap = { index ->
+            week.days.getOrNull(index)?.let { day ->
+                onEvent(WeekEvent.ReadingCellTapped(measure.id, day.date, prefillText(day.value, locale)))
+            }
+        },
     )
+}
+
+/**
+ * A stored value as the dialog's field starts: every digit it has, no grouping, in the reader's
+ * decimal separator when that is a comma — `ReadingInput` reads either back.
+ *
+ * ⚠ Built from `Double.toString` rather than a `NumberFormat`, so the digits are always ASCII and the
+ * separator always one the parser accepts. A locale whose formatter used other digits or another
+ * separator would otherwise prefill text that its own Save could not read.
+ */
+internal fun prefillText(
+    value: Double?,
+    locale: Locale,
+): String {
+    val plain = value?.let { BigDecimal.valueOf(it).stripTrailingZeros().toPlainString() } ?: return ""
+    val usesComma = DecimalFormatSymbols.getInstance(locale).decimalSeparator == ','
+    return if (usesComma) plain.replace('.', ',') else plain
 }
 
 /** At most one decimal, none when it is zero — see [WeekMeasureRow]. */

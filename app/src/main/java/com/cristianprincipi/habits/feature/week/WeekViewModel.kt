@@ -10,10 +10,12 @@ import com.cristianprincipi.habits.core.ui.launchWrite
 import com.cristianprincipi.habits.core.ui.observeEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
+import com.cristianprincipi.habits.domain.usecase.SetMeasureReading
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalDate
@@ -79,6 +82,12 @@ import javax.inject.Inject
  * less than the dimmed pill already does. The guard stays where it is regardless: it is the
  * domain's rule, the pill only mirrors it, and if the two ever disagree the pill is the bug.
  *
+ * ### ⭐ A number is typed through a dialog this class holds — M16.2b
+ *
+ * A number's cell opens [WeekUiState.Content.readingEntry]; Save writes through [SetMeasureReading]
+ * and closes it. The day's habit cards are not involved, and nor is the undo snackbar: the cell
+ * showing the new value is the confirmation. A write that fails says so ([WeekMessage.ReadingSaveFailed]).
+ *
  * ### An empty screen is the one place sync status is read
  *
  * With no habits in Room there is nothing to draw and nothing to explain it, so [emptyReason] says
@@ -87,10 +96,15 @@ import javax.inject.Inject
 @HiltViewModel
 class WeekViewModel
     @Inject
+    // One input per thing this screen shows or does: the habits, the numbers, the two writes, the
+    // empty screen's sync status, and the day in two forms (M6.9). A facade over two of them would
+    // exist only for the lint count — `SyncEngine` declines one for the same reason.
+    @Suppress("LongParameterList")
     constructor(
         private val getHabitsForWeek: GetHabitsForWeek,
-        // M16.1 — the number rows under the cards. Read-only: nothing here writes a reading.
+        // M16.1 — the number rows under the cards, and since M16.2b the write for one of their cells.
         private val getMeasuresForWeek: GetMeasuresForWeek,
+        private val setMeasureReading: SetMeasureReading,
         private val toggleCompletion: ToggleCompletion,
         // Read for one branch only — see `emptyReason`. Never awaited, never a gate (`CLAUDE.md` §1).
         private val syncStatus: SyncStatusRepository,
@@ -182,9 +196,12 @@ class WeekViewModel
          */
         private val emptyReason: Flow<HabitsEmptyReason> = syncStatus.observeEmptyReason()
 
+        /** The number dialog, while it is open (M16.2b). Local, not derived — `SyncStatusViewModel`'s prompt. */
+        private val readingEntry = MutableStateFlow<ReadingEntry?>(null)
+
         val uiState: StateFlow<WeekUiState> =
-            combine(visibleWeek, emptyReason) { visible, reason ->
-                stateFor(visible, reason)
+            combine(visibleWeek, emptyReason, readingEntry) { visible, reason, entry ->
+                stateFor(visible, reason, entry)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(SUBSCRIPTION_TIMEOUT_MILLIS),
@@ -247,8 +264,97 @@ class WeekViewModel
                 WeekEvent.ThisWeekPressed -> {
                     anchor.value = null
                 }
+
+                is WeekEvent.Reading -> {
+                    onReading(event)
+                }
             }
         }
+
+        /** The number dialog's events — M16.2b. */
+        private fun onReading(event: WeekEvent.Reading) {
+            when (event) {
+                is WeekEvent.ReadingCellTapped -> {
+                    openReading(event)
+                }
+
+                is WeekEvent.ReadingTextChanged -> {
+                    readingEntry.update { entry -> entry?.copy(text = event.text) }
+                }
+
+                WeekEvent.ReadingSaved -> {
+                    // A disabled Save cannot send this; a stale one is ignored rather than writing
+                    // whatever a half-typed field would parse to.
+                    readingEntry.value?.let { entry -> entry.value?.let { value -> closeAndWrite(entry, value) } }
+                }
+
+                WeekEvent.ReadingCleared -> {
+                    readingEntry.value?.let { entry -> closeAndWrite(entry, value = null) }
+                }
+
+                WeekEvent.ReadingDismissed -> {
+                    readingEntry.value = null
+                }
+
+                is WeekEvent.ReadingRetried -> {
+                    writeReading(event, measureName(event.measureId))
+                }
+            }
+        }
+
+        /**
+         * Opens the dialog for a cell — **only for a day that has happened**, on a number on screen.
+         *
+         * The cell for a future day is inert, so a tap on one does not reach here; this refuses it
+         * anyway, for `ToggleCompletion`'s reason — the rule is the domain's ([SetMeasureReading]) and
+         * the cell only mirrors it. Opening a dialog whose Save could only be refused would be a
+         * control that lies.
+         */
+        private fun openReading(event: WeekEvent.ReadingCellTapped) {
+            val week = measureOnScreen(event.measureId)
+            val day = week?.days?.firstOrNull { it.date == event.date }
+            if (week == null || day == null || day.isFuture) return
+            readingEntry.value =
+                ReadingEntry(
+                    measureId = event.measureId,
+                    measureName = week.measure.name,
+                    unit = week.measure.unit,
+                    date = event.date,
+                    text = event.prefill,
+                    hadValue = day.value != null,
+                )
+        }
+
+        /** Closes first, so the dialog is gone the frame Save is pressed rather than after Room answers. */
+        private fun closeAndWrite(
+            entry: ReadingEntry,
+            value: Double?,
+        ) {
+            readingEntry.value = null
+            writeReading(WeekEvent.ReadingRetried(entry.measureId, entry.date, value), entry.measureName)
+        }
+
+        /**
+         * One number into Room, and a sentence if it does not land. Silent on success — see
+         * [WeekMessage.ReadingSaveFailed]. The retry it offers is this same write.
+         */
+        private fun writeReading(
+            write: WeekEvent.ReadingRetried,
+            measureName: String?,
+        ) {
+            launchWrite(
+                onFailure = {
+                    _messages.trySend(WeekMessage.ReadingSaveFailed(measureName, write.date, retry = write))
+                },
+            ) {
+                setMeasureReading(measureId = write.measureId, date = write.date, value = write.value)
+            }
+        }
+
+        private fun measureOnScreen(id: MeasureId): MeasureWeek? =
+            (uiState.value as? WeekUiState.Content)?.measures?.firstOrNull { week -> week.measure.id == id }
+
+        private fun measureName(id: MeasureId): String? = measureOnScreen(id)?.measure?.name
 
         /**
          * Calendar arithmetic, not instant arithmetic.
@@ -372,6 +478,7 @@ class WeekViewModel
         private fun stateFor(
             week: VisibleWeek,
             reason: HabitsEmptyReason,
+            entry: ReadingEntry?,
         ): WeekUiState {
             val visible = week.snapshot
             return if (week.habits.isEmpty()) {
@@ -390,6 +497,7 @@ class WeekViewModel
                     isCurrentWeek = visible.week == startOfWeek(visible.today),
                     currentYear = visible.today.year,
                     measures = week.measures,
+                    readingEntry = entry,
                 )
             }
         }

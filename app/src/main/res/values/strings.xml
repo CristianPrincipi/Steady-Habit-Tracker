@@ -633,6 +633,22 @@
     <string name="week_save_failed_action">Retry</string>
 
     <!--
+      M16.2b — typing a number into a day (ADR-156 §2). The title reads "Weight · Thu, Oct 15".
+      week_reading_invalid shows only once something that is not a number is typed, never on an
+      empty field; it names both separators because a decimal keyboard offers whichever its
+      locale uses. Decimal hours only for a duration, the user's ruling: 7.5 is seven and a half.
+      week_reading_edit_action is what TalkBack says a tap does: "double-tap to edit".
+    -->
+    <string name="week_reading_title">%1$s · %2$s</string>
+    <string name="week_reading_field_description">%1$s for %2$s</string>
+    <string name="week_reading_invalid">Enter a number, like 7.5 or 7,5</string>
+    <string name="week_reading_save">Save</string>
+    <string name="week_reading_cancel">Cancel</string>
+    <string name="week_reading_clear">Clear</string>
+    <string name="week_reading_edit_action">edit</string>
+    <string name="week_reading_save_failed">Couldn\'t save %1$s for %2$s</string>
+
+    <!--
       The About screen (M11.8) — UNDESIGNED. The prototype has no such view at all
       (docs/design-spec.md), so every word here is ours.
 

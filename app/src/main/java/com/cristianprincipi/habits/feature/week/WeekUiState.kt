@@ -3,7 +3,9 @@ package com.cristianprincipi.habits.feature.week
 import com.cristianprincipi.habits.core.datetime.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.ui.HabitsEmptyReason
 import com.cristianprincipi.habits.domain.model.HabitPeriod
+import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.model.MeasureWeek
+import com.cristianprincipi.habits.domain.model.ReadingInput
 import java.time.LocalDate
 
 /**
@@ -100,8 +102,9 @@ sealed interface WeekUiState {
      *   year only for an endpoint that is not in it (M6.11). Read from the **same snapshot** as
      *   [isCurrentWeek], so the label and the today ring can never describe different days.
      * @param measures the tracked numbers over the same seven days, drawn under the habit cards
-     *   (M16.1). Read-only. Empty when the user mapped none, which draws nothing — and it does not
-     *   decide [Empty]: a screen with numbers and no habits has no check-off loop to land on.
+     *   (M16.1). Empty when the user mapped none, which draws nothing — and it does not decide
+     *   [Empty]: a screen with numbers and no habits has no check-off loop to land on.
+     * @param readingEntry the number dialog, while it is open (M16.2b); `null` the rest of the time.
      */
     data class Content(
         val weekStart: LocalDate,
@@ -109,6 +112,7 @@ sealed interface WeekUiState {
         val isCurrentWeek: Boolean,
         val currentYear: Int,
         val measures: List<MeasureWeek> = emptyList(),
+        val readingEntry: ReadingEntry? = null,
     ) : WeekUiState {
         /**
          * The last day of the shown week, for the `‹ Aug 17 – Aug 23 ›` label (M6.4).
@@ -118,4 +122,35 @@ sealed interface WeekUiState {
          */
         val weekEndInclusive: LocalDate get() = weekStart.plusDays((DAYS_PER_WEEK - 1).toLong())
     }
+}
+
+/**
+ * The number dialog's state — M16.2b, ADR-156 §2: *"Weight · Thu 15 Oct"*, a field, Save / Cancel,
+ * and Clear when the day has a value.
+ *
+ * In the ViewModel rather than the composable, as the Sync screen's disconnect prompt is, so what
+ * Save does with a given text is a JVM test rather than a device one.
+ *
+ * @param measureName and [unit] as the card draws them when the dialog opened.
+ * @param hadValue whether the day had a reading when the dialog opened — which is what offers Clear.
+ */
+data class ReadingEntry(
+    val measureId: MeasureId,
+    val measureName: String,
+    val unit: String,
+    val date: LocalDate,
+    val text: String,
+    val hadValue: Boolean,
+) {
+    /** What Save would write, or `null` while the field holds something that is not a number. */
+    val value: Double? get() = ReadingInput.parse(text)
+
+    /** Save is disabled, not refused, on anything that is not a number — the user sees why. */
+    val canSave: Boolean get() = value != null
+
+    /**
+     * The field holds text that is not a number. Empty is not an error — it is where a day without a
+     * value starts, and saying "not a number" before anything is typed would be scolding.
+     */
+    val isInvalid: Boolean get() = text.isNotBlank() && value == null
 }

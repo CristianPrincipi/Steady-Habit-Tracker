@@ -13,6 +13,7 @@ import com.cristianprincipi.habits.domain.model.HabitId
 import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
+import com.cristianprincipi.habits.domain.usecase.SetMeasureReading
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -66,6 +67,7 @@ class WeekWriteFailureTest {
             WeekViewModel(
                 getHabitsForWeek = GetHabitsForWeek(repository, clock),
                 getMeasuresForWeek = GetMeasuresForWeek(FakeMeasureRepository(), clock),
+                setMeasureReading = SetMeasureReading(FakeMeasureRepository(), clock),
                 toggleCompletion = ToggleCompletion(repository, clock),
                 syncStatus = syncStatus,
                 today = todayFlow,

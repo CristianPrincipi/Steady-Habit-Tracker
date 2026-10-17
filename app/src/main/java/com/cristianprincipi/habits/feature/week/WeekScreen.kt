@@ -143,6 +143,7 @@ private fun UndoSnackbars(
     val failedChecked = stringResource(R.string.week_save_failed_checked)
     val failedCleared = stringResource(R.string.week_save_failed_cleared)
     val failedUnnamed = stringResource(R.string.week_save_failed_unnamed)
+    val failedReading = stringResource(R.string.week_reading_save_failed)
     val retry = stringResource(R.string.week_save_failed_action)
 
     LaunchedEffect(messages, hostState, locale) {
@@ -182,12 +183,24 @@ private fun UndoSnackbars(
                             duration = SnackbarDuration.Long,
                         )
                     }
+
+                    // M16.2b — a number that did not land. Long, for `SaveFailed`'s reason: the cell
+                    // did not change, so this is the only thing saying anything happened.
+                    is WeekMessage.ReadingSaveFailed -> {
+                        hostState.showSnackbar(
+                            message =
+                                message.measureName?.let { name -> failedReading.format(name, day) } ?: failedUnnamed,
+                            actionLabel = retry,
+                            duration = SnackbarDuration.Long,
+                        )
+                    }
                 }
             if (result == SnackbarResult.ActionPerformed) {
                 onEvent(
                     when (message) {
                         is WeekMessage.Toggled -> message.undo
                         is WeekMessage.SaveFailed -> message.retry
+                        is WeekMessage.ReadingSaveFailed -> message.retry
                     },
                 )
             }

@@ -36,6 +36,7 @@ import com.cristianprincipi.habits.domain.model.SyncStatus
 import com.cristianprincipi.habits.domain.repository.SyncStatusRepository
 import com.cristianprincipi.habits.domain.usecase.GetHabitsForWeek
 import com.cristianprincipi.habits.domain.usecase.GetMeasuresForWeek
+import com.cristianprincipi.habits.domain.usecase.SetMeasureReading
 import com.cristianprincipi.habits.domain.usecase.ToggleCompletion
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -155,19 +156,18 @@ class WeekCheckOffPersistenceTest {
                 clock = clock,
                 widgets = RecordingWidgetRefresher(),
             )
+        val measures =
+            MeasureRepositoryImpl(
+                measureDao = instance.measureDao(),
+                dayDao = instance.dayDao(),
+                transactionRunner = RoomTransactionRunner(instance),
+                clock = clock,
+                widgets = RecordingWidgetRefresher(),
+            )
         return WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
-            getMeasuresForWeek =
-                GetMeasuresForWeek(
-                    MeasureRepositoryImpl(
-                        measureDao = instance.measureDao(),
-                        dayDao = instance.dayDao(),
-                        transactionRunner = RoomTransactionRunner(instance),
-                        clock = clock,
-                        widgets = RecordingWidgetRefresher(),
-                    ),
-                    clock,
-                ),
+            getMeasuresForWeek = GetMeasuresForWeek(measures, clock),
+            setMeasureReading = SetMeasureReading(measures, clock),
             toggleCompletion = ToggleCompletion(repository, clock),
             // Read only when there are no habits to draw, which is never in this test — seeded
             // habits are the whole premise. A permanently idle status keeps it out of the way.

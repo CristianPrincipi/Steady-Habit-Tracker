@@ -34,6 +34,9 @@ class FakeMeasureRepository(
     /** Every [setReading] call, in order. */
     val writtenReadings = mutableListOf<Triple<MeasureId, LocalDate, Double?>>()
 
+    /** Makes [setReading] throw, as `FakeHabitRepository.failWritesWith` does for a check-off (M13.12). */
+    var failWritesWith: Exception? = null
+
     override fun observeMeasures(): Flow<List<Measure>> = measureFlow
 
     override fun observeReadings(
@@ -50,6 +53,7 @@ class FakeMeasureRepository(
         date: LocalDate,
         value: Double?,
     ) {
+        failWritesWith?.let { throw it }
         writtenReadings += Triple(measureId, date, value)
         val others = readingFlow.value.filterNot { it.measureId == measureId && it.date == date }
         readingFlow.value = others + listOfNotNull(value?.let { MeasureReading(measureId, date, it) })

@@ -115,6 +115,7 @@ fun WeekHabitCard(
  * screen, so the header line, the cell tint and the dash are this app's, and were shown to the user.
  *
  * @param description the week's average, already formatted, or the sentence for a week without one.
+ * @param editable which days can be tapped to type a value (M16.2b) — see [WeekValues].
  */
 @Composable
 fun WeekMeasureCard(
@@ -128,6 +129,9 @@ fun WeekMeasureCard(
     dayContentDescriptions: List<String>,
     todayIndex: Int,
     modifier: Modifier = Modifier,
+    editable: List<Boolean> = emptyList(),
+    editLabel: String? = null,
+    onCellTap: (Int) -> Unit = {},
 ) {
     HabitsCard(
         modifier = modifier,
@@ -150,6 +154,9 @@ fun WeekMeasureCard(
             contentDescriptions = dayContentDescriptions,
             color = color,
             todayIndex = todayIndex,
+            editable = editable,
+            editLabel = editLabel,
+            onCellTap = onCellTap,
         )
     }
 }

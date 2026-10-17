@@ -111,4 +111,18 @@ sealed interface WeekMessage {
         val completed: Boolean,
         val retry: WeekEvent.Write,
     ) : WeekMessage
+
+    /**
+     * A number did not land in Room (M16.2b) — [SaveFailed]'s twin, for the same M13.12 rule.
+     *
+     * There is no success counterpart: the dialog closing over a cell that now shows the value is
+     * the confirmation, and a sentence would repeat it.
+     *
+     * @param measureName the number as this screen draws it, or `null` if it is no longer on screen.
+     */
+    data class ReadingSaveFailed(
+        val measureName: String?,
+        override val date: LocalDate,
+        val retry: WeekEvent.ReadingRetried,
+    ) : WeekMessage
 }

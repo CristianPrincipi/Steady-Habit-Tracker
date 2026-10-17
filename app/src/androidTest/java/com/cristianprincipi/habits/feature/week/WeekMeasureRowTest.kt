@@ -4,15 +4,19 @@ import android.content.Context
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
+import com.cristianprincipi.habits.core.datetime.shortDateLabel
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
@@ -21,6 +25,7 @@ import com.cristianprincipi.habits.domain.model.Measure
 import com.cristianprincipi.habits.domain.model.MeasureDay
 import com.cristianprincipi.habits.domain.model.MeasureId
 import com.cristianprincipi.habits.domain.model.MeasureWeek
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,6 +40,9 @@ import java.util.Locale
  * that has not happened. A wrong one of these does not crash; it draws a believable row.
  *
  * One habit card above, not five, so the number card is on screen without scrolling.
+ *
+ * Since M16.2b a day that has happened is tappable and opens the number dialog; the last tests here
+ * hold that, and the dialog's Save / Clear rules, still.
  */
 @RunWith(AndroidJUnit4::class)
 class WeekMeasureRowTest {
@@ -51,7 +59,10 @@ class WeekMeasureRowTest {
 
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
-    private fun showWeek() {
+    private fun showWeek(
+        onEvent: (WeekEvent) -> Unit = {},
+        readingEntry: ReadingEntry? = null,
+    ) {
         // The reference date is a Saturday, so Sat is today and only Sun is future.
         val days = values.mapIndexed { index, value -> monday.plusDays(index.toLong()) to value }
         val week =
@@ -70,8 +81,9 @@ class WeekMeasureRowTest {
                             isCurrentWeek = true,
                             currentYear = reference.year,
                             measures = listOf(week),
+                            readingEntry = readingEntry,
                         ),
-                    onEvent = {},
+                    onEvent = onEvent,
                     onOpenSyncStatus = {},
                 )
             }
@@ -141,12 +153,69 @@ class WeekMeasureRowTest {
     }
 
     @Test
-    fun nothingInTheRowIsTappableYet() {
+    fun everyDayThatHasHappenedIsTappableAndTheFutureIsNot() {
         showWeek()
 
-        // Editing is M16.2. Until then a cell that answered a tap would be a button that does nothing.
-        (0..5).forEach { index -> cell(index).assert(!hasClickAction()) }
+        // M16.2b. Monday to Saturday (today), recorded or not; Sunday has not happened, and a cell
+        // that answered a tap there would open a dialog whose Save could only be refused.
+        (0..5).forEach { index -> cell(index).assert(hasClickAction()) }
+        composeTestRule
+            .onNodeWithContentDescription(
+                string(R.string.week_pill_description)
+                    .format(weight.name, accessibleDate(monday.plusDays(6), Locale.getDefault())),
+                useUnmergedTree = true,
+            ).assert(!hasClickAction())
     }
+
+    @Test
+    fun aTapSendsTheDayWithItsValueAsStoredNotAsDrawn() {
+        // The cell draws 82.9; the field must start at 82.94, or an untouched Save rounds the value.
+        val sent = mutableListOf<WeekEvent>()
+        showWeek(onEvent = sent::add)
+
+        cell(0).performClick()
+
+        assertEquals(
+            listOf(WeekEvent.ReadingCellTapped(weight.id, monday, prefillText(82.94, Locale.getDefault()))),
+            sent,
+        )
+    }
+
+    @Test
+    fun theDialogIsNamedForTheNumberAndDayAndOffersClearOnlyForAValue() {
+        showWeek(readingEntry = entry(text = "82.94", hadValue = true))
+
+        composeTestRule
+            .onNodeWithText(
+                string(R.string.week_reading_title)
+                    .format(weight.name, shortDateLabel(monday, Locale.getDefault())),
+            ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.week_reading_clear)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(string(R.string.week_reading_save)).assertIsEnabled()
+    }
+
+    @Test
+    fun aDayWithoutAValueOffersNoClearAndCannotSaveEmpty() {
+        showWeek(readingEntry = entry(text = "", hadValue = false))
+
+        composeTestRule.onAllNodesWithText(string(R.string.week_reading_clear)).assertCountEquals(0)
+        composeTestRule.onNodeWithText(string(R.string.week_reading_save)).assertIsNotEnabled()
+        // Empty is where it starts, not a mistake — so no error under the field yet.
+        composeTestRule.onAllNodesWithText(string(R.string.week_reading_invalid)).assertCountEquals(0)
+    }
+
+    @Test
+    fun somethingThatIsNotANumberDisablesSaveAndSaysWhy() {
+        showWeek(readingEntry = entry(text = "7:30", hadValue = false))
+
+        composeTestRule.onNodeWithText(string(R.string.week_reading_save)).assertIsNotEnabled()
+        composeTestRule.onNodeWithText(string(R.string.week_reading_invalid)).assertIsDisplayed()
+    }
+
+    private fun entry(
+        text: String,
+        hadValue: Boolean,
+    ) = ReadingEntry(weight.id, weight.name, weight.unit, monday, text, hadValue)
 
     /** What a recorded cell shows: one decimal at most, as `WeekMeasureRow` formats it. */
     private fun shown(value: Double): String =
