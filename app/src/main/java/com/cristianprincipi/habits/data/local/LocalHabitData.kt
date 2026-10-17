@@ -31,7 +31,7 @@ class LocalHabitData
         private val transactionRunner: TransactionRunner,
     ) {
         /**
-         * Every habit, day, check-off, measure and reading, in one transaction.
+         * Every habit, day, check-off, measure, reading and owed number, in one transaction.
          *
          * **Children first**, even though both foreign keys cascade. A delete that depends on a
          * pragma being enabled to be complete is not the thing to lean on at the moment a user has
@@ -48,6 +48,8 @@ class LocalHabitData
                 // habits are gone, and the user's weight history quietly stays on the device
                 // after they asked for it to be removed. Nothing surfaces that, ever.
                 measureDao.deleteAllReadings()
+                // M16.2's owed numbers — the same trap one table later.
+                measureDao.deleteAllEdits()
                 dayDao.deleteAll()
                 habitDao.deleteAll()
                 measureDao.deleteAllMeasures()

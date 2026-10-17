@@ -26,6 +26,11 @@ class MutableClock(
 
     override fun withZone(zone: ZoneId): Clock = MutableClock(current, zone)
 
+    /** Moves to [instant] — for a test that lines a local edit up against a Notion timestamp. */
+    fun setTo(instant: Instant) {
+        current = instant
+    }
+
     /** Moves to the start of [date], in this clock's zone. */
     fun setTo(date: LocalDate) {
         current = date.atStartOfDay(zone).toInstant()

@@ -11,6 +11,8 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionRequestStatusDto
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.IOException
 import java.time.Instant
 
@@ -30,6 +32,10 @@ import java.time.Instant
  *   exercised by ordinary tests rather than by one that remembers to.
  * - **Writes move the clock forward.** Every create and update stamps a new `last_edited_time`, so
  *   the pull that follows a push sees what Notion would actually report.
+ * - **A written property reads back the way Notion returns it** — keyed by name, carrying its `id`
+ *   and `type` (M16.2). The engine sends `{"number": 82.9}` under an id; until this fake stamped
+ *   both back on, a value it had written was unreadable to the next pull, which made "the number
+ *   survives the round trip" a claim no test could make.
  * - **A run can be killed mid-pagination** ([failQueryAfterPages]), which is the only way to
  *   exercise ADR-047's cursorless resume rather than assume it — and, since M13.11,
  *   **mid-drain** too ([failWritesAfter]), which is the same claim on the push side.
@@ -289,7 +295,10 @@ class FakeNotionApi(
             NotionPageDto(
                 id = "created-${nextPageNumber++}",
                 lastEditedTime = stamp(),
-                properties = properties.mapValues { (_, value) -> value as JsonObject },
+                properties =
+                    properties.entries.associate { (id, value) ->
+                        nameInSchema(id) to asReturned(id, value as JsonObject)
+                    },
             )
         pages[page.id] = page
         return NotionResult.Success(page)
@@ -310,7 +319,7 @@ class FakeNotionApi(
             val merged =
                 existing.properties +
                     properties.entries.associate { (id, value) ->
-                        keyFor(existing, id) to value as JsonObject
+                        keyFor(existing, id) to asReturned(id, value as JsonObject)
                     }
             val page = existing.copy(lastEditedTime = stamp(), properties = merged)
             pages[pageId] = page
@@ -367,6 +376,27 @@ class FakeNotionApi(
             .firstOrNull { (_, value) -> value["id"]?.toString()?.trim('"') == propertyId }
             ?.key
             ?: propertyId
+
+    /** The name the schema gives a property id — what Notion keys a returned page by. */
+    private fun nameInSchema(propertyId: String): String =
+        schema.properties.values
+            .firstOrNull { it.id == propertyId }
+            ?.name ?: propertyId
+
+    /**
+     * A written value as a read returns it: `{"number": 82.9}` becomes
+     * `{"id": …, "type": "number", "number": 82.9}`. The type is the value's own key, which is how
+     * Notion's write shape names it.
+     */
+    private fun asReturned(
+        propertyId: String,
+        value: JsonObject,
+    ): JsonObject =
+        buildJsonObject {
+            put("id", propertyId)
+            value.keys.firstOrNull { it != "id" && it != "type" }?.let { type -> put("type", type) }
+            value.forEach { (key, element) -> if (key != "id" && key != "type") put(key, element) }
+        }
 
     private fun stamp(): String = Instant.ofEpochMilli(nextEditMillis.also { nextEditMillis += 1_000 }).toString()
 }

@@ -180,6 +180,14 @@
         <item quantity="one">%1$d habit affected</item>
         <item quantity="other">%1$d habits affected</item>
     </plurals>
+    <!--
+      M16.2: a number that lost names both values, the losing one first — "Weight: 82.9 kg was
+      replaced by 83.1 kg". A cleared side reads "no value", never "0".
+    -->
+    <string name="sync_discarded_number">%1$s: %2$s was replaced by %3$s</string>
+    <string name="sync_discarded_number_with_unit">%1$s %2$s</string>
+    <string name="sync_discarded_number_empty">no value</string>
+    <string name="sync_discarded_number_unnamed">A number</string>
     <string name="sync_discarded_dismiss">Got it</string>
 
     <!--

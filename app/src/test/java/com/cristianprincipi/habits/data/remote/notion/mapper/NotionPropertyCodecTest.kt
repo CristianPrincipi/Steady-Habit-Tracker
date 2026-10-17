@@ -238,10 +238,11 @@ class NotionPropertyCodecTest {
     }
 
     @Test
-    fun onlyTheTwoThingsThisAppOwnsCanBeWritten() {
+    fun onlyTheThreeThingsThisAppOwnsCanBeWritten() {
         // CLAUDE.md §3.2 wants a read-only property PREVENTED from being a write target rather than
-        // failing at sync time, and docs/notion-schema.md §7 wants Weight, Sleep and Area never
-        // nulled out. Both hold because there is no way to ask the others for a request body.
+        // failing at sync time, and docs/notion-schema.md §7 wants Area never nulled out. Both hold
+        // because there is no way to ask the others for a request body. A number joined the list
+        // in M16.2 (ADR-156) — and a formula's number result did NOT: it is still wrapped.
         //
         // The list is typed as the supertype deliberately. Written as `Formula(…) is Writable` the
         // compiler folds each check to a constant and warns that it is always false — which proves
@@ -261,8 +262,32 @@ class NotionPropertyCodecTest {
             )
 
         assertEquals(
-            listOf(NotionPropertyValue.Checkbox(true), NotionPropertyValue.DateValue(LocalDate.of(2026, 8, 19))),
+            listOf(
+                NotionPropertyValue.Checkbox(true),
+                NotionPropertyValue.DateValue(LocalDate.of(2026, 8, 19)),
+                NotionPropertyValue.Number(84.0),
+            ),
             everyKind.filterIsInstance<NotionPropertyValue.Writable>(),
+        )
+    }
+
+    @Test
+    fun aNumberIsWrittenAsABareJsonNumber() {
+        // `docs/notion-api.md` §13: `{"number": 82.9}`. A string, or the display format's `82.90`,
+        // would be a different value — or a rejected request.
+        assertEquals(
+            """{"number":82.9}""",
+            NotionJson.encodeToString(JsonObject.serializer(), NotionPropertyValue.numberOrCleared(82.9).toWire()),
+        )
+    }
+
+    @Test
+    fun aClearedNumberIsWrittenAsNullAndNeverAsZero() {
+        // ⚠⚠ The M16.2 failure that would be invisible: a cleared reading sent as `0` is a weigh-in
+        // of nothing, and every average over it is quietly wrong. Notion's own "empty" is `null`.
+        assertEquals(
+            """{"number":null}""",
+            NotionJson.encodeToString(JsonObject.serializer(), NotionPropertyValue.numberOrCleared(null).toWire()),
         )
     }
 

@@ -2,12 +2,15 @@ package com.cristianprincipi.habits.data.repository
 
 import com.cristianprincipi.habits.core.network.ConnectivityObserver
 import com.cristianprincipi.habits.data.local.dao.HabitDao
+import com.cristianprincipi.habits.data.local.dao.MeasureDao
+import com.cristianprincipi.habits.data.local.entity.MeasureEntity
 import com.cristianprincipi.habits.data.sync.DiscardedEdit
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncScheduler
 import com.cristianprincipi.habits.data.sync.SyncSide
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.DiscardedNumberNotice
 import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
@@ -66,6 +69,10 @@ import javax.inject.Singleton
 @Singleton
 class SyncStatusRepositoryImpl
     @Inject
+    // The four sources the class KDoc lists, the notices, and the two tables their ids are named
+    // from — habits since M4.13, measures since M16.2. Bundling the two DAOs behind a lookup class
+    // would add an indirection whose only job is a lint count.
+    @Suppress("LongParameterList")
     constructor(
         private val settings: SettingsRepository,
         private val lastFailure: LastSyncFailureStore,
@@ -73,6 +80,7 @@ class SyncStatusRepositoryImpl
         private val connectivity: ConnectivityObserver,
         private val discardedEdits: DiscardedEditStore,
         private val habitDao: HabitDao,
+        private val measureDao: MeasureDao,
     ) : SyncStatusRepository {
         /**
          * A run has been asked for and provably cannot start.
@@ -139,14 +147,16 @@ class SyncStatusRepositoryImpl
          *
          * A habit whose column has since been deleted has no name left to find and drops out of the
          * list — which is why the count travels separately, so the sentence can still say how many
-         * habits were affected.
+         * habits were affected. A number's notice (M16.2) is joined the same way, to the measure's
+         * name and unit as they are now.
          */
         override fun observeDiscardedEdits(): Flow<List<DiscardedEditNotice>> =
-            combine(discardedEdits.edits, habitDao.observeAll()) { edits, habits ->
+            combine(discardedEdits.edits, habitDao.observeAll(), measureDao.observeAll()) { edits, habits, measures ->
                 // The Notion column name, which is what the habit is called everywhere in this app
                 // — habits have no name of their own (ADR-010: they are columns, not rows).
                 val namesById = habits.associate { habit -> habit.id to habit.notionPropertyName }
-                edits.map { edit -> edit.toNotice(namesById) }
+                val measuresById = measures.associateBy(MeasureEntity::id)
+                edits.map { edit -> edit.toNotice(namesById, measuresById) }
             }.distinctUntilChanged()
 
         override suspend fun dismissDiscardedEdits() {
@@ -178,7 +188,10 @@ private fun SyncFailure?.isResolvedByReconnecting(): Boolean =
         -> false
     }
 
-private fun DiscardedEdit.toNotice(namesById: Map<String, String>): DiscardedEditNotice =
+private fun DiscardedEdit.toNotice(
+    namesById: Map<String, String>,
+    measuresById: Map<String, MeasureEntity>,
+): DiscardedEditNotice =
     DiscardedEditNotice(
         date = LocalDate.ofEpochDay(epochDay),
         habitNames = habitIds.mapNotNull(namesById::get).sorted(),
@@ -189,4 +202,14 @@ private fun DiscardedEdit.toNotice(namesById: Map<String, String>): DiscardedEdi
                 SyncSide.REMOTE -> EditSide.Remote
             },
         resolvedAt = Instant.ofEpochMilli(resolvedAtEpochMillis),
+        number =
+            number?.let { number ->
+                val measure = measuresById[number.measureId]
+                DiscardedNumberNotice(
+                    measureName = measure?.notionPropertyName,
+                    unit = measure?.unit.orEmpty(),
+                    discardedValue = number.discardedValue,
+                    keptValue = number.keptValue,
+                )
+            },
     )

@@ -5,6 +5,7 @@ import com.cristianprincipi.habits.core.testing.createInMemoryDatabase
 import com.cristianprincipi.habits.data.local.HabitsDatabase
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.domain.model.HabitColor
@@ -196,6 +197,101 @@ class MeasureDaoTest {
             assertEquals("h", stored[sleep]?.unit)
             assertEquals(HabitColor.GREEN.name, stored[weight]?.color)
             assertNull(stored["nothing"])
+        }
+
+    // ---- owed numbers (M16.2, ADR-156) --------------------------------------------------------
+
+    @Test
+    fun anEditIsStoredWithAnEmptyBaseAndReadBack() =
+        runTest {
+            // `baseValue` is nullable REAL: "Notion held nothing" must survive the column as null,
+            // not come back as 0.0 — the merge reads a zero base as a real weigh-in.
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = null, editedAtEpochMillis = 5_000))
+
+            assertEquals(
+                MeasurementEditEntity(weight, day1, baseValue = null, editedAtEpochMillis = 5_000),
+                measures.findEdit(weight, day1),
+            )
+            assertNull(measures.findEdit(sleep, day1))
+        }
+
+    @Test
+    fun aSecondEditForTheSameNumberReplacesTheFirst() =
+        runTest {
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 5_000))
+
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 6_000))
+
+            assertEquals(listOf(6_000L), measures.allEdits().map { it.editedAtEpochMillis })
+        }
+
+    @Test
+    fun editsComeBackOldestDayFirstAndByDay() =
+        runTest {
+            measures.upsertEdit(MeasurementEditEntity(weight, day2, baseValue = 84.0, editedAtEpochMillis = 5_000))
+            measures.upsertEdit(MeasurementEditEntity(sleep, day1, baseValue = 7.0, editedAtEpochMillis = 5_000))
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 5_000))
+
+            assertEquals(listOf(day1, day1, day2), measures.allEdits().map { it.epochDay })
+            assertEquals(setOf(weight, sleep), measures.editsForDay(day1).map { it.measureId }.toSet())
+        }
+
+    @Test
+    fun clearingAReadingLeavesItsEditOwed() =
+        runTest {
+            // The two tables are independent on purpose: a cleared number is a missing reading
+            // with its edit row still there, which is what tells the push to send an empty value.
+            measures.upsertReading(MeasurementEntity(weight, day1, 84.2))
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 5_000))
+
+            measures.deleteReading(weight, day1)
+
+            assertNull(measures.findReading(weight, day1))
+            assertEquals(84.2, measures.findEdit(weight, day1)?.baseValue)
+        }
+
+    @Test
+    fun deletingAnEditLeavesTheReading() =
+        runTest {
+            measures.upsertReading(MeasurementEntity(weight, day1, 83.6))
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 5_000))
+
+            measures.deleteEdit(weight, day1)
+
+            assertNull(measures.findEdit(weight, day1))
+            assertEquals(83.6, measures.findReading(weight, day1)?.value)
+        }
+
+    @Test
+    fun deletingADayOrAMeasureTakesItsEditsWithIt() =
+        runTest {
+            measures.upsertEdit(MeasurementEditEntity(weight, day1, baseValue = 84.2, editedAtEpochMillis = 5_000))
+            measures.upsertEdit(MeasurementEditEntity(weight, day2, baseValue = 84.0, editedAtEpochMillis = 5_000))
+
+            database.openHelper.writableDatabase.execSQL(
+                "DELETE FROM days WHERE epochDay = ?",
+                arrayOf<Any>(day1),
+            )
+            assertEquals(listOf(day2), measures.allEdits().map { it.epochDay })
+
+            measures.deleteAllReadings()
+            measures.deleteAllMeasures()
+            assertTrue(measures.allEdits().isEmpty())
+        }
+
+    @Test
+    fun anEditForADayThatWasNeverSyncedIsRefused() =
+        runTest {
+            // The repository writes the day first; this is the constraint that makes forgetting to
+            // a failure here rather than an orphan on the device.
+            val thrown =
+                runCatching {
+                    measures.upsertEdit(
+                        MeasurementEditEntity(weight, 19_000L, baseValue = null, editedAtEpochMillis = 1),
+                    )
+                }.exceptionOrNull()
+
+            assertTrue("Expected a constraint failure but got $thrown", thrown != null)
         }
 
     private fun measure(

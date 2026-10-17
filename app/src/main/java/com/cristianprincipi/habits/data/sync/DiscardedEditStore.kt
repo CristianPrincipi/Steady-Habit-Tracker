@@ -37,13 +37,31 @@ enum class SyncSide {
  *
  * @param habitIds local habit ids, not names. Names change upstream (ADR-038) and a notice written
  *   last week should render with the name the habit has today, so M4.13 joins these against the
- *   habits table rather than reading a name frozen in here.
+ *   habits table rather than reading a name frozen in here. Empty for a [number].
+ * @param number set when what was decided was one **number** rather than the day's checkboxes
+ *   (M16.2, ADR-156). The two are decided separately — a number never rides on the day's
+ *   last-write-wins — so one notice is one decision, never both.
  */
 data class DiscardedEdit(
     val epochDay: Long,
     val habitIds: Set<String>,
     val discardedSide: SyncSide,
     val resolvedAtEpochMillis: Long,
+    val number: DiscardedNumber? = null,
+)
+
+/**
+ * The number half of a [DiscardedEdit]: which one, and **both values**, because a number that lost
+ * cannot be recovered from a name alone — the user needs the figure to type it again.
+ *
+ * @param measureId a local measure id, joined to its name late for [DiscardedEdit.habitIds]' reason.
+ * @param discardedValue what the losing side held; `null` when it held nothing (a cleared number).
+ * @param keptValue what the winning side holds now; `null` likewise.
+ */
+data class DiscardedNumber(
+    val measureId: String,
+    val discardedValue: Double?,
+    val keptValue: Double?,
 )
 
 /**
@@ -109,6 +127,14 @@ class DiscardedEditStore
                         habitIds = edit.habitIds.toList(),
                         discardedSide = edit.discardedSide.name,
                         resolvedAtEpochMillis = edit.resolvedAtEpochMillis,
+                        number =
+                            edit.number?.let { number ->
+                                StoredNumber(
+                                    measureId = number.measureId,
+                                    discardedValue = number.discardedValue,
+                                    keptValue = number.keptValue,
+                                )
+                            },
                     )
                 },
             )
@@ -130,6 +156,14 @@ class DiscardedEditStore
                             habitIds = edit.habitIds.toSet(),
                             discardedSide = it,
                             resolvedAtEpochMillis = edit.resolvedAtEpochMillis,
+                            number =
+                                edit.number?.let { number ->
+                                    DiscardedNumber(
+                                        measureId = number.measureId,
+                                        discardedValue = number.discardedValue,
+                                        keptValue = number.keptValue,
+                                    )
+                                },
                         )
                     }
                 }
@@ -142,6 +176,15 @@ class DiscardedEditStore
             @SerialName("habit_ids") val habitIds: List<String>,
             @SerialName("discarded_side") val discardedSide: String,
             @SerialName("resolved_at_epoch_millis") val resolvedAtEpochMillis: Long,
+            // Defaulted, so a blob written before M16.2 still reads: its notices are all habits.
+            @SerialName("number") val number: StoredNumber? = null,
+        )
+
+        @Serializable
+        private data class StoredNumber(
+            @SerialName("measure_id") val measureId: String,
+            @SerialName("discarded_value") val discardedValue: Double?,
+            @SerialName("kept_value") val keptValue: Double?,
         )
 
         private companion object {

@@ -565,8 +565,26 @@ Seven types state they cannot be updated through the API:
 `NotionPropertyType.isReadOnly` is exactly this set and nothing else. **Everything outside it means
 "not documented as read-only", which is weaker than "we have written it and it worked"** — enough for
 the job `CLAUDE.md` §3.2 gives it (*prevent* a read-only property being chosen as a write target),
-because preventing needs only the exclusions to be right. What v1 actually writes is narrower still:
-a checkbox and a date, enforced by `NotionPropertyValue.Writable` (ADR-044).
+because preventing needs only the exclusions to be right. What the app actually writes is narrower
+still: a checkbox, a date and — since M16.2 — a number, enforced by `NotionPropertyValue.Writable`
+(ADR-044, ADR-156).
+
+### Writing a number — M16.2, read from the page-property-values reference on 2026-10-16
+
+```jsonc
+{ "number": 82.9 }   // set or change
+{ "number": null }   // clear — "`number` is a JSON number or `null`"
+```
+
+- **Clearing is `null`, never `0`.** The reference's table of properties that can be cleared lists
+  `number`. A cleared reading sent as `0` would be a weigh-in of nothing in every average over it.
+- **A property left out of an update keeps its value**, which is what lets a page update carry one
+  number and leave the day's checkboxes alone (and the reverse).
+- **Only numbers this device holds an edit for are sent** — a number column nobody typed into on the
+  phone is never part of a request body. Only `number` columns can be mapped as measures, and
+  `formula` / `rollup` are read-only above, so nothing unwritable can be chosen as a target.
+- ⚠ **These shapes are from the reference, not yet from a live write.** M16.2a is tested against the
+  fake Notion only; the first real write is M16.2b's check on a phone, and its result belongs here.
 
 ### Every property type a schema can hold
 

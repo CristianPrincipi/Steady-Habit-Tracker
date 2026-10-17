@@ -20,9 +20,21 @@ class MappedMeasures(
     val properties: List<MappedMeasure>,
     private val localIdByPropertyId: Map<String, String>,
 ) {
+    private val propertyIdByLocalId =
+        localIdByPropertyId.entries.associate { (propertyId, localId) ->
+            localId to
+                propertyId
+        }
+
     val localIds: Collection<String> get() = localIdByPropertyId.values
 
     fun localIdOf(measure: MappedMeasure): String? = localIdByPropertyId[measure.id.value]
+
+    /**
+     * The property a local measure is written to — M16.2's push — or null for a measure the
+     * mapping no longer names, whose owed numbers then wait rather than going anywhere.
+     */
+    fun propertyIdOf(localId: String): String? = propertyIdByLocalId[localId]
 }
 
 /**
@@ -31,8 +43,9 @@ class MappedMeasures(
  * [HabitImporter]'s twin, and a separate class rather than two more methods on it, because the rule
  * each one owns is different: that one owns *a habit is a checkbox column*, this owns *a measure is
  * a number column the user asked to average*. Both are schema facts, refreshed wholesale on every
- * sync and never pushed back — ADR-010 leaves this app no code path that can write a schema, and
- * M15.4 leaves it none that can write a number either.
+ * sync and never pushed back — ADR-010 leaves this app no code path that can write a schema. A
+ * *number* on a page can be written since M16.2, but that is a reading, not this table: nothing
+ * here ever reaches Notion.
  */
 @Singleton
 class MeasureImporter

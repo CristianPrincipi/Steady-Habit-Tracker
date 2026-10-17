@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -37,9 +38,12 @@ import com.cristianprincipi.habits.core.designsystem.component.SectionEyebrow
 import com.cristianprincipi.habits.core.designsystem.component.readingWidth
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
+import com.cristianprincipi.habits.core.ui.rememberCurrentLocale
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.DiscardedNumberNotice
 import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncFailure
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -186,6 +190,8 @@ private fun DiscardedEditsCard(
             style = MaterialTheme.typography.bodySmall,
             color = HabitsTheme.colors.text.secondary,
         )
+        val locale = rememberCurrentLocale()
+        val numberFormat = remember(locale) { NumberFormat.getNumberInstance(locale) }
         notices.forEach { notice ->
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.yearDotGap)) {
                 Text(
@@ -201,11 +207,13 @@ private fun DiscardedEditsCard(
                     color = HabitsTheme.colors.text.primary,
                 )
                 Text(
-                    // The names when they can still be found, and the count when they cannot: a
-                    // habit whose Notion column was deleted has no name left, and "1 habit
-                    // affected" is still true and still worth saying.
+                    // A number names both values (M16.2): the losing one is what the user would
+                    // type again. For habits, the names when they can still be found and the count
+                    // when they cannot: a habit whose Notion column was deleted has no name left,
+                    // and "1 habit affected" is still true and still worth saying.
                     text =
-                        notice.habitNames.takeIf(List<String>::isNotEmpty)?.joinToString()
+                        notice.number?.let { number -> discardedNumberText(number, numberFormat) }
+                            ?: notice.habitNames.takeIf(List<String>::isNotEmpty)?.joinToString()
                             ?: pluralStringResource(
                                 R.plurals.sync_discarded_habits,
                                 notice.habitCount,
@@ -224,6 +232,35 @@ private fun DiscardedEditsCard(
             )
         }
     }
+}
+
+/**
+ * `Weight: 82.9 kg was replaced by 83.1 kg` — the losing value first, since it is the one gone.
+ *
+ * Every digit the user typed is kept (the formatter's default three places, trailing zeros dropped),
+ * unlike Week's one-place cell: this may be the only record of a value they want back. An empty
+ * side says so in words — a cleared number is not a zero.
+ */
+@Composable
+private fun discardedNumberText(
+    number: DiscardedNumberNotice,
+    format: NumberFormat,
+): String {
+    val empty = stringResource(R.string.sync_discarded_number_empty)
+    val withUnit = stringResource(R.string.sync_discarded_number_with_unit)
+    val shown = { value: Double? ->
+        when {
+            value == null -> empty
+            number.unit.isBlank() -> format.format(value)
+            else -> withUnit.format(format.format(value), number.unit)
+        }
+    }
+    return stringResource(
+        R.string.sync_discarded_number,
+        number.measureName ?: stringResource(R.string.sync_discarded_number_unnamed),
+        shown(number.discardedValue),
+        shown(number.keptValue),
+    )
 }
 
 /**
@@ -344,6 +381,21 @@ private fun SyncStatusFailedPreview() {
                 habitCount = 1,
                 discardedSide = EditSide.Remote,
                 resolvedAt = Instant.parse("2026-08-22T18:30:00Z"),
+            ),
+            // A number (M16.2): both values, the losing one first.
+            DiscardedEditNotice(
+                date = LocalDate.of(2026, 8, 18),
+                habitNames = emptyList(),
+                habitCount = 0,
+                discardedSide = EditSide.Local,
+                resolvedAt = Instant.parse("2026-08-22T08:00:00Z"),
+                number =
+                    DiscardedNumberNotice(
+                        measureName = "Weight",
+                        unit = "kg",
+                        discardedValue = 82.9,
+                        keptValue = 83.1,
+                    ),
             ),
         )
     HabitsTheme {

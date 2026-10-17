@@ -6,6 +6,7 @@ import com.cristianprincipi.habits.data.local.dao.DayDao
 import com.cristianprincipi.habits.data.local.dao.MeasureDao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDatabaseId
@@ -51,7 +52,18 @@ import javax.inject.Singleton
  *    path in this class rests on that, including clearing a page id that turns out to be gone.
  * 3. **Push last**, so a day that both sides changed has already been marked [SyncState.CONFLICT]
  *    and is skipped — [DayDao.withState] asks for `PENDING_PUSH` only. Pushing a conflicted day
- *    would resolve it destructively and silently, which §3.5 forbids.
+ *    would resolve it destructively and silently, which §3.5 forbids. The same holds for a number
+ *    typed on this device (M16.2): the pull has already merged it, so what is still owed after the
+ *    pull is exactly what should be sent.
+ *
+ * ### ⭐⭐ Two kinds of owed write since M16.2, and they never ride on each other (ADR-156)
+ *
+ * A day's **checkboxes** are owed when the day is `PENDING_PUSH` and decided per day by
+ * [ConflictResolver]. A **number** is owed when it has a [MeasurementEditEntity] and is decided per
+ * number, by a three-way merge against what Notion held when it was typed. One page update can carry
+ * both, but neither is ever sent because of the other: a weight typed on the phone must not re-send
+ * the phone's checkboxes over a habit ticked later in Notion, and a check-off must not re-send a
+ * number nobody touched.
  *
  * ### Resumability is a property of the pull's sort order, not of a checkpoint
  *
@@ -183,7 +195,7 @@ class SyncEngine
             habitImporter.refreshStartDates(habits)
 
             val pushed =
-                when (val result = push(mapping, habits)) {
+                when (val result = push(mapping, habits, measures)) {
                     is NotionResult.Failure -> return SyncOutcome.Failed(result.error)
                     is NotionResult.Success -> result.value
                 }
@@ -287,7 +299,7 @@ class SyncEngine
             }
 
             val remoteMillis = remoteEditedAt.toEpochMilli()
-            val plan =
+            val decided =
                 transactionRunner.withTransaction {
                     val local = dayDao.find(epochDay)
                     val plan = planFor(local, remoteMillis, dto, epochDay, habits)
@@ -307,19 +319,17 @@ class SyncEngine
                         ),
                     )
                     if (plan.state == SyncState.SYNCED) applyCompletions(dto, epochDay, habits)
-                    // ⭐⭐ **Unconditional, where the completions above are gated on SYNCED — and
-                    // that is not an oversight of the gate but the absence of the thing it
-                    // protects.** That branch exists so a pull cannot clobber a check-off this
-                    // device has not pushed yet. Nothing can edit a measure locally: `Writable`
-                    // has two implementations and `Number` is not one, so there is no unpushed
-                    // reading anywhere to lose. Notion is authoritative for these, always
-                    // (M15.4), so a day that owes a push still gets today's weight.
-                    applyMeasurements(dto, epochDay, measures)
-                    plan
+                    // ⭐⭐ **Not gated on the day's state, where the completions above are — and that
+                    // is not an oversight of the gate.** That gate protects the day's *checkboxes*.
+                    // A number has its own protection since M16.2: an edit row, merged one number
+                    // at a time inside `applyMeasurements`. So a day that owes a check-off still
+                    // gets today's weight from Notion, and a day that owes nothing for its
+                    // checkboxes can still be owed a number.
+                    listOfNotNull(plan.discarded) + applyMeasurements(dto, epochDay, remoteMillis, measures)
                 }
             // Outside the transaction on purpose: a notice for a write that rolled back would be
             // an apology for something that never happened.
-            plan.discarded?.let(discarded::add)
+            discarded += decided
             return true
         }
 
@@ -454,7 +464,8 @@ class SyncEngine
         }
 
         /**
-         * Writes the page's numbers over the local ones, one mapped measure at a time.
+         * Writes the page's numbers over the local ones, one mapped measure at a time — **except a
+         * number this device still owes Notion, which is merged instead** (M16.2, [mergeReading]).
          *
          * [applyCompletions]' twin, with one case that has no counterpart there and one that reads
          * the same and means something different.
@@ -466,38 +477,113 @@ class SyncEngine
          * feature that a user could not detect. An **absent** property means the same thing here:
          * the page predates the column.
          *
-         * An **unreadable** value is left alone rather than deleted, exactly as a completion is. A
-         * value that will not decode means the shape changed, and throwing away a real reading over
-         * it would be inventing a gap.
+         * An **unreadable** value is left alone rather than deleted, exactly as a completion is —
+         * and an owed edit is left alone with it. A value that will not decode means the shape
+         * changed, and throwing away a real reading over it would be inventing a gap.
+         *
+         * @return what merging destroyed, one notice per number.
          */
         private suspend fun applyMeasurements(
             dto: NotionPageDto,
             epochDay: Long,
+            remoteMillis: Long,
             measures: MappedMeasures,
+        ): List<DiscardedEdit> =
+            measures.properties.mapNotNull { mapped ->
+                val measureId = measures.localIdOf(mapped) ?: return@mapNotNull null
+                val remote =
+                    when (val value = dto.property(mapped.id.value)) {
+                        is NotionPropertyValue.Number -> value.value
+                        NotionPropertyValue.Empty, null -> null
+                        else -> return@mapNotNull null
+                    }
+                val owed = measureDao.findEdit(measureId = measureId, epochDay = epochDay)
+                if (owed == null) {
+                    applyReading(measureId, epochDay, remote)
+                    null
+                } else {
+                    mergeReading(owed, remote, remoteMillis)
+                }
+            }
+
+        /** A reading, or its absence: `null` deletes the row and never stores a zero. */
+        private suspend fun applyReading(
+            measureId: String,
+            epochDay: Long,
+            value: Double?,
         ) {
-            measures.properties.forEach { mapped ->
-                val measureId = measures.localIdOf(mapped) ?: return@forEach
-                when (val value = dto.property(mapped.id.value)) {
-                    is NotionPropertyValue.Number -> {
-                        measureDao.upsertReading(
-                            MeasurementEntity(
-                                measureId = measureId,
-                                epochDay = epochDay,
-                                value = value.value,
-                            ),
-                        )
-                    }
+            if (value == null) {
+                measureDao.deleteReading(measureId = measureId, epochDay = epochDay)
+            } else {
+                measureDao.upsertReading(MeasurementEntity(measureId = measureId, epochDay = epochDay, value = value))
+            }
+        }
 
-                    NotionPropertyValue.Empty, null -> {
-                        measureDao.deleteReading(measureId = measureId, epochDay = epochDay)
-                    }
+        /**
+         * One number this device owes, against what the page holds now — a three-way merge, with
+         * [MeasurementEditEntity.baseValue] as the common ancestor (ADR-156 §2).
+         *
+         * 1. **Notion holds what we hold** → the two agree, and nothing is owed any more. This is
+         *    also what stops a killed push from leaving an edit behind, as `planFor`'s step 2 does
+         *    for a day.
+         * 2. **Notion still holds the base** → it did not touch this number, so ours is still owed.
+         * 3. **Otherwise both changed it**, and last-write-wins decides — the edit's time against
+         *    the page's `last_edited_time`, ties to the device, as [ConflictResolver] does for a
+         *    day. Local wins → still owed, now against the value it beat, so the next pull does not
+         *    find the same conflict again. Remote wins → applied, nothing owed. Either way the loser
+         *    is named, with both values.
+         *
+         * ⚠ The page's time is the **page's**, not the number's: a habit ticked in Notion after the
+         * number was changed there makes the page newer. Notion keeps no per-property time, so this
+         * is the same coarseness [ConflictResolver] documents, and the notice is the same remedy.
+         */
+        private suspend fun mergeReading(
+            owed: MeasurementEditEntity,
+            remote: Double?,
+            remoteMillis: Long,
+        ): DiscardedEdit? {
+            val ours = measureDao.findReading(measureId = owed.measureId, epochDay = owed.epochDay)?.value
+            return when {
+                remote == ours -> {
+                    measureDao.deleteEdit(measureId = owed.measureId, epochDay = owed.epochDay)
+                    null
+                }
 
-                    else -> {
-                        Unit
-                    }
+                remote == owed.baseValue -> {
+                    null
+                }
+
+                owed.editedAtEpochMillis >= remoteMillis -> {
+                    measureDao.upsertEdit(owed.copy(baseValue = remote))
+                    numberDiscarded(owed, SyncSide.REMOTE, discardedValue = remote, keptValue = ours)
+                }
+
+                else -> {
+                    applyReading(owed.measureId, owed.epochDay, remote)
+                    measureDao.deleteEdit(measureId = owed.measureId, epochDay = owed.epochDay)
+                    numberDiscarded(owed, SyncSide.LOCAL, discardedValue = ours, keptValue = remote)
                 }
             }
         }
+
+        private fun numberDiscarded(
+            owed: MeasurementEditEntity,
+            side: SyncSide,
+            discardedValue: Double?,
+            keptValue: Double?,
+        ): DiscardedEdit =
+            DiscardedEdit(
+                epochDay = owed.epochDay,
+                habitIds = emptySet(),
+                discardedSide = side,
+                resolvedAtEpochMillis = clock.millis(),
+                number =
+                    DiscardedNumber(
+                        measureId = owed.measureId,
+                        discardedValue = discardedValue,
+                        keptValue = keptValue,
+                    ),
+            )
 
         /**
          * A page Notion reports as trashed or archived.
@@ -506,7 +592,12 @@ class SyncEngine
          * — but the branch is short and the alternative is storing a day that upstream has deleted.
          *
          * **A day with an unpushed edit survives, and its page id is dropped so the push recreates
-         * it.** This is the one conflict [ConflictResolver] does not decide, because it cannot: a
+         * it** — and since M16.2 a number this device owes is an unpushed edit too. The day goes
+         * back to `PENDING_PUSH` either way, so the new page carries the checkboxes as well as the
+         * number: a page created with the number alone would come back on the next pull with every
+         * habit unticked, and be applied over the phone's.
+         *
+         * This is the one conflict [ConflictResolver] does not decide, because it cannot: a
          * deletion carries no timestamp to compare, so last-write-wins has nothing to weigh. Local
          * wins by construction instead, and the reasoning is asymmetric on purpose — this app has
          * no way to delete in Notion (ADR-036), so honouring the deletion would destroy the local
@@ -516,7 +607,8 @@ class SyncEngine
         private suspend fun reconcileGonePage(epochDay: Long) {
             transactionRunner.withTransaction {
                 val local = dayDao.find(epochDay) ?: return@withTransaction
-                if (local.syncState == SyncState.SYNCED) {
+                val owesNothing = local.syncState == SyncState.SYNCED && measureDao.editsForDay(epochDay).isEmpty()
+                if (owesNothing) {
                     dayDao.delete(epochDay)
                 } else {
                     dayDao.upsert(local.copy(notionPageId = null, syncState = SyncState.PENDING_PUSH))
@@ -527,21 +619,38 @@ class SyncEngine
         /**
          * Sends every day that owes Notion a write, oldest first.
          *
-         * **One page update per day, not one per check-off.** `CLAUDE.md` §3.5 asks for writes to be
-         * batched and coalesced; here it falls out of the data — five habits on a day are five
-         * properties of one page.
+         * **Two sources since M16.2**: the days whose checkboxes are `PENDING_PUSH`, and the days
+         * holding a number this device owes. A number owed for a measure the mapping no longer
+         * names is **kept and not sent** — there is no validated property to send it to, and
+         * writing under a stale mapping is what `CLAUDE.md` §3.4 forbids. It goes out the day the
+         * column is mapped again.
          *
-         * The first failure stops the run and the remaining days keep their `PENDING_PUSH`. Pressing
-         * on would mean spending the rate limit re-learning the same 429 or the same dead socket
-         * once per day owed.
+         * **One page update per day, not one per check-off.** `CLAUDE.md` §3.5 asks for writes to be
+         * batched and coalesced; here it falls out of the data — five habits and two numbers on a
+         * day are seven properties of one page.
+         *
+         * The first failure stops the run and the remaining days stay owed. Pressing on would mean
+         * spending the rate limit re-learning the same 429 or the same dead socket once per day.
          */
         private suspend fun push(
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            measures: MappedMeasures,
         ): NotionResult<Int> {
+            val mappedMeasures = measures.localIds.toSet()
+            val owedNumbers =
+                measureDao
+                    .allEdits()
+                    .filter { edit -> edit.measureId in mappedMeasures }
+                    .groupBy(MeasurementEditEntity::epochDay)
+            val days =
+                (dayDao.withState(SyncState.PENDING_PUSH) + owedNumbers.keys.mapNotNull { dayDao.find(it) })
+                    .distinctBy(DayEntity::epochDay)
+                    .sortedBy(DayEntity::epochDay)
+
             var pushed = 0
-            dayDao.withState(SyncState.PENDING_PUSH).forEach { day ->
-                when (val result = pushDay(day, mapping, habits)) {
+            days.forEach { day ->
+                when (val result = pushDay(day, mapping, habits, measures, owedNumbers[day.epochDay].orEmpty())) {
                     is NotionResult.Failure -> return result
                     is NotionResult.Success -> pushed++
                 }
@@ -549,27 +658,56 @@ class SyncEngine
             return NotionResult.Success(pushed)
         }
 
+        /** One owed number as it went into a request body — what [recordPush] settles it against. */
+        private data class SentNumber(
+            val edit: MeasurementEditEntity,
+            val propertyId: String,
+            val value: Double?,
+        )
+
         /**
          * One day, as one request.
          *
-         * **Only the mapped properties are sent**, so `Weight`, `Sleep`, `Area` and `Progress` come
-         * through a sync untouched — `docs/notion-schema.md` §7 requires exactly that, and
-         * `updatePage` being a partial update is what delivers it.
+         * **Only what is owed is sent**, so `Area`, `Progress` and every number nobody typed on this
+         * device come through a sync untouched — `docs/notion-schema.md` §7 requires exactly that,
+         * and `updatePage` being a partial update is what delivers it.
          *
-         * **Every mapped habit is written, including the unchecked ones.** Un-checking is a
-         * checkbox going to `false`, not a value being omitted (ADR-036: nothing here deletes), and
-         * a habit left out of the body would simply keep whatever Notion already had.
+         * - **The checkboxes only when the day is `PENDING_PUSH`** — and then every mapped habit,
+         *   unchecked ones included. Un-checking is a checkbox going to `false`, not a value being
+         *   omitted (ADR-036: nothing here deletes), and a habit left out would keep whatever Notion
+         *   had. ⚠ A day sent for a number alone sends **no** checkbox: they are not owed, and
+         *   sending the phone's copy would overwrite a habit ticked in Notion since (ADR-156).
+         * - **Each owed number as it stands in Room now**: its value, or an emptied number when it
+         *   was cleared — never a zero.
          */
         private suspend fun pushDay(
             day: DayEntity,
             mapping: NotionPropertyMapping,
             habits: MappedHabits,
+            measures: MappedMeasures,
+            owed: List<MeasurementEditEntity>,
         ): NotionResult<Unit> {
-            val checked = completionDao.forDay(day.epochDay).map(HabitCompletionEntity::habitId).toSet()
-            val properties =
-                habits.properties.associate { mapped ->
-                    mapped.id.value to NotionPropertyValue.Checkbox(habits.localIdOf(mapped) in checked).toWire()
+            val checkboxes =
+                if (day.syncState == SyncState.PENDING_PUSH) {
+                    val checked = completionDao.forDay(day.epochDay).map(HabitCompletionEntity::habitId).toSet()
+                    habits.properties.associate { mapped ->
+                        mapped.id.value to NotionPropertyValue.Checkbox(habits.localIdOf(mapped) in checked).toWire()
+                    }
+                } else {
+                    emptyMap()
                 }
+            val sent =
+                owed.mapNotNull { edit ->
+                    val propertyId = measures.propertyIdOf(edit.measureId) ?: return@mapNotNull null
+                    val value = measureDao.findReading(measureId = edit.measureId, epochDay = edit.epochDay)?.value
+                    SentNumber(edit = edit, propertyId = propertyId, value = value)
+                }
+            val properties =
+                checkboxes +
+                    sent.associate { number ->
+                        number.propertyId to
+                            NotionPropertyValue.numberOrCleared(number.value).toWire()
+                    }
 
             val result =
                 if (day.notionPageId == null) {
@@ -584,7 +722,7 @@ class SyncEngine
 
             return when (result) {
                 is NotionResult.Success -> {
-                    recordPush(day, result.value)
+                    recordPush(day, result.value, sent)
                     NotionResult.Success(Unit)
                 }
 
@@ -594,7 +732,11 @@ class SyncEngine
                         // it is only ever a cache of the date: forget it, keep the day owed, and let
                         // the next run either re-adopt the page on pull or create a new one. This is
                         // the only remote delete this app can actually detect (`notion-api.md` §14).
-                        dayDao.upsert(day.copy(notionPageId = null))
+                        // ⚠ Owed **in full** — `PENDING_PUSH` even for a day sent for a number alone,
+                        // for `reconcileGonePage`'s reason: a new page must carry the checkboxes too.
+                        dayDao.find(day.epochDay)?.let { current ->
+                            dayDao.upsert(current.copy(notionPageId = null, syncState = SyncState.PENDING_PUSH))
+                        }
                     }
                     result
                 }
@@ -609,6 +751,12 @@ class SyncEngine
          * only record that Notion is behind. So the day is re-read and its
          * [DayEntity.localUpdatedAtEpochMillis] compared with the value this push was built from; if
          * it moved, the state is left exactly as it is and the next run sends the newer version.
+         * A day sent for a number alone sent no checkboxes, so its state is left as it is too.
+         *
+         * **Each number sent is settled by its value, not its time** (M16.2): if Room still holds
+         * what was sent, Notion holds it now and nothing is owed. If the user typed again in flight,
+         * the edit stays owed with the sent value as its base — which is what Notion now holds, so
+         * the next pull reads it as untouched rather than as a conflict.
          *
          * The page id and the remote timestamp are stored either way. They are Notion's facts, they
          * are true whoever won the race, and recording the timestamp is what stops the next pull
@@ -617,9 +765,11 @@ class SyncEngine
         private suspend fun recordPush(
             day: DayEntity,
             page: NotionPageDto,
+            sent: List<SentNumber>,
         ) {
             transactionRunner.withTransaction {
                 val current = dayDao.find(day.epochDay) ?: return@withTransaction
+                val checkboxesSent = day.syncState == SyncState.PENDING_PUSH
                 val editedWhilePushing = current.localUpdatedAtEpochMillis != day.localUpdatedAtEpochMillis
                 dayDao.upsert(
                     current.copy(
@@ -627,9 +777,21 @@ class SyncEngine
                         remoteLastEditedAtEpochMillis =
                             parseInstant(page.lastEditedTime)?.toEpochMilli()
                                 ?: current.remoteLastEditedAtEpochMillis,
-                        syncState = if (editedWhilePushing) current.syncState else SyncState.SYNCED,
+                        syncState = if (checkboxesSent && !editedWhilePushing) SyncState.SYNCED else current.syncState,
                     ),
                 )
+                sent.forEach { number -> settle(number) }
+            }
+        }
+
+        private suspend fun settle(number: SentNumber) {
+            val edit = number.edit
+            val owed = measureDao.findEdit(measureId = edit.measureId, epochDay = edit.epochDay) ?: return
+            val held = measureDao.findReading(measureId = edit.measureId, epochDay = edit.epochDay)?.value
+            if (held == number.value) {
+                measureDao.deleteEdit(measureId = edit.measureId, epochDay = edit.epochDay)
+            } else {
+                measureDao.upsertEdit(owed.copy(baseValue = number.value))
             }
         }
     }

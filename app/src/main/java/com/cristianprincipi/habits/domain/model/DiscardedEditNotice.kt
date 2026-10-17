@@ -21,6 +21,8 @@ import java.time.LocalDate
  *   (`CLAUDE.md` §6) — a habit checked at 23:00 belongs to that day whatever the time zone does.
  * @param resolvedAt when resolution happened. A wall-clock instant, because "2 hours ago" is what
  *   the screen shows.
+ * @param number set when what was decided was one number rather than the day's check-offs (M16.2);
+ *   [habitNames] is then empty and [habitCount] zero.
  */
 data class DiscardedEditNotice(
     val date: LocalDate,
@@ -28,6 +30,22 @@ data class DiscardedEditNotice(
     val habitCount: Int,
     val discardedSide: EditSide,
     val resolvedAt: Instant,
+    val number: DiscardedNumberNotice? = null,
+)
+
+/**
+ * A number that last-write-wins replaced, with both values — the losing one is what the user would
+ * have to type again, so it is shown rather than summarised.
+ *
+ * @param measureName the column's name **now**, or `null` if the measure cannot be found any more.
+ * @param discardedValue what the losing copy held; `null` when it held nothing.
+ * @param keptValue what the winning copy holds; `null` likewise.
+ */
+data class DiscardedNumberNotice(
+    val measureName: String?,
+    val unit: String,
+    val discardedValue: Double?,
+    val keptValue: Double?,
 )
 
 /**

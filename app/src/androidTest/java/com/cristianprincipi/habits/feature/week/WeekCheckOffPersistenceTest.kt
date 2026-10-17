@@ -158,7 +158,16 @@ class WeekCheckOffPersistenceTest {
         return WeekViewModel(
             getHabitsForWeek = GetHabitsForWeek(repository, clock),
             getMeasuresForWeek =
-                GetMeasuresForWeek(MeasureRepositoryImpl(instance.measureDao(), RecordingWidgetRefresher()), clock),
+                GetMeasuresForWeek(
+                    MeasureRepositoryImpl(
+                        measureDao = instance.measureDao(),
+                        dayDao = instance.dayDao(),
+                        transactionRunner = RoomTransactionRunner(instance),
+                        clock = clock,
+                        widgets = RecordingWidgetRefresher(),
+                    ),
+                    clock,
+                ),
             toggleCompletion = ToggleCompletion(repository, clock),
             // Read only when there are no habits to draw, which is never in this test — seeded
             // habits are the whole premise. A permanently idle status keeps it out of the way.

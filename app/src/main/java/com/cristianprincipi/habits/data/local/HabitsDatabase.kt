@@ -11,15 +11,17 @@ import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
 import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 
 /**
  * The local source of truth. Every screen reads from here and from nowhere else (`CLAUDE.md` §1).
  *
- * Five tables, in the shape the user's Notion database actually has: habits are a cached schema,
+ * Six tables, in the shape the user's Notion database actually has: habits are a cached schema,
  * days are pages, completions are the checkboxes on them, and — since M15.4 — measures are a cached
  * schema too, with a reading per measure per day. See [DayEntity] for why the day is what carries
- * sync state.
+ * sync state for the checkboxes, and [MeasurementEditEntity] (M16.2) for why a number typed on this
+ * device carries its own.
  *
  * ⭐⭐ **Measures are two tables of their own rather than a flag on the habit tables, and that is
  * the whole exclusion mechanism** — see [MeasureEntity]. Every screen in this app reads habits; a
@@ -38,8 +40,9 @@ import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
         HabitCompletionEntity::class,
         MeasureEntity::class,
         MeasurementEntity::class,
+        MeasurementEditEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)

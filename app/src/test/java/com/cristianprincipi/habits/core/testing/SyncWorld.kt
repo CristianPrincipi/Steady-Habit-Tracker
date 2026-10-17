@@ -7,6 +7,7 @@ import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
 import com.cristianprincipi.habits.data.local.dao.FakeMeasureDao
 import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import com.cristianprincipi.habits.data.preferences.NotionDataSourceId
 import com.cristianprincipi.habits.data.preferences.NotionMappingStore
@@ -19,12 +20,16 @@ import com.cristianprincipi.habits.data.remote.notion.dto.NotionDataSourceDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPageDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionParentDto
 import com.cristianprincipi.habits.data.remote.notion.dto.NotionPropertySchemaDto
+import com.cristianprincipi.habits.data.remote.notion.mapper.NotionPropertyValue
+import com.cristianprincipi.habits.data.remote.notion.mapper.property
+import com.cristianprincipi.habits.data.repository.MeasureRepositoryImpl
 import com.cristianprincipi.habits.data.repository.SettingsRepositoryImpl
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
 import com.cristianprincipi.habits.data.sync.HabitImporter
 import com.cristianprincipi.habits.data.sync.MeasureImporter
 import com.cristianprincipi.habits.data.sync.PullFormatStore
 import com.cristianprincipi.habits.data.sync.SyncEngine
+import com.cristianprincipi.habits.domain.model.MeasureId
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -207,6 +212,15 @@ fun NotionPageDto.withUnreadableWeight(): NotionPageDto =
 val mappingWithWeight: NotionPropertyMapping =
     defaultMapping.copy(measures = listOf(NotionMeasure(NotionPropertyId(PropertyIds.WEIGHT), "kg")))
 
+/**
+ * A number as Notion holds it on this page: the value, [NotionPropertyValue.Empty] when the column
+ * is there and holds nothing, or `null` when the page has no such property at all.
+ *
+ * Read through the production decoder, by id — which works on a page this app wrote as well as on
+ * one a test built, since `FakeNotionApi` returns written properties the way Notion does.
+ */
+fun NotionPageDto.numberAt(propertyId: String = PropertyIds.WEIGHT): NotionPropertyValue? = property(propertyId)
+
 fun NotionPageDto.weightValue(): Double? =
     properties.values
         .firstOrNull { it["id"]?.jsonPrimitive?.content == PropertyIds.WEIGHT }
@@ -271,6 +285,24 @@ class SyncWorld(
     val settings = SettingsDataStore(preferences)
     val discardedEdits = DiscardedEditStore(preferences)
     val pullFormat = PullFormatStore(preferences)
+
+    /** The phone's clock for a number typed on it — moved per edit by [setNumberLocally]. */
+    private val deviceClock = MutableClock(Instant.ofEpochMilli(DEFAULT_LOCAL_EDIT_MILLIS))
+
+    /**
+     * ⭐ The production write path for a number (M16.2), not a copy of it. [checkOffLocally]
+     * re-states `HabitRepositoryImpl.setCompleted`; a number's write decides its base value and
+     * whether anything is owed at all, and a re-statement that drifted from the real one would let
+     * every sync test here pass against a write the app does not make.
+     */
+    val numbers =
+        MeasureRepositoryImpl(
+            measureDao = measures,
+            dayDao = days,
+            transactionRunner = TestTransactionRunner(),
+            clock = deviceClock,
+            widgets = RecordingWidgetRefresher(),
+        )
 
     val engine =
         SyncEngine(
@@ -338,10 +370,50 @@ class SyncWorld(
         completions.insert(HabitCompletionEntity(habitId = habitId, epochDay = epochDay))
     }
 
+    /**
+     * A number typed on the phone, through [numbers]. `null` clears it.
+     *
+     * @param at the device's clock at the moment of typing — the local side of last-write-wins.
+     */
+    suspend fun setNumberLocally(
+        date: LocalDate,
+        value: Double?,
+        at: Long = DEFAULT_LOCAL_EDIT_MILLIS,
+        propertyId: String = PropertyIds.WEIGHT,
+    ) {
+        deviceClock.setTo(Instant.ofEpochMilli(at))
+        numbers.setReading(MeasureId(measureId(propertyId)), date, value)
+    }
+
+    /** The local id of the measure backing a Notion number column. */
+    fun measureId(propertyId: String = PropertyIds.WEIGHT): String =
+        measures.current.single { it.notionPropertyId == propertyId }.id
+
+    /** The reading Room holds for a day, or `null` for none. */
+    fun readingOn(
+        date: LocalDate,
+        propertyId: String = PropertyIds.WEIGHT,
+    ): Double? =
+        measures.currentReadings
+            .singleOrNull { it.measureId == measureId(propertyId) && it.epochDay == date.toEpochDay() }
+            ?.value
+
+    /** What this device still owes Notion for a number on a day, or `null`. */
+    fun owedOn(
+        date: LocalDate,
+        propertyId: String = PropertyIds.WEIGHT,
+    ): MeasurementEditEntity? =
+        measures.currentEdits.singleOrNull { it.measureId == measureId(propertyId) && it.epochDay == date.toEpochDay() }
+
     /** The local id of the habit backing a Notion property. */
     fun habitId(propertyId: String): String = habits.current.single { it.notionPropertyId == propertyId }.id
 
     fun dayAt(date: LocalDate): DayEntity = days.current.getValue(date.toEpochDay())
+
+    private companion object {
+        /** [checkOffLocally]'s default too: after every fixture page's stamp unless a test says otherwise. */
+        const val DEFAULT_LOCAL_EDIT_MILLIS = 5_000L
+    }
 }
 
 /** A connected world, ready to sync. The state every test but the first-run ones starts from. */

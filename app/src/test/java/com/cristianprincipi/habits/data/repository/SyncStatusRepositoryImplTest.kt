@@ -5,15 +5,19 @@ import com.cristianprincipi.habits.core.testing.FakeConnectivityObserver
 import com.cristianprincipi.habits.core.testing.FakeSyncScheduler
 import com.cristianprincipi.habits.core.testing.InMemoryDataStore
 import com.cristianprincipi.habits.data.local.dao.FakeHabitDao
+import com.cristianprincipi.habits.data.local.dao.FakeMeasureDao
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
+import com.cristianprincipi.habits.data.local.entity.MeasureEntity
 import com.cristianprincipi.habits.data.preferences.SettingsDataStore
 import com.cristianprincipi.habits.data.remote.notion.NotionError
 import com.cristianprincipi.habits.data.sync.DiscardedEdit
 import com.cristianprincipi.habits.data.sync.DiscardedEditStore
+import com.cristianprincipi.habits.data.sync.DiscardedNumber
 import com.cristianprincipi.habits.data.sync.LastSyncFailureStore
 import com.cristianprincipi.habits.data.sync.SyncOutcome
 import com.cristianprincipi.habits.data.sync.SyncSide
 import com.cristianprincipi.habits.domain.model.DiscardedEditNotice
+import com.cristianprincipi.habits.domain.model.DiscardedNumberNotice
 import com.cristianprincipi.habits.domain.model.EditSide
 import com.cristianprincipi.habits.domain.model.SyncFailure
 import com.cristianprincipi.habits.domain.model.SyncStatus
@@ -41,6 +45,7 @@ class SyncStatusRepositoryImplTest {
 
     private val discardedEdits = DiscardedEditStore(dataStore)
     private val habits = FakeHabitDao()
+    private val measures = FakeMeasureDao()
 
     private val repository =
         SyncStatusRepositoryImpl(
@@ -50,6 +55,7 @@ class SyncStatusRepositoryImplTest {
             connectivity,
             discardedEdits,
             habits,
+            measures,
         )
 
     @Test
@@ -317,6 +323,52 @@ class SyncStatusRepositoryImplTest {
                 assertEquals(LocalDate.of(2026, 8, 21), notice.date)
                 assertEquals(listOf("✒️ Journal", "📖 Reading"), notice.habitNames)
                 assertEquals(EditSide.Local, notice.discardedSide)
+            }
+        }
+
+    @Test
+    fun aNumbersNoticeArrivesWithItsMeasuresNameUnitAndBothValues() =
+        runTest {
+            // M16.2: joined late like a habit's, so a column renamed since reads with its new name —
+            // and a measure whose column left the mapping is still found, because hidden measures
+            // keep their rows (ADR-081).
+            measures.upsert(
+                listOf(
+                    MeasureEntity(
+                        id = "m-weight",
+                        notionPropertyId = "prop-weight",
+                        notionPropertyName = "Body weight",
+                        unit = "kg",
+                        color = "GREEN",
+                        isActive = false,
+                        sortOrder = 0,
+                    ),
+                ),
+            )
+            discardedEdits.record(
+                listOf(
+                    DiscardedEdit(
+                        epochDay = LocalDate.of(2026, 10, 15).toEpochDay(),
+                        habitIds = emptySet(),
+                        discardedSide = SyncSide.LOCAL,
+                        resolvedAtEpochMillis = 1_755_000_000_000L,
+                        number = DiscardedNumber("m-weight", discardedValue = 83.6, keptValue = null),
+                    ),
+                ),
+            )
+
+            repository.observeDiscardedEdits().test {
+                val notice = awaitItem().single()
+                assertEquals(
+                    DiscardedNumberNotice(
+                        measureName = "Body weight",
+                        unit = "kg",
+                        discardedValue = 83.6,
+                        keptValue = null,
+                    ),
+                    notice.number,
+                )
+                assertEquals(0, notice.habitCount)
             }
         }
 

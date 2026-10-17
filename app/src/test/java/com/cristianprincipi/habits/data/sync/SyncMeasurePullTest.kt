@@ -125,10 +125,10 @@ class SyncMeasurePullTest {
         runTest {
             // ⭐⭐ **The deliberate asymmetry with completions.** `applyCompletions` is gated on the
             // day being SYNCED so a pull cannot clobber a check-off this device has not sent yet.
-            // No such edit can exist for a measure — `NotionPropertyValue.Writable` has two
-            // implementations and `Number` is not one — so there is nothing to protect, and a day
-            // that owes a push must still get today's weight. Gating it would mean a reading that
-            // does not arrive until the push does.
+            // A number is protected by its own edit row instead (M16.2, `SyncMeasureWriteTest`),
+            // and this one has none — so a day that owes a push for a check-off must still get
+            // today's weight. Gating it on the day would mean a reading that does not arrive until
+            // the push does.
             val world = measuringWorld()
             world.api.givePage(page("p1", august19))
             world.engine.sync()

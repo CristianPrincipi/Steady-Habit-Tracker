@@ -1,5 +1,6 @@
 package com.cristianprincipi.habits.data.remote.notion.mapper
 
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -14,15 +15,20 @@ import java.time.LocalDate
  *
  * **[Writable] is where `CLAUDE.md` §3.2's "prevent that mistake rather than failing at sync time"
  * actually lands.** A formula cannot be written to Notion, and in this vocabulary a formula cannot
- * be turned into a request body either — there is no method to call. The same is true of the number,
- * text and multi-select values this app reads but does not own: `docs/notion-schema.md` §7 says the
- * sync "must read pages without touching them, and must never null them out on write", and the
- * cheapest way to guarantee that is to make writing them unexpressible.
+ * be turned into a request body either — there is no method to call. The same is true of the text
+ * and multi-select values this app reads but does not own: `docs/notion-schema.md` §7 says the sync
+ * "must read pages without touching them, and must never null them out on write", and the cheapest
+ * way to guarantee that is to make writing them unexpressible.
  */
 sealed interface NotionPropertyValue {
     /**
-     * The values this app can send back to Notion. **Exactly two, and that is the whole write
-     * surface of v1**: a habit's checkbox, and the date that identifies the day.
+     * The values this app can send back to Notion: a habit's checkbox, the date that identifies the
+     * day, and — since M16.2 (ADR-156) — a tracked number, set or cleared. That is the whole write
+     * surface.
+     *
+     * ⚠ A number being writable does not make every number column fair game. Only a number this
+     * device holds an edit for is ever put in a request body (`SyncEngine.pushDay`), so a column
+     * the user never typed into on the phone is still never touched.
      */
     sealed interface Writable : NotionPropertyValue {
         /**
@@ -72,14 +78,31 @@ sealed interface NotionPropertyValue {
     ) : NotionPropertyValue
 
     /**
-     * `Weight` and `Sleep` — the user's daily metrics, which v1 reads and does not model.
+     * `Weight` and `Sleep` — the user's daily metrics.
      *
      * `Double`, because Notion sends a bare JSON number: `84`, not the `84.00` its display
      * formatting shows (`docs/notion-schema.md` §2.4). Never parse the display string.
+     *
+     * [Writable] since M16.2, as `{"number": 82.9}` (`docs/notion-api.md` §13). ⚠ A formula's
+     * number result decodes to this type too and stays unwritable all the same: it arrives wrapped
+     * in a [Formula], and nothing unwraps one to send it back.
      */
     data class Number(
         val value: Double,
-    ) : NotionPropertyValue
+    ) : Writable {
+        override fun toWire(): JsonObject = buildJsonObject { put("number", value) }
+    }
+
+    /**
+     * A number column emptied — what a cleared reading sends: `{"number": null}`.
+     *
+     * Write-only: the codec never produces it, because a number that arrives empty is [Empty], which
+     * names no type and so cannot be sent. ⚠⚠ **Never a zero.** A skipped weigh-in is not a weight
+     * of nothing, and Notion has its own way to say "no value" — this is it.
+     */
+    data object ClearedNumber : Writable {
+        override fun toWire(): JsonObject = buildJsonObject { put("number", JsonNull) }
+    }
 
     /** `Area`. Always a list, even holding one option — parse it as a list of one, never a scalar. */
     data class MultiSelect(
@@ -120,4 +143,9 @@ sealed interface NotionPropertyValue {
     data class Unreadable(
         val wireType: String,
     ) : NotionPropertyValue
+
+    companion object {
+        /** A reading as Notion is sent it: the number, or an emptied column for `null`. */
+        fun numberOrCleared(value: Double?): Writable = value?.let(::Number) ?: ClearedNumber
+    }
 }

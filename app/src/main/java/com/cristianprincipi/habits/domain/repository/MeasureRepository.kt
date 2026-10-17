@@ -10,23 +10,16 @@ import java.time.LocalDate
 /**
  * The numbers the user tracks alongside their habits (M15.4).
  *
- * ### ⚠⚠ The DATA is read-only. [setColor] is not data.
+ * ### ⭐⭐ A number can be written since M16.2 (ADR-156, superseding ADR-126 §3)
  *
- * A measure is something the user records **in Notion**, and this app mirrors it: the scope was
- * *"read only, just the average on stats"*. There is no `setReading` here, no `setUnit` — the unit
- * is edited on the mapping screen, which owns the mapping — and **no way for anything above the
- * data layer to change a number**. That claim is unchanged and is the one worth defending.
+ * Until v1.1 the data here was read-only, held so in four places. The user asked to type a weight
+ * or a night's sleep in the app and see it in Notion, so [setReading] exists now — and the four
+ * places became one rule: **only a number this device has an edit for is ever sent**, and sending it
+ * never touches the day's checkboxes (`MeasurementEditEntity` says why that has to be).
  *
- * It is still held in four places: `NotionPropertyValue` has no writable `Number`,
- * `SyncEngine.pushDay` builds its body from habits only, measure property ids live outside
- * `NotionPropertyMapping.habitPropertyIds`, and there is no write here that touches a reading. Any
- * one of them alone would be a rule; four of them is a shape.
- *
- * ⭐ **A colour is on the other side of that line, for the reason a habit's is** (`SetHabitColor`,
- * ADR-010): the user's database has no colour property, so a colour is not in the schema, not on a
- * page, and not something a pull can overwrite. `MeasureImporter` has carried it forward across
- * every sync since M15.4 precisely because it exists nowhere but here. Letting the user choose it
- * adds nothing to what this app can write to Notion, which is still nothing.
+ * ⭐ **A colour is still not data**, for the reason a habit's is (`SetHabitColor`, ADR-010): the
+ * user's database has no colour property, so a colour is not in the schema, not on a page, and not
+ * something a pull can overwrite.
  */
 interface MeasureRepository {
     /**
@@ -53,11 +46,25 @@ interface MeasureRepository {
     ): Flow<List<MeasureReading>>
 
     /**
+     * Sets, changes or clears one number on one day — M16.2, ADR-156.
+     *
+     * It lands in Room at once and every screen and widget shows it; Notion gets it on the next
+     * sync, exactly as a check-off does. **The day's checkbox sync state is not touched.**
+     *
+     * @param value the reading, or `null` to clear it — which Notion is sent as an empty number,
+     *   **never a zero** (a skipped weigh-in is not a weight of nothing). Must be finite.
+     */
+    suspend fun setReading(
+        measureId: MeasureId,
+        date: LocalDate,
+        value: Double?,
+    )
+
+    /**
      * Gives a measure the colour the user picked — M15.6f, the user's own request after seeing the
      * widget: *"I would add the possibility to change sleep and Weight colour."*
      *
-     * ⚠ **The only write on this interface, and it reaches no reading and no Notion page.** See the
-     * class KDoc: the read-only decision is about the *data*, and a colour is not in the schema.
+     * ⚠ **App-local: it reaches no reading and no Notion page.** See the class KDoc.
      */
     suspend fun setColor(
         measureId: MeasureId,

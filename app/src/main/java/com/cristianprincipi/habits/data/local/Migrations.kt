@@ -71,6 +71,39 @@ internal val MIGRATION_1_2 =
         }
     }
 
+// MagicNumber: a migration is named by the two versions it joins; a constant called THREE would say less.
+@Suppress("MagicNumber")
+internal val MIGRATION_2_3 =
+    object : Migration(2, 3) {
+        /**
+         * M16.2: `measurement_edits` — a number typed on this device that Notion has not been sent
+         * yet, with what Notion held when it was typed (ADR-156).
+         *
+         * ⭐ **Additive again: one new table and its index, and no existing row is read or
+         * written**, so `MIGRATION_1_2`'s safety argument holds unchanged. An upgraded install starts
+         * owing nothing, which is true — before this version nothing could be typed.
+         *
+         * Both parents (`measures`, `days`) exist since version 2, so there is no ordering question.
+         */
+        override fun migrate(connection: SupportSQLiteDatabase) {
+            connection.execSQL(
+                "CREATE TABLE IF NOT EXISTS `measurement_edits` (" +
+                    "`measureId` TEXT NOT NULL, " +
+                    "`epochDay` INTEGER NOT NULL, " +
+                    "`baseValue` REAL, " +
+                    "`editedAtEpochMillis` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`measureId`, `epochDay`), " +
+                    "FOREIGN KEY(`measureId`) REFERENCES `measures`(`id`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE , " +
+                    "FOREIGN KEY(`epochDay`) REFERENCES `days`(`epochDay`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE )",
+            )
+            connection.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_measurement_edits_epochDay` ON `measurement_edits` (`epochDay`)",
+            )
+        }
+    }
+
 /**
  * Handed to `Room.databaseBuilder`, and to the migration test, from one place.
  *
@@ -78,4 +111,4 @@ internal val MIGRATION_1_2 =
  * throws `IllegalStateException` on the user's device and nowhere else. One list, read by both the
  * builder and the test, is what makes "written" and "wired up" the same event.
  */
-internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2)
+internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3)

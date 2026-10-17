@@ -48,10 +48,54 @@ class MigrationTest {
 
         // ⭐ `validateDroppedTables = true`: a migration that left an orphaned table behind would
         // otherwise pass, and the leftovers of a botched migration are what a later one trips over.
-        val migrated = helper.runMigrationsAndValidate(TEST_DB, 2, true, *ALL_MIGRATIONS)
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true, *ALL_MIGRATIONS)
 
-        assertEquals(2, migrated.version)
+        assertEquals(CURRENT_VERSION, migrated.version)
         migrated.close()
+    }
+
+    @Test
+    fun theSchemaMigratesFromTwoToTheCurrentVersion() {
+        // Every v1.0.0 install is at version 2, so this is the path every real upgrade to v1.1 takes.
+        helper.createDatabase(TEST_DB, 2).close()
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true, *ALL_MIGRATIONS)
+
+        assertEquals(CURRENT_VERSION, migrated.version)
+        migrated.close()
+    }
+
+    @Test
+    fun everyReadingSurvivesTheSecondMigrationAndNothingIsOwed() {
+        // ⚠⚠ The readings are the user's weight and sleep history — for a column deleted in Notion,
+        // the only copy left. And an upgraded install must start owing Notion nothing: before
+        // version 3 nothing could be typed, so an edit row appearing here would push a value the
+        // user never entered.
+        helper.createDatabase(TEST_DB, 2).use { old ->
+            old.execSQL(
+                "INSERT INTO measures " +
+                    "(id, notionPropertyId, notionPropertyName, unit, color, isActive, sortOrder) " +
+                    "VALUES ('m1', 'Nw%7Cb', 'Weight', 'kg', 'GREEN', 1, 0)",
+            )
+            old.execSQL(
+                "INSERT INTO days " +
+                    "(epochDay, notionPageId, localUpdatedAtEpochMillis, " +
+                    "remoteLastEditedAtEpochMillis, syncState) " +
+                    "VALUES (20300, 'page-1', NULL, 1725000000000, 'SYNCED')",
+            )
+            old.execSQL("INSERT INTO measurements (measureId, epochDay, value) VALUES ('m1', 20300, 84.2)")
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true, *ALL_MIGRATIONS).use { migrated ->
+            migrated.query("SELECT value FROM measurements WHERE measureId = 'm1' AND epochDay = 20300").use { cursor ->
+                assertTrue("The reading did not survive the migration", cursor.moveToFirst())
+                assertEquals(84.2, cursor.getDouble(0), 0.0)
+            }
+            migrated.query("SELECT COUNT(*) FROM measurement_edits").use { cursor ->
+                cursor.moveToFirst()
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
     }
 
     @Test
@@ -75,7 +119,7 @@ class MigrationTest {
             old.execSQL("INSERT INTO habit_completions (habitId, epochDay) VALUES ('h1', 20300)")
         }
 
-        helper.runMigrationsAndValidate(TEST_DB, 2, true, *ALL_MIGRATIONS).use { migrated ->
+        helper.runMigrationsAndValidate(TEST_DB, CURRENT_VERSION, true, *ALL_MIGRATIONS).use { migrated ->
             migrated.query("SELECT notionPropertyName, color FROM habits WHERE id = 'h1'").use { cursor ->
                 assertTrue("The habit did not survive the migration", cursor.moveToFirst())
                 // ⚠ The name is read back, not just counted. `docs/notion-schema.md` §2.3 requires
@@ -100,5 +144,8 @@ class MigrationTest {
     private companion object {
         /** Not `HabitsDatabase.NAME`: a test must never open the file the app itself is using. */
         const val TEST_DB = "migration-test.db"
+
+        /** The version every migration path must end at. Raise it with `HabitsDatabase.version`. */
+        const val CURRENT_VERSION = 3
     }
 }

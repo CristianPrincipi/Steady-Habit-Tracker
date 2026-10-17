@@ -4,6 +4,7 @@ import com.cristianprincipi.habits.data.local.entity.DayEntity
 import com.cristianprincipi.habits.data.local.entity.HabitCompletionEntity
 import com.cristianprincipi.habits.data.local.entity.HabitEntity
 import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import com.cristianprincipi.habits.data.local.entity.SyncState
 import kotlinx.coroutines.flow.Flow
@@ -206,15 +207,21 @@ class FakeMeasureDao(
 ) : MeasureDao {
     private val measures = MutableStateFlow(initial.associateBy { it.id })
     private val readings = MutableStateFlow(emptyMap<Pair<String, Long>, MeasurementEntity>())
+    private val edits = LinkedHashMap<Pair<String, Long>, MeasurementEditEntity>()
 
     val current: List<MeasureEntity> get() = measures.value.values.toList()
 
     val currentReadings: List<MeasurementEntity> get() = readings.value.values.toList()
 
+    /** The numbers owed to Notion (M16.2), for assertions. */
+    val currentEdits: List<MeasurementEditEntity> get() = edits.values.toList()
+
     override fun observeActive(): Flow<List<MeasureEntity>> =
         measures.map { all -> all.values.filter { it.isActive }.sortedBy { it.sortOrder } }
 
     override suspend fun findAll(): List<MeasureEntity> = measures.value.values.toList()
+
+    override fun observeAll(): Flow<List<MeasureEntity>> = measures.map { all -> all.values.toList() }
 
     override suspend fun setColor(
         measureId: String,
@@ -259,9 +266,47 @@ class FakeMeasureDao(
         readings.value = readings.value - (measureId to epochDay)
     }
 
-    /** What the foreign key's cascade does when a day is deleted. Wire it to [FakeDayDao.onDelete]. */
+    override suspend fun findReading(
+        measureId: String,
+        epochDay: Long,
+    ): MeasurementEntity? = readings.value[measureId to epochDay]
+
+    override suspend fun findEdit(
+        measureId: String,
+        epochDay: Long,
+    ): MeasurementEditEntity? = edits[measureId to epochDay]
+
+    override suspend fun allEdits(): List<MeasurementEditEntity> = edits.values.sortedBy { it.epochDay }
+
+    override suspend fun editsForDay(epochDay: Long): List<MeasurementEditEntity> =
+        edits.values.filter { it.epochDay == epochDay }
+
+    override suspend fun upsertEdit(edit: MeasurementEditEntity) {
+        // The same foreign key as a reading's: an edit row cannot outlive, or precede, its day.
+        check(dayExists(edit.epochDay)) {
+            "FOREIGN KEY constraint failed: no row in `days` for epochDay ${edit.epochDay}"
+        }
+        edits[edit.measureId to edit.epochDay] = edit
+    }
+
+    override suspend fun deleteEdit(
+        measureId: String,
+        epochDay: Long,
+    ) {
+        edits.remove(measureId to epochDay)
+    }
+
+    override suspend fun deleteAllEdits() {
+        edits.clear()
+    }
+
+    /**
+     * What the foreign keys' cascades do when a day is deleted. Wire it to [FakeDayDao.onDelete].
+     * Both child tables, as on the device: an owed number would otherwise outlive its day here.
+     */
     fun dropDay(epochDay: Long) {
         readings.value = readings.value.filterKeys { (_, day) -> day != epochDay }
+        edits.keys.removeAll { (_, day) -> day == epochDay }
     }
 
     override suspend fun deleteAllReadings() {

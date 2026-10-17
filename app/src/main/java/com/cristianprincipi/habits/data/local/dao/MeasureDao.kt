@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
 import com.cristianprincipi.habits.data.local.entity.MeasureEntity
+import com.cristianprincipi.habits.data.local.entity.MeasurementEditEntity
 import com.cristianprincipi.habits.data.local.entity.MeasurementEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -13,7 +14,13 @@ import kotlinx.coroutines.flow.Flow
  * **Every write to `measurements` needs the row for its day to exist first**, exactly as a
  * completion does: a reading has a foreign key to `days`, because the page Notion stores is the
  * day. The sync writes both inside one transaction.
+ *
+ * `TooManyFunctions` is suppressed: a DAO is one SQL statement per function, not a class with
+ * responsibilities to split. Since M16.2 it serves three tables that only mean anything together —
+ * the measures, their readings, and the readings this device owes Notion (`measurement_edits`) —
+ * and a second DAO would put every caller of one in a constructor with the other.
  */
+@Suppress("TooManyFunctions")
 @Dao
 interface MeasureDao {
     /**
@@ -29,6 +36,15 @@ interface MeasureDao {
     /** Every measure, hidden ones included. The import reads this to carry forward what it must. */
     @Query("SELECT * FROM measures")
     suspend fun findAll(): List<MeasureEntity>
+
+    /**
+     * Every measure, hidden ones included, as it changes — for the discarded-edit notices only.
+     *
+     * `HabitDao.observeAll`'s twin, and for its reason: a notice about a number whose column has
+     * since left the mapping should still be able to say which number it was.
+     */
+    @Query("SELECT * FROM measures")
+    fun observeAll(): Flow<List<MeasureEntity>>
 
     /**
      * Gives a measure its colour — M15.6f, and `HabitDao.setColor`'s twin in every respect.
@@ -92,6 +108,46 @@ interface MeasureDao {
         measureId: String,
         epochDay: Long,
     )
+
+    /** One reading, or null for a day without one. */
+    @Query("SELECT * FROM measurements WHERE measureId = :measureId AND epochDay = :epochDay")
+    suspend fun findReading(
+        measureId: String,
+        epochDay: Long,
+    ): MeasurementEntity?
+
+    /** The edit this device owes Notion for one number on one day, or null when it owes none. */
+    @Query("SELECT * FROM measurement_edits WHERE measureId = :measureId AND epochDay = :epochDay")
+    suspend fun findEdit(
+        measureId: String,
+        epochDay: Long,
+    ): MeasurementEditEntity?
+
+    /**
+     * Every number owed to Notion, oldest day first — the push's second source beside
+     * `DayDao.withState(PENDING_PUSH)` (ADR-156).
+     */
+    @Query("SELECT * FROM measurement_edits ORDER BY epochDay ASC")
+    suspend fun allEdits(): List<MeasurementEditEntity>
+
+    /** The numbers owed for one day. A day with any is not deleted when its page goes (ADR-156). */
+    @Query("SELECT * FROM measurement_edits WHERE epochDay = :epochDay")
+    suspend fun editsForDay(epochDay: Long): List<MeasurementEditEntity>
+
+    /** Records, or re-records, that a number is owed. */
+    @Upsert
+    suspend fun upsertEdit(edit: MeasurementEditEntity)
+
+    /** Notion has the number now, or has a newer one that won. Deleting a missing row is not an error. */
+    @Query("DELETE FROM measurement_edits WHERE measureId = :measureId AND epochDay = :epochDay")
+    suspend fun deleteEdit(
+        measureId: String,
+        epochDay: Long,
+    )
+
+    /** Every owed number, gone. **Only for the disconnect action**, beside [deleteAllReadings]. */
+    @Query("DELETE FROM measurement_edits")
+    suspend fun deleteAllEdits()
 
     /**
      * Every reading, gone. **Only for the disconnect action.**

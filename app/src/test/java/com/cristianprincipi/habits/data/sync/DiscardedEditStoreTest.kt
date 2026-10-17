@@ -155,6 +155,36 @@ class DiscardedEditStoreTest {
             assertEquals("a real bug", thrown?.message)
         }
 
+    @Test
+    fun aNumbersNoticeComesBackWithBothValuesIncludingAnEmptyOne() =
+        runTest {
+            // M16.2. A cleared number is `null` on one side, and it must come back as `null` — a
+            // notice saying "replaced by 0" would be telling the user about a value nobody typed.
+            val store = DiscardedEditStore(InMemoryDataStore())
+            val discarded =
+                edit(20_000, SyncSide.REMOTE, habitIds = emptySet())
+                    .copy(number = DiscardedNumber("measure-weight", discardedValue = 84.0, keptValue = null))
+
+            store.record(listOf(discarded))
+
+            assertEquals(listOf(discarded), store.read())
+        }
+
+    @Test
+    fun aBlobWrittenBeforeNumbersCouldBeEditedStillReads() =
+        runTest {
+            // The upgrade path: a v1.0 install's notices have no `number` key at all.
+            val store =
+                DiscardedEditStore(
+                    storeHolding(
+                        """[{"epoch_day":20000,"habit_ids":["$read"],"discarded_side":"LOCAL",""" +
+                            """"resolved_at_epoch_millis":1755000000000}]""",
+                    ),
+                )
+
+            assertEquals(listOf(edit(20_000)), store.read())
+        }
+
     /** A store already holding [blob] under the notices' key, which is spelled out as a storage name. */
     private suspend fun storeHolding(blob: String): DataStore<Preferences> =
         InMemoryDataStore().apply {
