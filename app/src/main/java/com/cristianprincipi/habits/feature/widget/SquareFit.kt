@@ -13,7 +13,13 @@ package com.cristianprincipi.habits.feature.widget
  *
  * ⭐⭐ **The full size is the user's pick, not a formula's.** A first fix grew it to 18dp on the biggest
  * cards. On the phone the user chose the square their 2x2 widgets drew, for every bigger card too — so
- * [LARGE_SQUARE] is what those 148x148dp cards drew, and every bigger card draws the same.
+ * [LARGE_SQUARE] is what those 148x148dp cards drew.
+ *
+ * ⚠⚠ **"The same" has to mean the same on the screen, and in dp it was not (ADR-158).** Their launcher
+ * draws the 286.5x179dp card at 0.614 of its size and the 148x148dp one at 0.745, so one 13dp square
+ * looked ~18% smaller on the bigger card. From the 2x2 up the square therefore grows with the grid's
+ * dot, which is a fixed share of the card's height (`fitHabitWidgetGrid`): [LARGE_SQUARE] at 148dp tall,
+ * 179/148 of it at 179dp, and the two match side by side.
  */
 
 /** The square at one card size. All dp, measured from the card's right edge where it says so. */
@@ -37,8 +43,10 @@ internal data class SquareFit(
  * The square for a habit widget [cardWidthDp] × [cardHeightDp].
  *
  * ⭐ **It is today's dot, drawn large — so it grows with the grid's dot**: [SQUARE_PER_DOT] times it,
- * from [SMALL_SQUARE] up to [LARGE_SQUARE] and no further. Its distance from the edge and its outline
- * move with it by the same fraction. Nothing else in the header grows, so nothing else moves.
+ * from [SMALL_SQUARE] up to [LARGE_SQUARE] on a 2x2. Its distance from the edge and its outline move
+ * with it by the same fraction. Past the 2x2 the whole of [LARGE_SQUARE] scales with the dot, so the
+ * square keeps its share of the card exactly as the dot does. Nothing else in the header grows, so
+ * nothing else moves.
  *
  * ⚠ **The name outranks the square.** Growing it takes width from both text lines, so it grows only
  * while the text keeps [MIN_NAME_ROOM_DP]; a narrow card that is tall keeps the small square.
@@ -56,16 +64,31 @@ internal fun fitTodaySquare(
     // The text keeps what is left of the card after the padding, the badge, its gap and the square's
     // inset; that inset grows by this much from SMALL_SQUARE to LARGE_SQUARE.
     val insetGrowth = LARGE_SQUARE.textEndInsetDp - SMALL_SQUARE.textEndInsetDp
-    val textRoomAtSmall =
-        cardWidthDp - CARD_PADDING.value * 2 - BADGE_SIZE.value - BADGE_GAP.value - SMALL_SQUARE.textEndInsetDp
-    val byWidth = (textRoomAtSmall - MIN_NAME_ROOM_DP) / insetGrowth
+    val byWidth = (textRoomDp(cardWidthDp, SMALL_SQUARE) - MIN_NAME_ROOM_DP) / insetGrowth
     val t = minOf(byDot, byWidth).coerceIn(0f, 1f)
-    return SquareFit(
-        sizeDp = lerp(SMALL_SQUARE.sizeDp, LARGE_SQUARE.sizeDp, t),
-        endDp = lerp(SMALL_SQUARE.endDp, LARGE_SQUARE.endDp, t),
-        strokeDp = lerp(SMALL_SQUARE.strokeDp, LARGE_SQUARE.strokeDp, t),
-    )
+    if (t < 1f) {
+        return SquareFit(
+            sizeDp = lerp(SMALL_SQUARE.sizeDp, LARGE_SQUARE.sizeDp, t),
+            endDp = lerp(SMALL_SQUARE.endDp, LARGE_SQUARE.endDp, t),
+            strokeDp = lerp(SMALL_SQUARE.strokeDp, LARGE_SQUARE.strokeDp, t),
+        )
+    }
+    // Scaling LARGE_SQUARE by k widens the inset by k times its end plus its size, and only while the
+    // name keeps its room — which on a 2x2's width is exactly k = 1.
+    val byDotPast2x2 = dot / TWO_BY_TWO_DOT_DP
+    val byWidthPast2x2 =
+        1f + (textRoomDp(cardWidthDp, LARGE_SQUARE) - MIN_NAME_ROOM_DP) / (LARGE_SQUARE.endDp + LARGE_SQUARE.sizeDp)
+    return LARGE_SQUARE.scaledBy(minOf(byDotPast2x2, byWidthPast2x2).coerceAtLeast(1f))
 }
+
+/** What both header lines keep for text on a card [cardWidthDp] wide with [fit]'s square. */
+internal fun textRoomDp(
+    cardWidthDp: Float,
+    fit: SquareFit,
+): Float = cardWidthDp - CARD_PADDING.value * 2 - BADGE_SIZE.value - BADGE_GAP.value - fit.textEndInsetDp
+
+private fun SquareFit.scaledBy(k: Float): SquareFit =
+    SquareFit(sizeDp = sizeDp * k, endDp = endDp * k, strokeDp = strokeDp * k)
 
 private fun lerp(
     from: Float,
@@ -83,7 +106,7 @@ internal val SMALL_SQUARE = SquareFit(sizeDp = 10f, endDp = CARD_PADDING.value, 
 /**
  * ⭐ **The user's choice (2026-10-16): the square their 2x2 widgets drew in `a497ec7`** — 12.8dp, 15.2dp
  * from the edge, a 1.69dp outline — rounded to 13, 15 and 1.7, under a pixel from what they pointed
- * at. Every card from 2x2 up draws this one.
+ * at. Every card from 2x2 up draws this one, scaled with its height (ADR-158).
  */
 internal val LARGE_SQUARE = SquareFit(sizeDp = 13f, endDp = 15f, strokeDp = 1.7f)
 

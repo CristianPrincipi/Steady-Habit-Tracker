@@ -35,7 +35,7 @@ internal data class GridFit(
  * the reference's own 2dp gap, so the proportion is preserved at every size instead of a fixed gap
  * swallowing a small grid and vanishing in a large one.
  *
- * ⚠ **[MAX_DOT_DP] means a very tall widget stops growing its dots** and leaves space below rather
+ * ⚠ **[maxDotDp] means a very tall widget stops growing its dots** and leaves space below rather
  * than drawing seven fat rows. A dot grid reads as a density plot; past a certain size it stops
  * being one. [MIN_DOT_DP] is the other end: below it the dots merge into a smear.
  *
@@ -45,10 +45,9 @@ internal data class GridFit(
 internal fun fitGrid(
     availableWidthDp: Float,
     availableHeightDp: Float,
+    maxDotDp: Float = MAX_DOT_DP,
 ): GridFit {
-    // height = rows*dot + (rows-1)*gap, with gap = dot/GAP_RATIO. Solved for dot.
-    val unclamped = availableHeightDp / (DAYS_PER_WEEK + (DAYS_PER_WEEK - 1) / GAP_RATIO)
-    val dot = unclamped.coerceIn(MIN_DOT_DP, MAX_DOT_DP)
+    val dot = dotFilling(availableHeightDp).coerceIn(MIN_DOT_DP, maxDotDp)
     val gap = (dot / GAP_RATIO).coerceAtLeast(MIN_GAP_DP)
     // The trailing gap is added back because gaps sit *between* columns: n columns occupy
     // (n * dot) + ((n - 1) * gap), which rearranges to this.
@@ -56,10 +55,27 @@ internal fun fitGrid(
     return GridFit(columns = columns, dotDp = dot, gapDp = gap)
 }
 
+/** The dot whose seven rows fill [heightDp]: height = rows*dot + (rows-1)*gap, with gap = dot/GAP_RATIO. */
+private fun dotFilling(heightDp: Float): Float = heightDp / (DAYS_PER_WEEK + (DAYS_PER_WEEK - 1) / GAP_RATIO)
+
 /**
  * [fitGrid] for a habit widget card of this size: what is left once the card's padding, the header
  * and the gap under it are taken out. One place, because the corner square is sized from this
  * grid's dot (`SquareFit.kt`) and two copies of the subtraction would drift.
+ *
+ * ### ⚠⚠ From a 2x2 up, the dot is a fixed share of the card's height — ADR-158
+ *
+ * **A launcher may draw a widget smaller than the size it reports, and by a different amount for each
+ * widget.** The user's launcher reports their 2x2 as 148x148dp and their 2x3 as 286.5x179dp, then draws
+ * both 110dp tall: the 2x2 at 0.745 of its size, the 2x3 at 0.614 — read off the phone's view tree, and
+ * nothing in the widget's options says so. So the same dp comes out ~18% smaller on the 2x3, and the
+ * user saw its corner square as smaller than the 2x2's beside it.
+ *
+ * ⭐ **That scaling keeps a widget's proportions, so a share of the card survives it.** Above the 2x2's
+ * height the dot grows in step with the card — [TWO_BY_TWO_DOT_DP] per 148dp of it — and two widgets in
+ * one row draw the same dot on the screen whatever each was scaled by. On a launcher that draws widgets
+ * at their real size the rule is the same: equal heights, equal dots. Below a 2x2 nothing changes: the
+ * grid fills the height, as it always has.
  */
 internal fun fitHabitWidgetGrid(
     cardWidthDp: Float,
@@ -67,8 +83,13 @@ internal fun fitHabitWidgetGrid(
 ): GridFit =
     fitGrid(
         availableWidthDp = cardWidthDp - CARD_PADDING.value * 2,
-        availableHeightDp = cardHeightDp - CARD_PADDING.value * 2 - BADGE_SIZE.value - HEADER_GAP.value,
+        availableHeightDp = habitGridHeight(cardHeightDp),
+        maxDotDp = minOf(MAX_DOT_DP, TWO_BY_TWO_DOT_DP * (cardHeightDp / TWO_BY_TWO_CARD_DP)),
     )
+
+/** What a habit card this tall leaves the grid. */
+private fun habitGridHeight(cardHeightDp: Float): Float =
+    cardHeightDp - CARD_PADDING.value * 2 - BADGE_SIZE.value - HEADER_GAP.value
 
 /**
  * The most recent [columns] weeks of a trailing year.
@@ -97,4 +118,13 @@ private const val MIN_DOT_DP = 2.5f
  * `internal` so the test can assert the trade-off rather than restate the number.
  */
 internal const val MAX_DOT_DP = 12f
+
+/** The user's 2x2 habit widgets are 148x148dp cards, read off their phone (ADR-153 §5). */
+internal const val TWO_BY_TWO_CARD_DP = 148f
+
+/**
+ * The dot that card draws, ~8.67dp: its grid's height filled. Computed rather than typed, so it is the
+ * same float the 2x2 itself gets, and follows the card's padding and header if they ever change.
+ */
+internal val TWO_BY_TWO_DOT_DP: Float = dotFilling(habitGridHeight(TWO_BY_TWO_CARD_DP))
 private const val MIN_GAP_DP = 0.75f

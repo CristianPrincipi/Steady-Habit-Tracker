@@ -72,6 +72,45 @@ class WidgetGridFitTest {
     }
 
     @Test
+    fun aBiggerCardBesideA2x2DrawsTheSameDotOnTheScreen() {
+        // ⚠⚠ ADR-158. The user's launcher reports these two cards, then draws both the same height,
+        // scaling each to fit: the same dp came out ~18% smaller on the 2x3. What the eye compares is
+        // dp × (drawn height ÷ reported height), and the drawn heights are equal.
+        val twoByTwo = fitHabitWidgetGrid(TWO_BY_TWO_CARD_DP, TWO_BY_TWO_CARD_DP)
+        val twoByThree = fitHabitWidgetGrid(USER_2X3_WIDTH_DP, USER_2X3_HEIGHT_DP)
+
+        // The 2x2 itself is untouched: ten columns of 8.67dp dots, as it has drawn since M15.6b.
+        assertEquals(TWO_BY_TWO_DOT_DP, twoByTwo.dotDp, 0f)
+        assertEquals(10, twoByTwo.columns)
+        assertEquals(
+            "dot on screen",
+            onScreen(twoByTwo.dotDp, TWO_BY_TWO_CARD_DP),
+            onScreen(twoByThree.dotDp, USER_2X3_HEIGHT_DP),
+            TOLERANCE,
+        )
+        assertEquals(
+            "gap on screen",
+            onScreen(twoByTwo.gapDp, TWO_BY_TWO_CARD_DP),
+            onScreen(twoByThree.gapDp, USER_2X3_HEIGHT_DP),
+            TOLERANCE,
+        )
+    }
+
+    @Test
+    fun aTallerCardKeepsItsDotAtTheSameShareOfItsHeightUntilTheCap() {
+        // Equal heights draw equal dots on any launcher, scaled or not; past the 12dp cap the long view
+        // the user chose wins, and below a 2x2 the grid fills its height as it always has.
+        for (height in TWO_BY_TWO_CARD_DP.toInt()..MAX_CARD_HEIGHT_DP step 5) {
+            val fit = fitHabitWidgetGrid(USER_2X3_WIDTH_DP, height.toFloat())
+            val share = TWO_BY_TWO_DOT_DP / TWO_BY_TWO_CARD_DP * height
+
+            assertEquals("${height}dp tall", minOf(share, MAX_DOT_DP), fit.dotDp, TOLERANCE)
+        }
+        val short = fitHabitWidgetGrid(USER_2X3_WIDTH_DP, USER_AVAILABLE_HEIGHT_DP + 70f)
+        assertEquals("a short card still fills", USER_AVAILABLE_HEIGHT_DP, short.heightDp, TOLERANCE)
+    }
+
+    @Test
     fun aGridNeverOverflowsTheSpaceItIsGivenAtAnyPlausibleWidgetSize() {
         // Swept rather than sampled, because the failure above was at one specific size and a
         // single example would have missed it. Every size a launcher could hand us must fit.
@@ -163,5 +202,20 @@ class WidgetGridFitTest {
 
         /** Roughly seven months. What capping the dot buys, and what they chose to keep. */
         const val LONG_VIEW_WEEKS = 28
+
+        /** The user's 2x3 habit widget as their launcher reports it; it draws it 110dp tall (ADR-158). */
+        const val USER_2X3_WIDTH_DP = 286.5f
+        const val USER_2X3_HEIGHT_DP = 179f
+
+        /** Both their 2x2 and their 2x3 are drawn this tall on the screen, each scaled to fit. */
+        const val DRAWN_HEIGHT_DP = 110f
+
+        const val MAX_CARD_HEIGHT_DP = 400
+
+        /** A size the launcher draws in a card it reports [reportedHeight] tall, as the eye sees it. */
+        fun onScreen(
+            dp: Float,
+            reportedHeight: Float,
+        ): Float = dp * DRAWN_HEIGHT_DP / reportedHeight
     }
 }
