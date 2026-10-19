@@ -131,8 +131,10 @@ android {
         // on versionCode. It is not, or not only: the row was unchanged after the bump, as it was
         // after two reinstalls and after force-stopping the launcher. `versionCode` is Play's
         // counter and nothing more.
-        versionCode = 2
-        versionName = "1.0.0"
+        //
+        // 2 -> 3 and 1.0.0 -> 1.1.0 at M16.4: numbers can be typed in, on Week and from the widget.
+        versionCode = 3
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
