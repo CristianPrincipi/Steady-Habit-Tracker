@@ -87,12 +87,12 @@
     <string name="setup_mapping_habits_empty">This database has no checkbox columns, so there are no habits to import.</string>
     <!--
       M15.4. The body leads with what happens next — where the number turns up — rather than with
-      what a "measure" is. The second sentence is the one that matters: the user asked for these
-      "read only", and a column the app promises never to write is worth saying out loud on the
-      screen that maps it, not only in a KDoc.
+      what a "measure" is. The second sentence is the one that matters: until M16.2 it promised the
+      app never writes a number back, and ADR-156 made that false. A column the app writes to is
+      worth saying out loud on the screen that maps it, not only in a KDoc.
     -->
-    <string name="setup_mapping_measures_eyebrow">ANY NUMBERS TO AVERAGE?</string>
-    <string name="setup_mapping_measures_body">Tick a number column to see its average on the Stats screen. These are only ever read — the app never writes a number back to Notion.</string>
+    <string name="setup_mapping_measures_eyebrow">ANY NUMBERS TO TRACK?</string>
+    <string name="setup_mapping_measures_body">Tick a number column to see it on the Week screen and its average on Stats. A value you type in the app is written back to that column in Notion.</string>
     <!--
       The unit cannot be derived: the schema carries no number format, and CLAUDE.md §3.4 forbids
       reading "kg" off a column called Weight. So it is asked for, and it is optional — blank shows
