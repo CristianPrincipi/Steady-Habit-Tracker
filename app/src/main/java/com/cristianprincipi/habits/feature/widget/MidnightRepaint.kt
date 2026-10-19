@@ -35,11 +35,12 @@ import kotlin.time.Duration.Companion.minutes
  *
  * ### ⚠ Armed from the widget, not from the app
  *
- * [armMidnightRepaint] runs every time a habit widget's session starts, so the alarm exists exactly
- * when a habit widget does: after placing one, after a reboot (the system re-sends
- * `APPWIDGET_UPDATE`), after an app update, and after every repaint — including the one this alarm
- * causes, which is how it re-arms for the next night. One `PendingIntent` throughout, so arming twice
- * replaces rather than stacks. A phone with no habit widget has no alarm.
+ * [armMidnightRepaint] runs every time a habit or number widget's session starts, so the alarm exists
+ * exactly when a widget with a "today" square does: after placing one, after a reboot (the system
+ * re-sends `APPWIDGET_UPDATE`), after an app update, and after every repaint — including the one this
+ * alarm causes, which is how it re-arms for the next night. One `PendingIntent` throughout, so arming
+ * twice replaces rather than stacks. A phone with neither widget has no alarm. (The number widget's
+ * square joined at M16.3: it fills once today has a value, so it has a midnight too.)
  */
 
 /**
@@ -108,9 +109,11 @@ class MidnightRepaintReceiver : BroadcastReceiver() {
                     .fromApplication(app, HabitWidgetEntryPoint::class.java)
                     .widgets()
                     .refreshQuietly()
-                if (GlanceAppWidgetManager(app).getGlanceIds(HabitGridWidget::class.java).isNotEmpty()) {
-                    armMidnightRepaint(app)
-                }
+                val manager = GlanceAppWidgetManager(app)
+                val anySquare =
+                    manager.getGlanceIds(HabitGridWidget::class.java).isNotEmpty() ||
+                        manager.getGlanceIds(MeasureWidget::class.java).isNotEmpty()
+                if (anySquare) armMidnightRepaint(app)
             } finally {
                 pending.finish()
             }

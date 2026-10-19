@@ -1,4 +1,4 @@
-package com.cristianprincipi.habits.feature.week
+package com.cristianprincipi.habits.core.designsystem.component
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +43,10 @@ import java.util.Locale
  * draws: the disconnect dialog's surface, shape and button colours, and the setup wizard's field.
  * Shown to the user before polishing (`CLAUDE.md` §2).
  *
+ * ⭐ **One dialog, two doors (M16.3).** Week opens it from a cell; the number widget's corner square
+ * opens it over the home screen for today. It lives here, and speaks in callbacks rather than either
+ * screen's events, so the two cannot drift into two dialogs that ask the same question differently.
+ *
  * - **The field starts with the day's value selected**, so typing replaces it and a correction is
  *   one gesture; an empty day starts empty. Focus and the decimal keyboard arrive with the dialog.
  * - **Save is disabled, not refused**, on anything that is not a number, and the field says why the
@@ -53,10 +57,13 @@ import java.util.Locale
  * a `String` field cannot start with its contents selected.
  */
 @Composable
-internal fun ReadingEntryDialog(
+fun ReadingEntryDialog(
     entry: ReadingEntry,
     locale: Locale,
-    onEvent: (WeekEvent) -> Unit,
+    onTextChange: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var field by remember(entry.measureId, entry.date) {
@@ -65,20 +72,23 @@ internal fun ReadingEntryDialog(
     val focus = remember { FocusRequester() }
     val fieldDescription =
         stringResource(R.string.week_reading_field_description, entry.measureName, accessibleDate(entry.date, locale))
+    val dateLabel = shortDateLabel(entry.date, locale)
+    // At most one thing is wrong at a time, and a field that cannot be read outranks a save that failed.
+    val problem =
+        when {
+            entry.isInvalid -> stringResource(R.string.week_reading_invalid)
+            entry.saveFailed -> stringResource(R.string.week_reading_save_failed, entry.measureName, dateLabel)
+            else -> null
+        }
 
     AlertDialog(
-        onDismissRequest = { onEvent(WeekEvent.ReadingDismissed) },
+        onDismissRequest = onDismiss,
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         title = {
             Text(
-                text =
-                    stringResource(
-                        R.string.week_reading_title,
-                        entry.measureName,
-                        shortDateLabel(entry.date, locale),
-                    ),
+                text = stringResource(R.string.week_reading_title, entry.measureName, dateLabel),
                 style = MaterialTheme.typography.titleMedium,
                 color = HabitsTheme.colors.text.primary,
             )
@@ -93,7 +103,7 @@ internal fun ReadingEntryDialog(
                 value = field,
                 onValueChange = { changed ->
                     field = changed
-                    onEvent(WeekEvent.ReadingTextChanged(changed.text))
+                    onTextChange(changed.text)
                 },
                 modifier =
                     Modifier
@@ -102,16 +112,11 @@ internal fun ReadingEntryDialog(
                         .semantics { contentDescription = fieldDescription },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 suffix = entry.unit.takeIf(String::isNotBlank)?.let { unit -> { Text(text = unit) } },
-                supportingText =
-                    if (entry.isInvalid) {
-                        { Text(text = stringResource(R.string.week_reading_invalid)) }
-                    } else {
-                        null
-                    },
-                isError = entry.isInvalid,
+                supportingText = problem?.let { text -> { Text(text = text) } },
+                isError = problem != null,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (entry.canSave) onEvent(WeekEvent.ReadingSaved) }),
+                keyboardActions = KeyboardActions(onDone = { if (entry.canSave) onSave() }),
                 // The design's 14dp, as `SetupTextField` corrects it — Material's own tier is not it.
                 shape = MaterialTheme.shapes.large,
                 colors =
@@ -130,21 +135,21 @@ internal fun ReadingEntryDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onEvent(WeekEvent.ReadingSaved) }, enabled = entry.canSave) {
+            TextButton(onClick = onSave, enabled = entry.canSave) {
                 Text(text = stringResource(R.string.week_reading_save))
             }
         },
         dismissButton = {
             Row {
                 if (entry.hadValue) {
-                    TextButton(onClick = { onEvent(WeekEvent.ReadingCleared) }) {
+                    TextButton(onClick = onClear) {
                         Text(
                             text = stringResource(R.string.week_reading_clear),
                             color = HabitsTheme.colors.text.secondary,
                         )
                     }
                 }
-                TextButton(onClick = { onEvent(WeekEvent.ReadingDismissed) }) {
+                TextButton(onClick = onDismiss) {
                     Text(text = stringResource(R.string.week_reading_cancel), color = HabitsTheme.colors.text.secondary)
                 }
             }
@@ -167,7 +172,10 @@ private fun ReadingEntryDialogPreview() {
                     hadValue = true,
                 ),
             locale = Locale.US,
-            onEvent = {},
+            onTextChange = {},
+            onSave = {},
+            onClear = {},
+            onDismiss = {},
         )
     }
 }

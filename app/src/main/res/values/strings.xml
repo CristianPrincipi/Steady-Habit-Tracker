@@ -723,6 +723,12 @@
     -->
     <string name="widget_today_open">Mark %1$s done for today</string>
     <string name="widget_today_done">%1$s is done for today. Tap to undo</string>
+    <!--
+      The number widget's corner square - M16.3. Spoken, never drawn, for the same reason: a tap
+      opens a dialog, and "filled" alone would not say so. %1$s is the number's name, as Notion has it.
+    -->
+    <string name="widget_measure_today_add">Add today\'s %1$s</string>
+    <string name="widget_measure_today_change">%1$s is logged for today. Tap to change it</string>
 
     <!--
       The configuration screen the system opens when a widget is dropped.

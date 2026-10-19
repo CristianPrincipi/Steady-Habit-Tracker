@@ -6,7 +6,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
@@ -15,23 +14,16 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.background
 import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
-import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.semantics.contentDescription
-import androidx.glance.semantics.semantics
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.unit.ColorProvider
 import com.cristianprincipi.habits.R
@@ -39,7 +31,6 @@ import com.cristianprincipi.habits.core.designsystem.component.DayStatus
 import com.cristianprincipi.habits.core.designsystem.component.DotGridMetrics
 import com.cristianprincipi.habits.core.designsystem.component.dotGridBitmap
 import com.cristianprincipi.habits.core.designsystem.component.yearDayColor
-import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColorScheme
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsDarkColors
 import com.cristianprincipi.habits.core.ui.resolveIn
 import com.cristianprincipi.habits.domain.model.HabitColor
@@ -253,33 +244,8 @@ private fun Grid(state: HabitWidgetState.Content) {
  * today is open, **filled with that colour** once it is done. A second tap takes it back, because a
  * control on a home screen gets brushed by accident and has to be undoable where it was hit.
  *
- * ⭐ **It is today's dot, drawn large.** The corner is the grid's own ratio ([DOT_CORNER_RATIO]), so
- * the square reads as the last dot of the grid lifted into the corner, not as a borrowed checkbox.
- *
- * ### ⭐ It mirrors the habit badge, and that is the user's call
- *
- * The badge sits [CARD_PADDING] in from the left, with [BADGE_GAP] to the text. The square sits on the
- * right with the same gap back to the text, **centred on the badge's own line** — so the header reads
- * badge · text · square, symmetric about its middle. Two earlier cuts were rejected on the phone: one
- * beside the name's top line, and one tucked into the card's corner padding, which lined up with
- * nothing else on the card.
- *
- * ⭐ **Its size and place come from the card ([fit], `SquareFit.kt`)**: 10dp on [CARD_PADDING] on a
- * short card, growing with the grid's dots to 13dp, 15dp in, on a 2x2 and everything bigger — the
- * size the user picked off their own 2x2 widgets. A fixed 10dp was smaller than a single dot on a
- * big card, and the user saw it (ADR-153).
- *
- * ⚠ **The cost is the whole text column, not just the name line**, because a square on the badge's
- * centre line straddles both lines: [SquareFit.textEndInsetDp]. The square grows only while the name
- * keeps its room. `TodaySquareFitTest`.
- *
- * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
- * colour inset by the stroke draws the same picture on every API level this app supports.
- *
- * ⚠ **The touch target is much bigger than the square**: the header's full height plus the top
- * padding ([SQUARE_TARGET_HEIGHT]), and everything right of the text — that is why the square is a
- * [WidgetCard] corner rather than one more item in the header row, which could not reach the padding.
- * It overlaps the text by only a few dp, so a tap on a name still opens the app.
+ * The drawing, its place and its target are [CornerSquare]'s, shared with the number widget since
+ * M16.3 so the two corners look and sit alike.
  */
 @Composable
 private fun TodaySquare(
@@ -288,48 +254,16 @@ private fun TodaySquare(
     color: HabitColor,
     fit: SquareFit,
 ) {
-    val size = fit.sizeDp.dp
-    val stroke = fit.strokeDp.dp
-    val habitColor = ColorProvider(color.resolveIn(HabitsDarkColors.habit))
-    // Says what a tap DOES, not only what is shown: "checked" alone would not tell a TalkBack user
-    // that this square writes.
-    val description =
-        LocalContext.current.getString(
-            if (check.completed) R.string.widget_today_done else R.string.widget_today_open,
-            name,
-        )
-    Box(
-        modifier =
-            GlanceModifier
-                .size(fit.targetWidthDp.dp, SQUARE_TARGET_HEIGHT)
-                .clickable(checkOffTodayAction(check))
-                .semantics { contentDescription = description }
-                .padding(top = CARD_PADDING + (BADGE_SIZE - size) / 2, end = fit.endDp.dp),
-        contentAlignment = Alignment.TopEnd,
-    ) {
-        Box(
-            modifier =
-                GlanceModifier
-                    .size(size)
-                    .cornerRadius(size / DOT_CORNER_RATIO)
-                    .background(habitColor),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (!check.completed) {
-                Box(
-                    modifier =
-                        GlanceModifier
-                            .size(size - stroke * 2)
-                            .cornerRadius((size / DOT_CORNER_RATIO - stroke).coerceAtLeast(0.dp))
-                            .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer)),
-                ) {}
-            }
-        }
-    }
+    CornerSquare(
+        fit = fit,
+        color = color,
+        filled = check.completed,
+        plus = false,
+        action = checkOffTodayAction(check),
+        description =
+            LocalContext.current.getString(
+                if (check.completed) R.string.widget_today_done else R.string.widget_today_open,
+                name,
+            ),
+    )
 }
-
-/** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
-private const val DOT_CORNER_RATIO = 6f
-
-/** The square's touch target reaches from the card's top edge to the header's bottom: 48dp. */
-internal val SQUARE_TARGET_HEIGHT = CARD_PADDING + BADGE_SIZE

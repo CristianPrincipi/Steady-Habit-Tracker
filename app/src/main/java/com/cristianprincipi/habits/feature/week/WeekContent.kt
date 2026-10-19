@@ -16,9 +16,11 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.startOfWeek
 import com.cristianprincipi.habits.core.datetime.weekdayLabels
+import com.cristianprincipi.habits.core.designsystem.component.ReadingEntryDialog
 import com.cristianprincipi.habits.core.designsystem.component.ValueStatus
 import com.cristianprincipi.habits.core.designsystem.component.WeekHabitCard
 import com.cristianprincipi.habits.core.designsystem.component.WeekMeasureCard
+import com.cristianprincipi.habits.core.designsystem.component.prefillText
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.designsystem.theme.Sizing
 import com.cristianprincipi.habits.core.designsystem.theme.Spacing
@@ -33,9 +35,7 @@ import com.cristianprincipi.habits.domain.model.HabitPeriod
 import com.cristianprincipi.habits.domain.model.MeasureDay
 import com.cristianprincipi.habits.domain.model.MeasureWeek
 import com.cristianprincipi.habits.domain.model.PeriodCell
-import java.math.BigDecimal
 import java.math.RoundingMode
-import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -103,7 +103,14 @@ fun WeekContent(
                     modifier = Modifier.fillMaxSize(),
                 )
                 state.readingEntry?.let { entry ->
-                    ReadingEntryDialog(entry = entry, locale = locale, onEvent = onEvent)
+                    ReadingEntryDialog(
+                        entry = entry,
+                        locale = locale,
+                        onTextChange = { text -> onEvent(WeekEvent.ReadingTextChanged(text)) },
+                        onSave = { onEvent(WeekEvent.ReadingSaved) },
+                        onClear = { onEvent(WeekEvent.ReadingCleared) },
+                        onDismiss = { onEvent(WeekEvent.ReadingDismissed) },
+                    )
                 }
             }
         }
@@ -282,23 +289,6 @@ private fun WeekMeasureRow(
             }
         },
     )
-}
-
-/**
- * A stored value as the dialog's field starts: every digit it has, no grouping, in the reader's
- * decimal separator when that is a comma — `ReadingInput` reads either back.
- *
- * ⚠ Built from `Double.toString` rather than a `NumberFormat`, so the digits are always ASCII and the
- * separator always one the parser accepts. A locale whose formatter used other digits or another
- * separator would otherwise prefill text that its own Save could not read.
- */
-internal fun prefillText(
-    value: Double?,
-    locale: Locale,
-): String {
-    val plain = value?.let { BigDecimal.valueOf(it).stripTrailingZeros().toPlainString() } ?: return ""
-    val usesComma = DecimalFormatSymbols.getInstance(locale).decimalSeparator == ','
-    return if (usesComma) plain.replace('.', ',') else plain
 }
 
 /** At most one decimal, none when it is zero — see [WeekMeasureRow]. */

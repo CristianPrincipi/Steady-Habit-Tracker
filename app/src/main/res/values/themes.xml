@@ -16,4 +16,15 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!--
+      M16.3: TodayReadingActivity's window, which holds nothing but a dialog. Transparent and
+      translucent so the home screen it was opened from stays in view behind the dialog's own scrim,
+      and no opening animation, so the dialog appears where the tap was rather than after a slide.
+    -->
+    <style name="Theme.Steady.Translucent">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

@@ -7,6 +7,7 @@ import com.cristianprincipi.habits.core.designsystem.component.DAYS_PER_WEEK
 import com.cristianprincipi.habits.core.designsystem.component.DayStatus
 import com.cristianprincipi.habits.domain.model.HabitColor
 import com.cristianprincipi.habits.domain.model.HabitId
+import com.cristianprincipi.habits.domain.model.MeasureId
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -141,6 +142,10 @@ internal suspend fun sampleMeasureWidgetState(context: Context): MeasureWidgetSt
         average = points.map { point -> point.y.toDouble() }.average(),
         unit = series?.measure?.unit ?: context.getString(R.string.widget_preview_measure_unit),
         points = points,
+        // The picker's card cannot be tapped, so the id only has to be one; and an empty today shows
+        // the "+" — what the corner is for, which a filled square would not say.
+        id = series?.measure?.id ?: MeasureId(SAMPLE_MEASURE_ID),
+        today = null,
     )
 }
 
@@ -201,6 +206,9 @@ private val SAMPLE_MEASURE_COLOR = HabitColor.PURPLE
 
 /** Only reached with no tracked numbers at all, where there is no real average to round. */
 private const val SAMPLE_MEASURE_ANCHOR = 72.0
+
+/** [SAMPLE_HABIT_ID]'s twin: not a Notion property id, so it can never name a real number. */
+private const val SAMPLE_MEASURE_ID = "widget-preview-sample"
 
 /**
  * Fractions of [samplePoints]'s anchor: a slow decline with a real wobble on it.

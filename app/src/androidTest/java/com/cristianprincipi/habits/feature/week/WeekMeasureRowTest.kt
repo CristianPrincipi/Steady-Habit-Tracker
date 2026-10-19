@@ -18,6 +18,8 @@ import com.cristianprincipi.habits.R
 import com.cristianprincipi.habits.core.datetime.accessibleDate
 import com.cristianprincipi.habits.core.datetime.shortDateLabel
 import com.cristianprincipi.habits.core.datetime.startOfWeek
+import com.cristianprincipi.habits.core.designsystem.component.ReadingEntry
+import com.cristianprincipi.habits.core.designsystem.component.prefillText
 import com.cristianprincipi.habits.core.designsystem.theme.HabitsTheme
 import com.cristianprincipi.habits.core.ui.preview.SampleHabits
 import com.cristianprincipi.habits.domain.model.HabitColor

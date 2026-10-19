@@ -1,6 +1,7 @@
 package com.cristianprincipi.habits.feature.week
 
 import app.cash.turbine.test
+import com.cristianprincipi.habits.core.designsystem.component.ReadingEntry
 import com.cristianprincipi.habits.core.testing.FakeHabitRepository
 import com.cristianprincipi.habits.core.testing.FakeMeasureRepository
 import com.cristianprincipi.habits.core.testing.FakeSyncStatusRepository

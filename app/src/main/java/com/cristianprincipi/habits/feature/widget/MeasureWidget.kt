@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
@@ -19,6 +20,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.currentState
@@ -69,6 +71,11 @@ internal class MeasureWidget : GlanceAppWidget() {
         context: Context,
         id: GlanceId,
     ) {
+        // M16.3: the corner square means "today" here too, so this widget must also hear about
+        // midnight — a phone with number widgets and no habit widget would otherwise keep yesterday's
+        // filled square until something else repainted it.
+        armMidnightRepaint(context)
+
         // Resolved BEFORE provideContent so the opening frame is already right — see
         // loadMeasureWidgetState. This is the first frame only; the flow below carries the rest.
         val initial =
@@ -116,7 +123,16 @@ internal class MeasureWidget : GlanceAppWidget() {
 
 @Composable
 private fun MeasureWidgetBody(state: MeasureWidgetState) {
-    WidgetCard {
+    val content = state as? MeasureWidgetState.Content
+    val size = LocalSize.current
+    // The habit widget's own fit, so a number widget beside a habit widget of the same size puts its
+    // square in the same place at the same size — the point of "Square like habits" (M16.3).
+    val square = fitTodaySquare(size.width.value, size.height.value)
+    // Only a number that is really there gets a square: the empty states are sentences about a widget
+    // with nothing to write to.
+    val corner: (@Composable () -> Unit)? =
+        content?.let { { TodayReadingSquare(content = it, fit = square) } }
+    WidgetCard(corner = corner) {
         when (state) {
             MeasureWidgetState.Unconfigured -> {
                 WidgetMessage(R.string.widget_measure_unconfigured)
@@ -140,6 +156,7 @@ private fun MeasureWidgetBody(state: MeasureWidgetState) {
                     subtitle = state.summary(),
                     color = state.color,
                     badgeTextSize = badgeTextSize(badge),
+                    textEndInset = square.textEndInsetDp.dp,
                 )
                 Spacer(GlanceModifier.height(HEADER_GAP))
                 Box(
@@ -158,6 +175,35 @@ private fun MeasureWidgetBody(state: MeasureWidgetState) {
             }
         }
     }
+}
+
+/**
+ * Today, as the corner square the habit widget draws — M16.3, the user's pick (*"Square like
+ * habits"*): **filled** once today has a number, **an outline with a "+"** while it has none.
+ *
+ * ⭐ A tap opens [TodayReadingActivity] rather than writing, because a number has to be typed. That
+ * makes it the one square that is never wrong to tap: it asks, and the dialog names the day. So unlike
+ * the habit square it carries no day of its own and nothing here can be stale enough to refuse.
+ */
+@Composable
+private fun TodayReadingSquare(
+    content: MeasureWidgetState.Content,
+    fit: SquareFit,
+) {
+    val context = LocalContext.current
+    val logged = content.today != null
+    CornerSquare(
+        fit = fit,
+        color = content.color,
+        filled = logged,
+        plus = !logged,
+        action = actionStartActivity(TodayReadingActivity.intent(context, content.id)),
+        description =
+            context.getString(
+                if (logged) R.string.widget_measure_today_change else R.string.widget_measure_today_add,
+                content.name,
+            ),
+    )
 }
 
 /**

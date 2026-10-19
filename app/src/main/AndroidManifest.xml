@@ -182,6 +182,22 @@
             </intent-filter>
         </activity>
 
+        <!--
+          M16.3: the number widget's square opens this - today's value, typed over the home screen.
+
+          NOT exported: only the widget's own PendingIntent opens it, and that runs as this app.
+          taskAffinity="" + excludeFromRecents give it a task of its own, so finishing it returns to
+          the home screen instead of surfacing the app's task, and it never lingers in Recents.
+          Translucent, so the launcher stays visible around the dialog. See TodayReadingActivity.
+        -->
+        <activity
+            android:name=".feature.widget.TodayReadingActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Steady.Translucent"
+            android:windowSoftInputMode="adjustResize" />
+
     </application>
 
 </manifest>

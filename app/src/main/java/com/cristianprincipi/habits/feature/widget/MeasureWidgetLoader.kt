@@ -19,10 +19,11 @@ import kotlinx.coroutines.flow.map
  * of the time, and it is not free here** — see `AppWidgetRefresher`, which had to widen before this
  * widget could be woken at all.
  *
- * ⭐ **A measure has exactly one thing that can change it, where a habit has three.** A habit widget
- * moves on a check-off, a colour change and a pull; a measure is read-only at four layers, so
- * nothing local can touch one and a **pull is the only writer**. That is why this step adds no
- * repository call site: `SyncOutcome.changedLocalData` already covers it.
+ * ⭐ **A measure changes on a pull, a colour change, and — since M16.2 — a typed number**, from a Week
+ * cell or from this widget's own square (M16.3). Every one lands in Room, which this flow observes,
+ * and `MeasureRepository` repaints the widgets after each local write; a pull is covered by
+ * `SyncOutcome.changedLocalData`. (This used to say a pull was the only writer, which was true until
+ * numbers became writable.)
  */
 internal fun measureWidgetStateFlow(
     context: Context,
@@ -63,11 +64,15 @@ internal suspend fun loadMeasureWidgetState(
  * the data actually came from. A loader that recomputed "days since thirty days ago" from its own
  * clock could disagree with the query by a day at midnight and nobody would see it.
  */
-private fun MeasureSeries.toContent(): MeasureWidgetState.Content =
+internal fun MeasureSeries.toContent(): MeasureWidgetState.Content =
     MeasureWidgetState.Content(
         name = measure.name,
         color = measure.color,
         average = average.value,
         unit = measure.unit,
         points = readings.map { reading -> Offset(positionOf(reading.date), reading.value.toFloat()) },
+        id = measure.id,
+        // The window ends today (`GetMeasureSeries`), so today is its last day — asked of the series,
+        // not of a clock here, for `positionOf`'s reason above.
+        today = readings.lastOrNull { reading -> reading.date == to }?.value,
     )

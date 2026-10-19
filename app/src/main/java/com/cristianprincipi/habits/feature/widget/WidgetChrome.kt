@@ -4,10 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
+import androidx.glance.action.Action
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
@@ -22,6 +24,8 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -223,6 +227,107 @@ internal fun WidgetHeader(
         }
     }
 }
+
+/**
+ * Today, as a square in a [WidgetCard]'s top-right corner — the habit widget's check-off (M15.11) and,
+ * since M16.3, the number widget's way in to today's value.
+ *
+ * ⭐⭐ **One drawing for both, and that was the user's pick for M16.3** (*"Square like habits"*). A
+ * number widget beside a habit widget shows the same square in the same place, so *"is today done?"*
+ * reads the same across a home screen: **filled with the colour** once today has its answer, **an
+ * outline** while it has not. An empty number square carries a **"+"**, because its tap opens a
+ * dialog rather than writing — the one difference between the two, and the one a user needs to see.
+ *
+ * ⭐ **It is today's dot, drawn large.** The corner is the grid's own ratio ([DOT_CORNER_RATIO]), so
+ * the square reads as the last dot of the grid lifted into the corner, not as a borrowed checkbox.
+ *
+ * ### ⭐ It mirrors the badge, and that is the user's call (M15.11)
+ *
+ * The badge sits [CARD_PADDING] in from the left, with [BADGE_GAP] to the text. The square sits on the
+ * right with the same gap back to the text, **centred on the badge's own line** — so the header reads
+ * badge · text · square, symmetric about its middle. Two earlier cuts were rejected on the phone: one
+ * beside the name's top line, and one tucked into the card's corner padding, which lined up with
+ * nothing else on the card.
+ *
+ * ⭐ **Its size and place come from the card ([fit], `SquareFit.kt`)**: 10dp on [CARD_PADDING] on a
+ * short card, growing with the card's height to 13dp, 15dp in, on a 2x2 and in step with the height
+ * beyond — the size the user picked off their own 2x2 widgets (ADR-153, ADR-158). The caller keeps
+ * [SquareFit.textEndInsetDp] clear at the end of both header lines; the square grows only while the
+ * name keeps its room. `TodaySquareFitTest`.
+ *
+ * ⚠ **The outline is two boxes, because Glance has no border.** A filled square with the card's own
+ * colour inset by the stroke draws the same picture on every API level this app supports. The "+"
+ * is two more, for the same reason: a drawable would be one more thing to tint and keep in step.
+ *
+ * ⚠ **The touch target is much bigger than the square**: the header's full height plus the top
+ * padding ([SQUARE_TARGET_HEIGHT]), and everything right of the text — that is why the square is a
+ * [WidgetCard] corner rather than one more item in the header row, which could not reach the padding.
+ * It overlaps the text by only a few dp, so a tap on a name still opens the app.
+ *
+ * @param description what a tap **does**, not only what is shown — "checked" alone would not tell a
+ *   TalkBack user that this square writes.
+ */
+@Composable
+internal fun CornerSquare(
+    fit: SquareFit,
+    color: HabitColor,
+    filled: Boolean,
+    plus: Boolean,
+    action: Action,
+    description: String,
+) {
+    val size = fit.sizeDp.dp
+    val stroke = fit.strokeDp.dp
+    val colour = ColorProvider(color.resolveIn(HabitsDarkColors.habit))
+    Box(
+        modifier =
+            GlanceModifier
+                .size(fit.targetWidthDp.dp, SQUARE_TARGET_HEIGHT)
+                .clickable(action)
+                .semantics { contentDescription = description }
+                .padding(top = CARD_PADDING + (BADGE_SIZE - size) / 2, end = fit.endDp.dp),
+        contentAlignment = Alignment.TopEnd,
+    ) {
+        Box(
+            modifier =
+                GlanceModifier
+                    .size(size)
+                    .cornerRadius(size / DOT_CORNER_RATIO)
+                    .background(colour),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (!filled) {
+                Box(
+                    modifier =
+                        GlanceModifier
+                            .size(size - stroke * 2)
+                            .cornerRadius((size / DOT_CORNER_RATIO - stroke).coerceAtLeast(0.dp))
+                            .background(ColorProvider(HabitsDarkColorScheme.surfaceContainer)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (plus) {
+                        // Children of a Glance Box stack, so the two bars cross at the centre.
+                        val arm = size * PLUS_SHARE
+                        Box(GlanceModifier.size(arm, stroke).background(colour)) {}
+                        Box(GlanceModifier.size(stroke, arm).background(colour)) {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A 6dp dot gets the design system's 1dp corner; the ratio holds that proportion at every size. */
+internal const val DOT_CORNER_RATIO = 6f
+
+/** The square's touch target reaches from the card's top edge to the header's bottom: 48dp. */
+internal val SQUARE_TARGET_HEIGHT = CARD_PADDING + BADGE_SIZE
+
+/**
+ * How far the "+" reaches across the square: half of it, so a 13dp square draws a 6.5dp cross with
+ * room inside the outline on every side.
+ */
+private const val PLUS_SHARE = 0.5f
 
 /**
  * ⚠ **Every empty state here is a sentence, not blank space.** A widget outlives the screen that

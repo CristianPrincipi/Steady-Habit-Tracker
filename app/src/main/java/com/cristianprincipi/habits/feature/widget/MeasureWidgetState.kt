@@ -2,6 +2,7 @@ package com.cristianprincipi.habits.feature.widget
 
 import androidx.compose.ui.geometry.Offset
 import com.cristianprincipi.habits.domain.model.HabitColor
+import com.cristianprincipi.habits.domain.model.MeasureId
 
 /**
  * What one measure widget shows — resolved before any Glance composition runs (M15.6d).
@@ -46,6 +47,10 @@ internal sealed interface MeasureWidgetState {
      *   at its start, `1f` at today) and `y` the raw value. ⚠ **The x is already the reading's real
      *   position in time** — see `MeasureSeries.positionOf`. A drawing that spaced these evenly
      *   would turn four weigh-ins into a month of steady change.
+     * @param id what the corner square's dialog writes to (M16.3).
+     * @param today today's reading, or null when there is none yet — which is what draws the corner
+     *   square as an outline with a "+" rather than filled. Read off the same series as [points], so
+     *   the square and the line's last point cannot disagree about today.
      */
     data class Content(
         val name: String,
@@ -53,5 +58,7 @@ internal sealed interface MeasureWidgetState {
         val average: Double?,
         val unit: String,
         val points: List<Offset>,
+        val id: MeasureId,
+        val today: Double?,
     ) : MeasureWidgetState
 }
