@@ -10,11 +10,11 @@ or adapt one you already have.
 | --- | --- | --- | --- |
 | The day | **Date** | Yes, one | Identifies which day a page is. Date only, no time. |
 | Each habit | **Checkbox** | At least one | One habit per checkbox. The property name is the habit name, and a leading emoji becomes its icon. |
-| Numbers to track | **Number** | No | Shown as daily averages and trends. Read-only: the app never writes a number back. |
+| Numbers to track | **Number** | No | Shown day by day on Week, as averages and as trends. A value typed in the app is written to its day's page. |
 | Anything else | Any type | No | Ignored and left exactly as it is. |
 
 Property **names are yours to choose**. During setup you tell the app which date is the day, which
-checkboxes are habits and which numbers to average. That mapping is stored by Notion's property ID,
+checkboxes are habits and which numbers to track. That mapping is stored by Notion's property ID,
 so renaming a column in Notion later does not break sync.
 
 Steady never changes the database's structure. To add, rename or remove a habit, edit the checkbox

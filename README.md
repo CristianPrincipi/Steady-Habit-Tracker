@@ -11,9 +11,9 @@
   <img src="docs/images/made-for-notion-black.png" alt="Made for Notion" height="44">
 </picture>
 
-Check your habits off each day and see streaks, a month, a year and completion rates. Your habits
-live in a Notion database of your own; Steady keeps a copy on the phone so it works with no signal,
-and syncs both ways whenever it can reach Notion.
+Check your habits off each day, type in numbers such as weight or sleep, and see streaks, a month,
+a year and completion rates. Your habits live in a Notion database of your own; Steady keeps a copy
+on the phone so it works with no signal, and syncs both ways whenever it can reach Notion.
 
 Steady is not on Google Play. To use it, build it from source as described under [Setup](#setup).
 
@@ -21,23 +21,24 @@ Steady is not on Google Play. To use it, build it from source as described under
 
 | Week | Month | Year | Your habits | Widgets |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="docs/images/week.png" alt="Week view with one row of day pills per habit" width="170"> | <img src="docs/images/month.png" alt="Month view with a dot grid per habit" width="170"> | <img src="docs/images/year.png" alt="Year view with completion rates" width="170"> | <img src="docs/images/habits.png" alt="Habit order and colour settings" width="170"> | <img src="docs/images/widgets.png" alt="Home screen widgets" width="170"> |
+| <img src="docs/images/week.png" alt="Week view with the habit cards and a row of values per number" width="170"> | <img src="docs/images/month.png" alt="Month view with a dot grid per habit" width="170"> | <img src="docs/images/year.png" alt="Year view with completion rates" width="170"> | <img src="docs/images/habits.png" alt="Habit order and colour settings" width="170"> | <img src="docs/images/widgets.png" alt="Home screen widgets" width="170"> |
 
 ## Features
 
 - **Week** is the landing tab: one row of day pills per habit, today ringed. Tap to check off, tap
-  again to undo. Pull down to sync.
+  again to undo. Under the habits, each number you track has a row of daily values: tap a day to
+  type its value, change it or clear it. Pull down to sync.
 - **Month** and **Year** show each habit as a dot grid, with a count and a completion rate.
 - **Stats** per habit: completed days, completion rate, current and best streak, and a monthly
   completions chart. Number properties you choose (weight, sleep, anything) are shown as daily
   averages over the last 30 days.
 - **Home screen widgets**: *Habit grid*, a year of one habit as dots, with a square in the corner
   that checks today off without opening the app; and *Number trend*, one number's last 30 days as a
-  line.
-- **Two-way Notion sync**, offline-first. A check-off is saved on the phone immediately and sent to
-  Notion afterwards; changes made in Notion are pulled down.
+  line, with a square that opens today's value for typing.
+- **Two-way Notion sync**, offline-first. A check-off or a typed number is saved on the phone
+  immediately and sent to Notion afterwards; changes made in Notion are pulled down.
 - **Property mapping**: you choose which date property is the day, which checkboxes are habits and
-  which numbers to average. No property name is hardcoded.
+  which numbers to track. No property name is hardcoded.
 - **Habit order and colour** are set in the app and stay on the phone.
 - **Sync status** in Settings: last result, errors with a retry, *Sync now*, replace the token, edit
   the mapping, disconnect.
@@ -72,7 +73,7 @@ Every version is pinned in [`gradle/libs.versions.toml`](gradle/libs.versions.to
 ```mermaid
 flowchart LR
     UI["Compose screens<br/>+ Glance widgets"] -- observe Flow --> Room[(Room)]
-    UI -- check-off --> Room
+    UI -- "check-off, number" --> Room
     Room <--> Engine["SyncEngine<br/>(WorkManager)"]
     Engine <--> Api["NotionApi<br/>(Ktor)"]
     Api <--> Notion[("api.notion.com")]
@@ -81,12 +82,14 @@ flowchart LR
 - **Room is the source of truth for the UI.** No screen and no ViewModel waits on the network to
   render.
 - **A check-off succeeds immediately and locally**, online or not. The day is marked as pending and
-  pushed at the next sync.
+  pushed at the next sync. A typed number is pending on its own, so sending it never re-sends the
+  day's checkboxes.
 - **Sync runs in WorkManager**: each time the app comes to the front, every 15 minutes, and on demand
   (pull-to-refresh or *Sync now*), with a network constraint and exponential backoff. One run at a
   time.
 - **Pull is incremental** (only pages edited since the last successful sync). **Conflicts resolve
-  last-write-wins per day**, and the sync screen says so when a local edit loses.
+  last-write-wins**, per day for checkboxes and per value for numbers, and the sync screen says so
+  when a local edit loses.
 - **The mapping is validated before every sync.** A property that was retyped or deleted in Notion
   pauses sync with a message; the app never writes a null over real data.
 - **Requests are throttled** to about three per second, and a `429` is retried after the delay Notion
@@ -144,7 +147,7 @@ Gradle 9.7.1 comes with the wrapper; you do not need to install it.
    | --- | --- | --- |
    | The day (any name, for example `Date`) | Date | Yes |
    | One per habit (any name, for example `📖 Read`) | Checkbox | At least one |
-   | Numbers to average (any name, for example `Weight`) | Number | No |
+   | Numbers to track (any name, for example `Weight`) | Number | No |
 
    Names are yours to choose, because you map them in the app. The full example database, with every
    property and option, is in [`docs/notion-setup.md`](docs/notion-setup.md).
@@ -188,7 +191,7 @@ APK is produced unsigned and never falls back to the debug key.
 | "No database is shared with this connection yet." or an empty database list | `404` | The database is not shared with the connection. Open it in Notion → `•••` → *Add connections*. Notion answers *not found* here, not *forbidden*. |
 | "Notion is busy or having trouble." | `429` or `5xx` | Usually nothing to do. The app waits for the delay Notion asks for and retries by itself; this message appears only if it is still failing after several attempts. |
 | "Your database has changed since it was set up." | – | A mapped property was retyped or deleted. Fix it in Notion or re-map it in *Settings → Your habits*. |
-| "Couldn't reach Notion." | – | No connection. Check-offs are kept on the phone and sent at the next sync. |
+| "Couldn't reach Notion." | – | No connection. Check-offs and numbers are kept on the phone and sent at the next sync. |
 | The database is missing from the list | – | A database shared a moment ago can take a minute to appear. Paste its link instead. |
 
 ## Roadmap
