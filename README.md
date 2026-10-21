@@ -15,7 +15,9 @@ Check your habits off each day, type in numbers such as weight or sleep, and see
 a year and completion rates. Your habits live in a Notion database of your own; Steady keeps a copy
 on the phone so it works with no signal, and syncs both ways whenever it can reach Notion.
 
-Steady is not on Google Play. To use it, build it from source as described under [Setup](#setup).
+Steady is not on Google Play. Download the APK from
+[Releases](https://github.com/CristianPrincipi/Steady-Habit-Tracker/releases/latest), or build it from source
+as described under [Setup](#setup).
 
 ## Screenshots
 
@@ -128,6 +130,12 @@ Gradle 9.7.1 comes with the wrapper; you do not need to install it.
 
 ## Setup
 
+### Install the app
+
+Either download `Steady-<version>.apk` from the
+[latest release](https://github.com/CristianPrincipi/Steady-Habit-Tracker/releases/latest) and open it on your
+phone (Android asks you to allow installs from your browser or file manager), or build it:
+
 1. **Clone the repository.**
 
    ```bash
@@ -137,11 +145,22 @@ Gradle 9.7.1 comes with the wrapper; you do not need to install it.
 2. **Open it in Android Studio** and let Gradle sync. Android Studio writes `local.properties` with
    your SDK location; that file is gitignored.
 
-3. **Create a Notion token.** In Notion's developer portal, create a personal access token (Notion's
+3. **Build and run.**
+
+   ```bash
+   ./gradlew installDebug
+   ```
+
+   A debug build has the same package name as the APK from Releases but is signed with another key,
+   so Android won't install one over the other. Uninstall the one on the phone first.
+
+### Connect Notion
+
+1. **Create a Notion token.** In Notion's developer portal, create a personal access token (Notion's
    current name for an internal integration token). It starts with `ntn_`, and Notion shows it only
    once, so copy it. The connection needs permission to read, update and insert content.
 
-4. **Create the database.** Steady expects one page per day, with these properties:
+2. **Create the database.** Steady expects one page per day, with these properties:
 
    | Property | Type | Required |
    | --- | --- | --- |
@@ -152,16 +171,10 @@ Gradle 9.7.1 comes with the wrapper; you do not need to install it.
    Names are yours to choose, because you map them in the app. The full example database, with every
    property and option, is in [`docs/notion-setup.md`](docs/notion-setup.md).
 
-5. **Connect the token to the database.** In Notion, open the database → `•••` → *Add connections*,
+3. **Connect the token to the database.** In Notion, open the database → `•••` → *Add connections*,
    and add your connection. A valid token cannot see a database until you do this.
 
-6. **Build and run.**
-
-   ```bash
-   ./gradlew installDebug
-   ```
-
-7. **Paste the token in the app.** On first launch Steady asks for the token, lists the databases it
+4. **Paste the token in the app.** On first launch Steady asks for the token, lists the databases it
    can reach (or takes a pasted database link), and asks which columns are the day, the habits and
    the numbers. The token is entered in the app only. It is never read from `local.properties`, a
    Gradle property or the build.
